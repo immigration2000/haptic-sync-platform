@@ -1,0 +1,83 @@
+<section class="container">
+    <a href="/bj" class="text-faint" style="font-size:13px;">← 스트리머 목록</a>
+
+    <div class="list-header" style="margin-top:8px;">
+        <div>
+            <div class="section-eyebrow">스트리머 영상 라이브러리</div>
+            <h1 class="section-title" style="margin-bottom:4px;"><%= bj.stage_name %></h1>
+            <% if (bj.description) { %><p class="text-dim" style="margin:0;"><%= bj.description %></p><% } %>
+        </div>
+    </div>
+
+    <% if (typeof error !== 'undefined' && error) { %><div class="flash-error mt-3"><%= error %></div><% } %>
+    <% if (typeof ok !== 'undefined' && ok) { %>
+        <div class="flash-error mt-3" style="background:rgba(0,220,130,0.1);border-color:rgba(0,220,130,0.3);color:#5EFFB0;">✓ <%= ok %></div>
+    <% } %>
+
+    <!-- 구독 박스 -->
+    <div class="card card-body mt-4" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+            <div class="panel-title" style="margin-bottom:4px;">멤버십 구독</div>
+            <% if (isOwner) { %>
+                <p class="text-dim" style="margin:0;font-size:13px;">내 라이브러리입니다. 영상 가격·구독가는 <a href="/bj-studio/profile">스튜디오</a>에서 설정하세요.</p>
+            <% } else if (sub) { %>
+                <p class="text-dim" style="margin:0;font-size:13px;">
+                    <span style="color:var(--c-green);font-weight:600;">● 구독 중</span> — <%= (sub.end_at || '').slice(0,10) %>까지 · 모든 영상 무료 시청
+                </p>
+            <% } else if (bj.sub_price > 0) { %>
+                <p class="text-dim" style="margin:0;font-size:13px;">구독하면 <strong><%= bj.sub_days %>일</strong>간 이 스트리머의 모든 영상을 자유롭게 볼 수 있어요.</p>
+            <% } else { %>
+                <p class="text-dim" style="margin:0;font-size:13px;">이 스트리머는 현재 구독을 제공하지 않습니다. (영상별 개별구매만 가능)</p>
+            <% } %>
+        </div>
+        <% if (!isOwner && !sub && bj.sub_price > 0) { %>
+            <form method="POST" action="/bj/<%= bj.id %>/subscribe" style="margin:0;">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-primary">구독하기 · <%= bj.sub_price.toLocaleString() %> Ruby / <%= bj.sub_days %>일</button>
+            </form>
+        <% } else if (!isOwner && sub) { %>
+            <form method="POST" action="/bj/<%= bj.id %>/subscribe" style="margin:0;">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="btn btn-secondary">연장 · <%= bj.sub_price.toLocaleString() %> Ruby</button>
+            </form>
+        <% } %>
+    </div>
+
+    <!-- 영상 목록 -->
+    <h2 class="section-title" style="font-size:18px;margin:28px 0 12px;">영상 <%= videos.length %>편</h2>
+    <% if (!videos.length) { %>
+        <div class="text-center text-faint" style="padding:60px 0;">아직 업로드된 영상이 없습니다.</div>
+    <% } else { %>
+        <div class="grid-list">
+            <% videos.forEach(v => { %>
+                <div class="card content-card" style="cursor:default;">
+                    <div class="content-thumb" style="position:relative;">
+                        <% if (v.locked) { %>
+                            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:2;font-size:28px;">🔒</div>
+                        <% } %>
+                        <div class="duration"><%= v.script_path ? '✓ 디바이스 연동' : '' %></div>
+                    </div>
+                    <div class="content-info">
+                        <div class="content-title"><%= v.title %></div>
+                        <div class="content-tags" style="margin-top:8px;">
+                            <% if (!v.locked) { %>
+                                <a href="/bj/vid/<%= v.id %>" class="btn btn-sm btn-primary">▶ 시청</a>
+                                <% if (v.accessReason === 'OWNER') { %><span class="tag">내 영상</span>
+                                <% } else if (v.accessReason === 'SUBSCRIBED') { %><span class="badge badge-multi">구독</span>
+                                <% } else if (v.accessReason === 'PURCHASED') { %><span class="badge badge-multi">구매함</span><% } %>
+                            <% } else if (v.price > 0) { %>
+                                <form method="POST" action="/bj/vid/<%= v.id %>/purchase" style="margin:0;display:inline;">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <button class="btn btn-sm btn-secondary">구매 · <%= v.price.toLocaleString() %> Ruby</button>
+                                </form>
+                                <span class="text-faint" style="font-size:11px;display:block;margin-top:4px;">또는 구독 시 무료</span>
+                            <% } else { %>
+                                <span class="tag">🔒 구독 전용</span>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</section>

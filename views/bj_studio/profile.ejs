@@ -1,0 +1,137 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">스트리머 STUDIO · 프로필</div>
+            <h1 class="section-title">프로필 편집</h1>
+
+            <% if (typeof error !== 'undefined' && error) { %><div class="flash-error"><%= error %></div><% } %>
+            <% if (typeof ok !== 'undefined' && ok) { %>
+                <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">✓ <%= ok %></div>
+            <% } %>
+
+            <div class="card card-body">
+                <form method="POST" action="/bj-studio/profile">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-row">
+                        <label class="form-label">활동명 (스테이지명)</label>
+                        <input class="form-input" type="text" name="stage_name" value="<%= profile.stage_name %>" required maxlength="30">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">자기 소개 (사용자가 카드에서 보는 텍스트)</label>
+                        <textarea class="form-input" name="description" rows="3" maxlength="300"><%= profile.description %></textarea>
+                    </div>
+                    <div class="grid grid-2 gap-3">
+                        <div class="form-row">
+                            <label class="form-label">분당 요금 (Ruby) — 50~1000</label>
+                            <input class="form-input" type="number" name="rate_per_minute" value="<%= profile.rate_per_minute %>" min="50" max="1000" required>
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">태그 (콤마 구분)</label>
+                            <input class="form-input" type="text" name="tags" value="<%= profile.tags || '' %>" placeholder="#청순,#성숙,#텍니션" maxlength="100">
+                        </div>
+                    </div>
+                    <div class="grid grid-2 gap-3">
+                        <div class="form-row">
+                            <label class="form-label">무료 체험 시간 (초) — 0~120</label>
+                            <input class="form-input" type="number" name="free_preview_sec" value="<%= profile.free_preview_sec %>" min="0" max="120" step="10" required>
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">시간제 결제 단위 (분) — 1~60</label>
+                            <input class="form-input" type="number" name="session_block_min" value="<%= profile.session_block_min %>" min="1" max="60" required>
+                        </div>
+                    </div>
+                    <% const svc = (profile.services || 'call,cowatch,live-priv,broadcast').split(','); %>
+                    <div class="form-row">
+                        <label class="form-label">제공 서비스 (사용자가 선택 가능한 항목)</label>
+                        <div class="svc-grid">
+                            <label class="svc-item">
+                                <input type="checkbox" name="services" value="call" <%= svc.includes('call') ? 'checked' : '' %>>
+                                <div><strong>📞 통화</strong><span>음성 + 디바이스</span></div>
+                            </label>
+                            <label class="svc-item">
+                                <input type="checkbox" name="services" value="cowatch" <%= svc.includes('cowatch') ? 'checked' : '' %>>
+                                <div><strong>🎙 함께보기</strong><span>영상 동시 시청 + 음성</span></div>
+                            </label>
+                            <label class="svc-item">
+                                <input type="checkbox" name="services" value="live-priv" <%= svc.includes('live-priv') ? 'checked' : '' %>>
+                                <div><strong>🎬 비공개 라이브</strong><span>1:1 영상+음성+디바이스</span></div>
+                            </label>
+                            <label class="svc-item">
+                                <input type="checkbox" name="services" value="broadcast" <%= svc.includes('broadcast') ? 'checked' : '' %>>
+                                <div><strong>🔴 공개 라이브</strong><span>1:다수 송출</span></div>
+                            </label>
+                        </div>
+                        <p class="text-faint mt-2" style="font-size: 11px;">체크한 서비스만 사용자에게 표시되고 스튜디오에서 방송 시작 가능.</p>
+                    </div>
+
+                    <div class="card card-body mb-4" style="border-color: rgba(123,45,255,0.2);">
+                        <div class="panel-title">보이스 제공 옵션 (능력별 요금)</div>
+                        <p class="text-faint" style="font-size:11px; margin-bottom:10px;">통화는 항상 제공(위 '분당 요금'). 모니터링·캠은 0이면 미제공이며, 제공 시 사용자가 진입할 때 옵션으로 골라 그 요율로 결제합니다.</p>
+                        <div class="form-row" style="margin:0 0 10px;">
+                            <label class="form-label">🎬 모니터링 (사용자 영상 시청 + 스트리머 제어) 분당 — 0=미제공</label>
+                            <input class="form-input" type="number" name="rate_with_video" value="<%= profile.rate_with_video %>" min="0" max="2000" step="10">
+                        </div>
+                        <div class="form-row" style="margin:0;">
+                            <label class="form-label">📷 캠 (1:1 화상) 분당 — 0=미제공</label>
+                            <input class="form-input" type="number" name="rate_cam" value="<%= profile.rate_cam %>" min="0" max="2000" step="10">
+                        </div>
+                    </div>
+
+                    <div class="card card-body mb-4" style="border-color: rgba(0,220,130,0.2);">
+                        <div class="panel-title">영상 멤버십 구독</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label">구독 가격 (Ruby) — 0이면 구독 미제공</label>
+                                <input class="form-input" type="number" name="sub_price" value="<%= profile.sub_price %>" min="0" max="100000" step="100">
+                            </div>
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label">구독 기간 (일)</label>
+                                <input class="form-input" type="number" name="sub_days" value="<%= profile.sub_days %>" min="1" max="365">
+                            </div>
+                        </div>
+                        <p class="text-faint mt-2" style="font-size:11px;">구독자는 기간 내 내 업로드 영상을 모두 무료로 시청합니다. 비구독자는 영상별 개별구매(가격은 <a href="/bj-studio/videos">내 영상</a>에서 설정) 가능.</p>
+                    </div>
+
+                    <div class="card card-body mb-4" style="background: rgba(123,45,255,0.06); border-color: rgba(123,45,255,0.2);">
+                        <div class="mono text-faint" style="font-size: 12px;">미리보기</div>
+                        <p class="text-dim mt-2" style="font-size: 13px;">
+                            사용자는 <strong id="pv-free" style="color: var(--c-pink);"><%= profile.free_preview_sec %></strong>초 무료 체험 후,
+                            <strong id="pv-block" style="color: var(--c-pink);"><%= profile.session_block_min %></strong>분에
+                            <strong id="pv-cost" style="color: var(--c-yellow);"><%= (profile.rate_per_minute * profile.session_block_min).toLocaleString() %></strong> Ruby로 결제합니다.
+                        </p>
+                    </div>
+                    <button class="btn btn-primary">저장</button>
+                </form>
+            </div>
+
+            <div class="card card-body mt-5" style="background: rgba(255, 184, 94, 0.05);">
+                <div class="panel-title" style="color: var(--c-yellow);">💡 프로필 작성 팁</div>
+                <ul class="text-dim" style="padding-left: 20px; line-height: 1.8; font-size: 13px;">
+                    <li><strong>활동명</strong>: 사용자가 카드에서 처음 보는 이름. 기억에 남는 짧은 형태가 좋습니다.</li>
+                    <li><strong>자기 소개</strong>: 1~2문장. 분위기·스타일을 함축적으로.</li>
+                    <li><strong>요금</strong>: 신규는 100~150 Ruby/분 추천. 평점·후기 쌓이면 인상.</li>
+                    <li><strong>태그</strong>: 3개 이내 권장. 검색·필터에 사용됩니다.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+(function () {
+    const rate  = document.querySelector('input[name="rate_per_minute"]');
+    const free  = document.querySelector('input[name="free_preview_sec"]');
+    const block = document.querySelector('input[name="session_block_min"]');
+    const pvFree = document.getElementById('pv-free');
+    const pvBlock = document.getElementById('pv-block');
+    const pvCost = document.getElementById('pv-cost');
+    function upd() {
+        pvFree.textContent = free.value || 0;
+        pvBlock.textContent = block.value || 0;
+        pvCost.textContent = ((parseInt(rate.value||0) * parseInt(block.value||0)) || 0).toLocaleString();
+    }
+    [rate, free, block].forEach(el => el && el.addEventListener('input', upd));
+})();
+</script>

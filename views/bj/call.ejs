@@ -1,0 +1,108 @@
+<section class="container">
+    <!-- 세션 룸: 영상 영역(스트리머가 틀면 표시) + 통화 사이드 -->
+    <div class="session-room">
+        <!-- 좌측: 영상 (영상 모드일 때만) / 통화 전용일 땐 스트리머 아바타 -->
+        <div class="session-stage">
+            <div id="session-call-view" class="session-callview">
+                <div class="bj-thumb session-avatar"><%= (bj.stage_name || '?').replace(/^BJ-?/,'').charAt(0) %></div>
+                <h1 class="player-title" style="margin-top: var(--sp-4);"><%= bj.stage_name %></h1>
+                <p class="text-dim mt-3"><%= bj.description %></p>
+                <div class="mt-3 mono" style="color: var(--c-yellow); font-size: 14px;"><%= bj.rate_per_minute %> Ruby / 분</div>
+            </div>
+            <div id="session-video-view" class="session-videoview hidden">
+                <video id="session-video" controls playsinline style="width:100%; height:100%; object-fit:contain; background:#000;"></video>
+                <div id="session-video-badge" class="session-video-badge hidden">🎬 스트리머가 재생 중</div>
+            </div>
+        </div>
+
+        <!-- 우측: 통화 컨트롤 -->
+        <aside class="session-side">
+            <div class="card card-body">
+                <div class="panel-title">통화 세션</div>
+                <div id="call-state" class="text-dim mb-3">대기 중 — "통화 시작"을 누르세요</div>
+                <div id="call-stats" class="mono text-faint" style="font-size: 12px; display: grid; grid-template-columns: 78px 1fr; gap: 6px 10px;">
+                    <span>모드</span><span id="call-mode">—</span>
+                    <span>시간</span><span id="call-elapsed">00:00</span>
+                    <span>디바이스</span><span id="call-device">—</span>
+                    <span>제어</span><span id="call-ctrl">스트리머 수동</span>
+                    <span>수신</span><span id="call-recv-count">0 cmd</span>
+                </div>
+
+                <div class="form-row mt-4" id="tier-select">
+                    <label class="form-label">옵션 선택</label>
+                    <label class="svc-item" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="tier" value="call" checked>
+                        <div><strong>📞 통화</strong> <span class="text-faint" style="font-size:12px;">음성 + 디바이스 — <%= bj.rate_per_minute %> Ruby/분</span></div>
+                    </label>
+                    <% if (bj.rate_with_video > 0) { %>
+                    <label class="svc-item" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;">
+                        <input type="radio" name="tier" value="video">
+                        <div><strong>🎬 모니터링</strong> <span class="text-faint" style="font-size:12px;">영상 시청 + 스트리머 제어 — <%= bj.rate_with_video %> Ruby/분</span></div>
+                    </label>
+                    <% } %>
+                    <% if (bj.rate_cam > 0) { %>
+                    <label class="svc-item" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;">
+                        <input type="radio" name="tier" value="cam">
+                        <div><strong>📷 캠</strong> <span class="text-faint" style="font-size:12px;">1:1 화상 — <%= bj.rate_cam %> Ruby/분</span></div>
+                    </label>
+                    <% } %>
+                    <p class="text-faint mt-2" style="font-size:11px;">스트리머가 제공하는 옵션 중 선택하세요. 화면 전환·제어는 스트리머가 진행합니다.</p>
+                </div>
+
+                <div class="flex gap-3 mt-5" id="call-actions-start">
+                    <button id="btn-start" class="btn btn-primary btn-lg btn-block">통화 시작</button>
+                </div>
+                <div class="flex gap-2 mt-5 hidden" id="call-actions-live">
+                    <button id="btn-mic" class="btn btn-secondary" style="flex:1;">🎤 마이크</button>
+                    <button id="btn-hangup" class="btn btn-ghost" style="flex:1; background: rgba(255,80,80,0.1); border-color: rgba(255,80,80,0.4); color: #FFB8B8;">종료</button>
+                </div>
+            </div>
+
+            <div class="card card-body" style="margin-top: var(--sp-4);">
+                <div class="panel-title">안내</div>
+                <p class="text-faint" style="font-size: 12px; line-height: 1.6;">
+                    무료 체험 후 결제하면 통화가 이어집니다.<br>
+                    이후 <strong>스트리머가 영상을 틀어주거나 디바이스를 직접 조작</strong>합니다. 영상·제어 전환 권한은 스트리머에게 있습니다.
+                </p>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<style>
+.session-room { display: grid; grid-template-columns: 1fr 340px; gap: var(--sp-5); padding: var(--sp-5) 0; }
+@media (max-width: 1000px) { .session-room { grid-template-columns: 1fr; } }
+.session-stage {
+    background: #000; border-radius: var(--rad-md); overflow: hidden;
+    aspect-ratio: 16/9; position: relative;
+    display: flex; align-items: center; justify-content: center;
+}
+.session-callview { text-align: center; padding: var(--sp-5); }
+.session-avatar {
+    width: 120px; height: 120px; border-radius: 50%; margin: 0 auto;
+    font-size: 48px; box-shadow: 0 16px 48px rgba(255,45,94,0.35);
+    animation: callPulse 2s ease-in-out infinite;
+}
+@keyframes callPulse { 0%,100%{box-shadow:0 16px 48px rgba(255,45,94,0.35);} 50%{box-shadow:0 20px 64px rgba(255,45,94,0.65);} }
+.session-videoview { position: absolute; inset: 0; }
+.session-video-badge {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(0,0,0,0.7); border: 1px solid rgba(255,45,94,0.5);
+    color: #FF4B7A; font-size: 12px; padding: 4px 10px; border-radius: 6px;
+    font-family: var(--font-mono);
+}
+.hidden { display: none !important; }
+</style>
+
+<script>
+window.__BJ_CALL__ = {
+    bjId:   <%= bj.id %>,
+    bjName: "<%= bj.stage_name %>",
+};
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/vendor/simple-peer.min.js"></script>
+<script src="/js/core/device.js"></script>
+<script src="/js/core/funscript.js"></script>
+<script src="/js/core/bj_session.js"></script>
+<script src="/js/pages/bj_call.js?v=2"></script>

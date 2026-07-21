@@ -1,0 +1,83 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <h1 class="section-title">콘텐츠 관리</h1>
+
+            <% if (req.query && req.query.added) { %>
+                <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">✓ 콘텐츠 추가 완료</div>
+            <% } %>
+
+            <div class="card card-body mb-5">
+                <div class="panel-title">새 콘텐츠 추가</div>
+                <p class="text-faint mb-4" style="font-size:12px;">⚠ 파일은 SSH/FTP로 <code>public/content/{vods|vrs}/</code>에 먼저 업로드 후 경로 입력.</p>
+                <form method="POST" action="/admin/contents/add">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="grid grid-2 gap-3">
+                        <div class="form-row">
+                            <label class="form-label">타입</label>
+                            <select class="form-select" name="type">
+                                <option value="vod">VOD (2D)</option>
+                                <option value="vr">VR (360°)</option>
+                                <option value="volumetric">볼륨메트릭</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">가격 (Ruby)</label>
+                            <input class="form-input" type="number" name="price" value="0">
+                        </div>
+                    </div>
+                    <div class="form-row"><label class="form-label">제목</label><input class="form-input" type="text" name="title" required></div>
+                    <div class="form-row"><label class="form-label">설명</label><textarea class="form-input" name="description" rows="2"></textarea></div>
+                    <div class="form-row"><label class="form-label">제작자</label><input class="form-input" type="text" name="creator"></div>
+                    <div class="grid grid-2 gap-3">
+                        <div class="form-row">
+                            <label class="form-label">영상 경로</label>
+                            <input class="form-input" type="text" name="video_path" placeholder="/content/vods/xxx.mp4" required>
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">스크립트 경로 (옵션)</label>
+                            <input class="form-input" type="text" name="script_path" placeholder="/content/vods/xxx.funscript">
+                        </div>
+                    </div>
+                    <div class="grid grid-2 gap-3">
+                        <div class="form-row">
+                            <label class="form-label">썸네일 경로</label>
+                            <input class="form-input" type="text" name="thumbnail_path" placeholder="/content/thumbnails/xxx.jpg">
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">길이 (초)</label>
+                            <input class="form-input" type="number" name="duration_sec" value="0">
+                        </div>
+                    </div>
+                    <div class="form-row"><label class="form-label">태그 (콤마 구분)</label><input class="form-input" type="text" name="tags" placeholder="#태그1,#태그2"></div>
+                    <label class="form-checkbox"><input type="checkbox" name="multi_axis"> 다축 funscript</label>
+                    <button class="btn btn-primary mt-4">추가</button>
+                </form>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">전체 콘텐츠 (<%= contents.length %>)</div>
+                <div style="overflow-x: auto;">
+                    <table class="tx-table">
+                        <thead><tr><th>ID</th><th>타입</th><th>제목</th><th>제작자</th><th>길이</th><th>가격</th><th>조회</th></tr></thead>
+                        <tbody>
+                            <% contents.forEach(c => { %>
+                                <tr>
+                                    <td class="mono"><%= c.id %></td>
+                                    <td><span class="badge"><%= c.type %></span></td>
+                                    <td><a href="/content/play/<%= c.id %>" target="_blank"><%= c.title %></a></td>
+                                    <td><%= c.creator %></td>
+                                    <td class="mono"><%= Math.floor(c.duration_sec/60) %>:<%= String(c.duration_sec%60).padStart(2,'0') %></td>
+                                    <td class="mono"><%= c.price %></td>
+                                    <td class="mono"><%= c.view_count %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

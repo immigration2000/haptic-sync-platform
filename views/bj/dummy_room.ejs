@@ -1,0 +1,68 @@
+<section class="container">
+    <div class="player-wrap">
+        <div>
+            <div class="player-video">
+                <video controls autoplay muted loop playsinline
+                       src="<%= room.looping_video %>" style="width:100%; aspect-ratio: 16/9; background:#000;"></video>
+            </div>
+            <div class="player-info">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="badge" style="background: rgba(255,80,80,0.2); color: #FF8080; border: 1px solid rgba(255,80,80,0.4);">🔴 LIVE</span>
+                    <span class="badge">데모 룸</span>
+                </div>
+                <h1 class="player-title"><%= room.stage_name %></h1>
+                <div class="player-creator"><%= room.description %></div>
+                <p class="text-faint mt-4" style="font-size: 12px;">⚠ 데모용 가상 방송 — 실제 스트리머가 송출 중이 아닙니다. 영상 자동 재생만 됩니다.</p>
+            </div>
+        </div>
+
+        <aside class="player-side">
+            <div class="panel">
+                <div class="panel-title">ROOM INFO</div>
+                <div class="mono text-faint" style="font-size:12px; display:grid; grid-template-columns: 100px 1fr; gap:6px 12px;">
+                    <span>요금</span><span style="color: var(--c-yellow);"><%= room.rate_per_minute %> Rb/분</span>
+                    <span>시청자</span><span><%= room.viewer_count %>명</span>
+                    <span>평점</span><span><%= room.rating_avg.toFixed(1) %> ★</span>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">CHAT (DEMO)</div>
+                <div style="background:var(--bg-0); border-radius:8px; padding:12px; height:240px; overflow-y:auto; font-size:13px;" id="chat-log">
+                    <div style="margin-bottom:6px;"><span style="color:var(--c-pink); font-weight:600;">시스템</span> <span class="text-dim">${room.stage_name}의 라이브에 입장했습니다.</span></div>
+                </div>
+                <div class="flex gap-2 mt-3">
+                    <input id="chat-inp" placeholder="채팅…" style="flex:1; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:6px; color:white; padding:8px 10px; font-size:12px;">
+                    <button id="chat-send" class="btn btn-secondary btn-sm">전송</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<script>
+(function () {
+    const log = document.getElementById('chat-log');
+    const inp = document.getElementById('chat-inp');
+    const btn = document.getElementById('chat-send');
+    function append(sender, text, color) {
+        const div = document.createElement('div');
+        div.style.marginBottom = '6px';
+        div.innerHTML = `<span style="color: ${color || 'var(--c-pink)'}; font-weight: 600;">${sender}</span> <span class="text-dim">${text}</span>`;
+        log.appendChild(div); log.scrollTop = log.scrollHeight;
+    }
+    function send() { const t = inp.value.trim(); if (!t) return; append('나', t, '#5EFFB0'); inp.value = ''; }
+    btn.addEventListener('click', send);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+    // 가짜 다른 시청자 메시지
+    const FAKE = ['ㅎㅇ', '오늘 너무 예쁨ㅠ', '디바이스 동기 미쳤다', '강도 좀 올려주세요', '신청곡 받아요?', '돈쭐 내드림 ㅋㅋ', '+1', 'gg'];
+    const NAMES = ['빨강곰', '소금빵', '심야편의점', 'lover99', '맥주한잔'];
+    function fakeMsg() {
+        const n = NAMES[Math.floor(Math.random() * NAMES.length)];
+        const m = FAKE[Math.floor(Math.random() * FAKE.length)];
+        append(n, m, '#5EB6FF');
+    }
+    setTimeout(fakeMsg, 3000);
+    setInterval(fakeMsg, 7000 + Math.random() * 8000);
+})();
+</script>

@@ -1,0 +1,54 @@
+<section class="container">
+    <div class="player-wrap">
+        <div>
+            <div class="player-video">
+                <video id="bj-video" autoplay playsinline style="width:100%; aspect-ratio: 16/9; background: #000;"></video>
+            </div>
+            <div class="player-info">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="badge" style="background: rgba(255,80,80,0.2); color: #FF8080; border: 1px solid rgba(255,80,80,0.4);">🔴 LIVE</span>
+                    <span class="badge">공개 방송</span>
+                </div>
+                <h1 class="player-title"><%= bj.stage_name %></h1>
+                <div class="player-creator"><%= bj.description %></div>
+            </div>
+        </div>
+
+        <aside class="player-side">
+            <div class="panel">
+                <div class="panel-title">LIVE STATUS</div>
+                <div id="w-state" class="text-dim mb-3" style="font-size: 13px;">방송 합류 중…</div>
+                <div class="mono text-faint" style="font-size: 12px; display: grid; grid-template-columns: 100px 1fr; gap: 6px 12px;">
+                    <span>요금</span><span style="color: var(--c-yellow);">시청 무료 (후원만)</span>
+                    <span>시간</span><span id="w-elapsed">00:00</span>
+                    <span>동시 시청</span><span id="w-viewer-count">—</span>
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button id="btn-leave" class="btn btn-ghost btn-sm" style="flex:1;">나가기</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">디바이스</div>
+                <div id="w-dev-status" class="text-dim" style="font-size: 13px;">우상단 메뉴에서 디바이스를 연결하면 스트리머의 실시간 제어를 받습니다.</div>
+                <div class="mono text-faint" style="font-size: 11px; margin-top: 8px;">스트리머 제어 수신 <span id="w-dev-recv">0</span> cmd</div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">CHAT</div>
+                <div id="chat-log" style="height:240px; overflow-y:auto; background:var(--bg-0); border:1px solid var(--border-soft); border-radius:8px; padding:10px; font-size:12px;"></div>
+                <div class="flex gap-2 mt-3">
+                    <input id="chat-input" placeholder="채팅…" style="flex:1; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:6px; color:white; padding:8px 10px; font-size:12px;">
+                    <button id="chat-send" class="btn btn-secondary btn-sm">전송</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<script>
+window.__WATCH__ = { bjUserId: <%= bj.id %>, bjName: "<%= bj.stage_name %>", myName: "<%= user.nickname %>" };
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/vendor/simple-peer.min.js"></script>
+<script src="/js/pages/watch.js?v=2"></script>

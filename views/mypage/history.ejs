@@ -1,0 +1,31 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_layout_helper') %>
+
+        <div>
+            <div class="card card-body">
+                <div class="panel-title">최근 시청</div>
+                <% if (!items.length) { %>
+                    <div class="text-faint text-center" style="padding: 60px 0;">아직 시청한 영상이 없습니다.</div>
+                <% } else { %>
+                    <div class="grid grid-auto">
+                        <% items.forEach(it => { %>
+                            <a class="card content-card" href="/content/play/<%= it.id %>">
+                                <div class="content-thumb">
+                                    <% if (it.thumbnail_path) { %><img src="<%= it.thumbnail_path %>" alt="" onerror="this.style.display='none'"><% } %>
+                                </div>
+                                <div class="content-info">
+                                    <div class="content-title"><%= it.title %></div>
+                                    <div class="content-meta">
+                                        <span><%= Math.floor(it.last_position / 60) %>:<%= String(Math.floor(it.last_position % 60)).padStart(2,'0') %> 시점</span>
+                                        <span>· <%= it.watched_at %></span>
+                                    </div>
+                                </div>
+                            </a>
+                        <% }) %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,212 @@
+/* PULSE Device UI — 사이트 전역 헤더 디바이스 컨트롤
+ * 기존 사이트 헤더에 자연스럽게 녹아드는 다크 알약 버튼
+ */
+
+.header-device-wrap {
+    position: relative;
+    margin-right: 16px;
+}
+
+.pulse-device-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.35);
+    color: rgba(255,255,255,0.85);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    font-family: inherit;
+}
+
+.pulse-device-btn:hover {
+    background: rgba(0,0,0,0.55);
+    border-color: rgba(255,255,255,0.3);
+}
+
+.pulse-device-btn.connected {
+    background: rgba(0, 220, 130, 0.15);
+    border-color: rgba(0, 220, 130, 0.5);
+    color: #5EFFB0;
+}
+
+.pulse-device-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+}
+
+.pulse-device-btn.connected .pulse-device-dot {
+    background: #5EFFB0;
+    box-shadow: 0 0 8px rgba(94, 255, 176, 0.7);
+    animation: pulse-dev-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse-dev-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+/* Popover */
+.pulse-device-popover {
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    width: 320px;
+    background: rgba(20, 20, 26, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    z-index: 9999;
+    color: rgba(255,255,255,0.9);
+    font-family: 'Noto Sans KR', sans-serif;
+}
+.pulse-device-popover[hidden] { display: none; }
+
+.pulse-pop-arrow {
+    position: absolute;
+    top: -6px;
+    right: 28px;
+    width: 12px;
+    height: 12px;
+    background: rgba(20, 20, 26, 0.97);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    border-left: 1px solid rgba(255,255,255,0.1);
+    transform: rotate(45deg);
+}
+
+.pulse-pop-section { display: flex; flex-direction: column; gap: 12px; }
+.pulse-pop-section.pulse-hidden { display: none; }
+
+.pulse-pop-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.pulse-pop-desc {
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.55;
+    margin: 0;
+}
+
+.pulse-pop-hint {
+    font-size: 11px;
+    color: rgba(255, 80, 80, 0.85);
+    margin: 0;
+    min-height: 14px;
+}
+
+.pulse-pop-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+}
+
+.pulse-k {
+    color: rgba(255,255,255,0.5);
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+
+.pulse-v {
+    color: #fff;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 12px;
+    text-align: right;
+    word-break: break-all;
+}
+
+.pulse-ok { color: #5EFFB0; }
+
+.pulse-pop-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 4px 0;
+}
+
+.pulse-btn-primary {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, #FF2D5E 0%, #7B2DFF 100%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 4px 16px rgba(255, 45, 94, 0.25);
+    font-family: inherit;
+}
+.pulse-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(255, 45, 94, 0.4);
+}
+.pulse-btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.pulse-btn-secondary {
+    width: 100%;
+    padding: 11px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(123, 45, 255, 0.5);
+    background: rgba(123, 45, 255, 0.1);
+    color: #C8B8FF;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    font-family: inherit;
+}
+.pulse-btn-secondary:hover:not(:disabled) {
+    background: rgba(123, 45, 255, 0.2);
+    border-color: rgba(123, 45, 255, 0.8);
+}
+.pulse-btn-secondary:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.pulse-btn-primary:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.pulse-btn-ghost {
+    width: 100%;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.pulse-btn-ghost:hover {
+    background: rgba(255, 80, 80, 0.08);
+    border-color: rgba(255, 80, 80, 0.4);
+    color: #FFB8B8;
+}
+
+@media (max-width: 600px) {
+    .pulse-device-popover { width: calc(100vw - 24px); right: -100px; }
+}

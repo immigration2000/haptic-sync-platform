@@ -1,0 +1,31 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">스트리머 STUDIO · 기록</div>
+            <h1 class="section-title">통화 / 방송 기록</h1>
+
+            <div class="card card-body">
+                <% if (!calls.length) { %>
+                    <div class="text-faint text-center" style="padding: 80px 0;">아직 기록이 없습니다.<br><br><a href="/bj/console" class="btn btn-primary">통화 콘솔로 가기 →</a></div>
+                <% } else { %>
+                    <table class="tx-table">
+                        <thead><tr><th>일시</th><th>사용자</th><th>유형</th><th>지속</th><th>매출</th></tr></thead>
+                        <tbody>
+                            <% calls.forEach(c => { %>
+                                <tr>
+                                    <td class="mono text-faint" style="font-size:11px;"><%= c.started_at %></td>
+                                    <td><%= c.user_nick %></td>
+                                    <td><span class="badge"><%= c.kind || 'call' %></span></td>
+                                    <td class="mono"><%= Math.floor(c.duration_sec / 60) %>분 <%= c.duration_sec % 60 %>초</td>
+                                    <td class="mono amt-pos">+<%= (c.charged || 0).toLocaleString() %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</section>

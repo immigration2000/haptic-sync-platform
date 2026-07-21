@@ -1,0 +1,33 @@
+<section class="container">
+    <div class="section-eyebrow" style="margin-top:8px;">영상</div>
+    <%- include('_tabs') %>
+
+    <div class="list-header" style="margin-top:0;">
+        <div>
+            <h1 class="section-title" style="margin-bottom: 0;">스트리머 채널</h1>
+            <p class="text-dim" style="margin-top:6px;">스트리머별 영상 라이브러리. 구독하면 그 스트리머의 영상을 자유롭게 볼 수 있어요.</p>
+        </div>
+    </div>
+
+    <% if (!libraries.length) { %>
+        <div class="text-center text-faint" style="padding: 80px 0;">아직 영상을 올린 스트리머가 없습니다.</div>
+    <% } else { %>
+        <div class="grid-list">
+            <% libraries.forEach(s => { %>
+                <a class="card content-card" href="/bj/<%= s.user_id %>/library">
+                    <div class="content-thumb" style="display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#7B2DFF,#FF2D5E);">
+                        <span style="font-size:32px; font-weight:700; color:#fff;"><%= (s.stage_name || '?').charAt(0) %></span>
+                    </div>
+                    <div class="content-info">
+                        <div class="content-title"><%= s.stage_name %> 채널</div>
+                        <div class="content-meta"><span>영상 <%= s.video_count %>편</span></div>
+                        <div class="content-tags">
+                            <% if (s.sub_price > 0) { %><span class="badge badge-multi">구독 <%= s.sub_price.toLocaleString() %></span>
+                            <% } else { %><span class="tag">개별구매</span><% } %>
+                        </div>
+                    </div>
+                </a>
+            <% }) %>
+        </div>
+    <% } %>
+</section>

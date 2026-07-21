@@ -1,0 +1,88 @@
+<section class="container section">
+    <div class="text-center mb-6">
+        <div class="section-eyebrow">PRICING</div>
+        <h1 class="section-title">간단한 <span class="accent">요금제</span></h1>
+        <p class="section-sub" style="margin-left:auto;margin-right:auto;">월 구독 + 충전 Ruby 병행. 구독 가입 시 디바이스 연동 콘텐츠 무제한 시청.</p>
+    </div>
+
+    <div class="pricing-grid">
+        <div class="pricing-card">
+            <div class="pricing-tier">BASIC</div>
+            <div class="pricing-name">베이직</div>
+            <div class="pricing-price">9,900<span style="font-size:18px;">원</span></div>
+            <div class="pricing-period">/ 월</div>
+            <ul class="pricing-features">
+                <li>VOD 무제한 시청</li>
+                <li>디바이스 연동</li>
+                <li>1080p 화질</li>
+                <li>스트리머 통화 별도 과금</li>
+            </ul>
+            <% if (typeof user !== 'undefined' && user) { %>
+                <form method="POST" action="/mypage/subscribe">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="tier" value="basic">
+                    <button class="btn btn-secondary btn-block">구독하기</button>
+                </form>
+            <% } else { %>
+                <a href="/auth/register" class="btn btn-secondary btn-block">가입 후 구독</a>
+            <% } %>
+        </div>
+
+        <div class="pricing-card featured">
+            <div class="pricing-tier">PREMIUM</div>
+            <div class="pricing-name">프리미엄</div>
+            <div class="pricing-price">19,900<span style="font-size:18px;">원</span></div>
+            <div class="pricing-period">/ 월</div>
+            <ul class="pricing-features">
+                <li>모든 콘텐츠 (VOD + VR)</li>
+                <li>다축 funscript 지원</li>
+                <li>4K VR 화질</li>
+                <li>스트리머 통화 10% 할인</li>
+                <li>매월 1,000 Ruby 보너스</li>
+            </ul>
+            <% if (typeof user !== 'undefined' && user) { %>
+                <form method="POST" action="/mypage/subscribe">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="tier" value="premium">
+                    <button class="btn btn-primary btn-block">구독하기</button>
+                </form>
+            <% } else { %>
+                <a href="/auth/register" class="btn btn-primary btn-block">가입 후 구독</a>
+            <% } %>
+        </div>
+
+        <div class="pricing-card">
+            <div class="pricing-tier">VIP</div>
+            <div class="pricing-name">VIP</div>
+            <div class="pricing-price">39,900<span style="font-size:18px;">원</span></div>
+            <div class="pricing-period">/ 월</div>
+            <ul class="pricing-features">
+                <li>프리미엄 전체</li>
+                <li>볼륨메트릭 영상 (P4)</li>
+                <li>시뮬레이션 (P5)</li>
+                <li>스트리머 통화 20% 할인</li>
+                <li>매월 5,000 Ruby 보너스</li>
+                <li>우선 스트리머 매칭</li>
+            </ul>
+            <% if (typeof user !== 'undefined' && user) { %>
+                <form method="POST" action="/mypage/subscribe">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="tier" value="vip">
+                    <button class="btn btn-secondary btn-block">구독하기</button>
+                </form>
+            <% } else { %>
+                <a href="/auth/register" class="btn btn-secondary btn-block">가입 후 구독</a>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="card card-body text-center">
+        <div class="panel-title">RUBY · 충전형</div>
+        <p class="text-dim mb-4">스트리머 통화 / 후원 / 단건 구매에 사용. 마이페이지에서 충전.</p>
+        <% if (typeof user !== 'undefined' && user) { %>
+            <a href="/mypage/billing" class="btn btn-primary">Ruby 충전 →</a>
+        <% } else { %>
+            <a href="/auth/login" class="btn btn-primary">로그인 →</a>
+        <% } %>
+    </div>
+</section>

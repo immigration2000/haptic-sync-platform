@@ -1,0 +1,47 @@
+<section class="container section" style="max-width: 640px;">
+    <h1 class="section-title">신고하기</h1>
+    <p class="text-dim mb-5">불법 촬영물 / 아동 / 미성년자 / 기타 위반 신고. 24시간 내 처리.</p>
+
+    <% if (sent) { %>
+        <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">
+            ✓ 신고가 접수되었습니다. 검토 후 조치합니다.
+        </div>
+    <% } %>
+
+    <div class="card card-body">
+        <form method="POST" action="/support/report">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div class="form-row">
+                <label class="form-label">신고 대상</label>
+                <select class="form-select" name="target_type" required>
+                    <option value="">선택</option>
+                    <option value="content">콘텐츠 (VOD/VR)</option>
+                    <option value="bj">스트리머</option>
+                    <option value="user">사용자</option>
+                    <option value="other">기타</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label class="form-label">대상 ID (선택)</label>
+                <input class="form-input" type="number" name="target_id" placeholder="콘텐츠/스트리머 ID">
+            </div>
+            <div class="form-row">
+                <label class="form-label">사유</label>
+                <select class="form-select" name="reason_code" required>
+                    <option value="">선택</option>
+                    <option value="illegal">불법 촬영물</option>
+                    <option value="underage">미성년자 콘텐츠</option>
+                    <option value="abuse">욕설·폭력</option>
+                    <option value="spam">스팸·광고</option>
+                    <option value="copyright">저작권 침해</option>
+                    <option value="other">기타</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label class="form-label">상세 내용</label>
+                <textarea class="form-input" name="detail" rows="6" maxlength="500" required></textarea>
+            </div>
+            <button class="btn btn-primary" style="background: linear-gradient(135deg, #FF2D5E, #FF8080);">신고 접수</button>
+        </form>
+    </div>
+</section>

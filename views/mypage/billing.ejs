@@ -1,0 +1,49 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_layout_helper') %>
+
+        <div>
+            <div class="balance-card">
+                <div class="label">CURRENT BALANCE</div>
+                <div class="value"><%= (user.credits || 0).toLocaleString() %></div>
+                <div class="text-faint" style="font-size:12px;">Ruby</div>
+            </div>
+
+            <div class="card card-body mb-5">
+                <div class="panel-title">충전 (Mock)</div>
+                <p class="text-dim mb-4" style="font-size:13px;">실제 PG 연동은 추후. 현재는 데모용 즉시 적립.</p>
+                <form method="POST" action="/mypage/charge" class="flex gap-3" style="flex-wrap: wrap;">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" name="amount" value="5000"  class="btn btn-secondary">+5,000 Rb</button>
+                    <button type="submit" name="amount" value="10000" class="btn btn-secondary">+10,000 Rb</button>
+                    <button type="submit" name="amount" value="50000" class="btn btn-primary">+50,000 Rb</button>
+                    <button type="submit" name="amount" value="100000" class="btn btn-primary">+100,000 Rb</button>
+                </form>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">거래 내역</div>
+                <% if (!txs.length) { %>
+                    <div class="text-faint text-center" style="padding: 32px;">거래 내역이 없습니다.</div>
+                <% } else { %>
+                    <div style="overflow-x: auto;">
+                        <table class="tx-table">
+                            <thead><tr><th>일시</th><th>구분</th><th>금액</th><th>잔액</th><th>설명</th></tr></thead>
+                            <tbody>
+                                <% txs.forEach(t => { %>
+                                    <tr>
+                                        <td class="mono text-faint" style="font-size:11px;"><%= t.created_at %></td>
+                                        <td><%= t.type %></td>
+                                        <td class="mono <%= t.amount > 0 ? 'amt-pos' : 'amt-neg' %>"><%= t.amount > 0 ? '+' : '' %><%= t.amount.toLocaleString() %></td>
+                                        <td class="mono"><%= t.balance_after.toLocaleString() %></td>
+                                        <td class="text-dim"><%= t.description %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,27 @@
+<aside class="mypage-side">
+    <div class="profile-card">
+        <div class="avatar" style="background: var(--gradient-main);">
+            <%= (profile && profile.stage_name ? profile.stage_name.replace(/^BJ-?/,'').charAt(0) : '?') %>
+        </div>
+        <div class="name"><%= profile && profile.stage_name || user.nickname %></div>
+        <div class="email"><%= user.email %></div>
+        <div class="mt-3 mono" style="font-size: 11px; color: var(--c-yellow);">스트리머 STUDIO</div>
+    </div>
+    <ul class="menu">
+        <li><a href="/bj-studio"           class="<%= path === '/bj-studio' ? 'active' : '' %>">대시보드</a></li>
+        <li><a href="/bj-studio/profile"   class="<%= path.startsWith('/bj-studio/profile') ? 'active' : '' %>">프로필 편집</a></li>
+        <li><a href="/bj-studio/videos"    class="<%= path.startsWith('/bj-studio/videos') ? 'active' : '' %>">내 영상</a></li>
+        <li><a href="/bj-studio/earnings"  class="<%= path.startsWith('/bj-studio/earnings') ? 'active' : '' %>">수익 내역</a></li>
+        <li><a href="/bj-studio/calls"     class="<%= path.startsWith('/bj-studio/calls') ? 'active' : '' %>">통화 기록</a></li>
+        <li style="border-top: 1px solid var(--border-soft); margin-top: 8px; padding-top: 8px;">
+            <a href="/bj/console"   style="color: var(--c-pink);">📞 통화 콘솔 (방송 시작)</a>
+        </li>
+        <li>
+            <a href="/bj/broadcast" style="color: #FF8080;">🔴 공개 라이브 송출</a>
+        </li>
+        <li style="border-top: 1px solid var(--border-soft); margin-top: 8px; padding-top: 8px;">
+            <a href="/mypage">← 일반 마이페이지</a>
+        </li>
+        <li><a href="/auth/logout">로그아웃</a></li>
+    </ul>
+</aside>

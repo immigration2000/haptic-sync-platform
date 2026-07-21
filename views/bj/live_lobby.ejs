@@ -1,0 +1,69 @@
+<section class="container">
+    <div class="list-header">
+        <div>
+            <div class="section-eyebrow">PUBLIC LIVE · 진행 중</div>
+            <h1 class="section-title" style="margin-bottom:0;">LIVE 방송 — 시청 가능</h1>
+            <p class="text-dim mt-4">현재 송출 중인 스트리머. 시청 무료, 후원만 결제.</p>
+        </div>
+    </div>
+
+    <div id="lobby-list" class="grid-list">
+        <!-- 더미 방송 (서버 사이드 렌더) -->
+        <% if (dummyRooms && dummyRooms.length) { %>
+            <% dummyRooms.forEach(r => { %>
+                <a class="card bj-card" href="/bj/dummy/<%= r.id %>" style="border: 1px solid rgba(255,184,94,0.3);">
+                    <div class="bj-thumb" style="background: linear-gradient(135deg, #FFB85E, #FF2D5E);">
+                        <%= r.stage_name.replace(/^[^가-힯a-zA-Z]+/,'').charAt(0) %>
+                    </div>
+                    <div class="bj-info">
+                        <div class="bj-name"><%= r.stage_name %>
+                            <span class="badge" style="background:rgba(255,80,80,0.2); color:#FF8080; font-size:9px; padding:2px 6px; margin-left:6px;">🔴 LIVE</span>
+                        </div>
+                        <div class="bj-desc"><%= r.description %></div>
+                        <div class="bj-rate">
+                            <span style="color: var(--c-green);">● 방송중</span>
+                            <span><%= r.viewer_count %>명 시청</span>
+                        </div>
+                    </div>
+                </a>
+            <% }) %>
+        <% } %>
+        <!-- 실제 broadcaster (Socket.IO로 동적 추가) -->
+    </div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function () {
+    const socket = io();
+    const listEl = document.getElementById('lobby-list');
+    socket.emit('broadcast-lobby-enter');
+    function render(list) {
+        if (!list || !list.length) {
+            listEl.innerHTML = '<div class="text-faint text-center" style="padding: 80px 0; grid-column: 1 / -1;">진행 중인 방송이 없습니다.</div>';
+            return;
+        }
+        listEl.innerHTML = '';
+        for (const b of list) {
+            const div = document.createElement('a');
+            div.className = 'card bj-card';
+            div.href = `/bj/watch/${b.broadcasterUserId}`;
+            const initial = b.name.replace(/^BJ-?/, '').charAt(0);
+            div.innerHTML = `
+                <div class="bj-thumb">${initial}</div>
+                <div class="bj-info">
+                    <div class="bj-name">${b.name} <span class="badge" style="background:rgba(255,80,80,0.2); color:#FF8080; font-size:9px; padding:2px 6px; margin-left:6px;">🔴 LIVE</span></div>
+                    <div class="bj-desc">공개 방송 — 무료 시청</div>
+                    <div class="bj-rate">
+                        <span style="color: var(--c-green);">● 송출중</span>
+                        <span>${b.viewerCount}명 시청</span>
+                    </div>
+                </div>
+            `;
+            listEl.appendChild(div);
+        }
+    }
+    socket.on('broadcast-list',         (list) => render(list));
+    socket.on('broadcast-list-update',  (list) => render(list));
+})();
+</script>

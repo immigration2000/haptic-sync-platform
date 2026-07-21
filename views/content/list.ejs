@@ -1,0 +1,41 @@
+<section class="container">
+    <div class="section-eyebrow" style="margin-top:8px;">영상</div>
+    <%- include('_tabs') %>
+
+    <div class="list-header" style="margin-top:0;">
+        <div>
+            <h1 class="section-title" style="margin-bottom: 0;"><%= kind === 'vr' ? 'VR 영상' : 'VOD' %></h1>
+        </div>
+        <form class="list-search" method="GET">
+            <input type="text" name="q" placeholder="검색…" value="<%= query %>">
+        </form>
+    </div>
+
+    <% if (!items.length) { %>
+        <div class="text-center text-faint" style="padding: 80px 0;">결과가 없습니다.</div>
+    <% } else { %>
+        <div class="grid-list">
+            <% items.forEach(item => { %>
+                <a class="card content-card" href="/content/play/<%= item.id %>">
+                    <div class="content-thumb">
+                        <% if (item.thumbnail_path) { %><img src="<%= item.thumbnail_path %>" alt="" onerror="this.style.display='none'"><% } %>
+                        <div class="duration"><%= Math.floor(item.duration_sec / 60) %>:<%= String(item.duration_sec % 60).padStart(2,'0') %></div>
+                    </div>
+                    <div class="content-info">
+                        <div class="content-title"><%= item.title %></div>
+                        <div class="content-meta">
+                            <span><%= item.creator %></span>
+                            <span>·</span>
+                            <span><%= (item.view_count || 0).toLocaleString() %> 회</span>
+                        </div>
+                        <div class="content-tags">
+                            <% if (item.type === 'vr') { %><span class="badge badge-vr">VR 재투영</span><% } %>
+                            <% if (item.multi_axis) { %><span class="badge badge-multi">다축</span><% } %>
+                            <% (item.tags || '').split(',').filter(Boolean).slice(0,2).forEach(t => { %><span class="tag"><%= t.trim() %></span><% }) %>
+                        </div>
+                    </div>
+                </a>
+            <% }) %>
+        </div>
+    <% } %>
+</section>

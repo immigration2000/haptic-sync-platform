@@ -1,0 +1,35 @@
+<section class="auth-wrap">
+    <h1>회원가입</h1>
+    <p class="sub">가입 즉시 <strong style="color: var(--c-yellow)">1,000 Ruby</strong> 보너스 지급</p>
+
+    <% if (error) { %><div class="flash-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/auth/register">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-row">
+            <label class="form-label">이메일</label>
+            <input class="form-input" type="email" name="email" required>
+        </div>
+        <div class="form-row">
+            <label class="form-label">닉네임</label>
+            <input class="form-input" type="text" name="nickname" maxlength="20" required>
+        </div>
+        <div class="form-row">
+            <label class="form-label">비밀번호 (4자 이상)</label>
+            <input class="form-input" type="password" name="password" required>
+        </div>
+        <div class="form-row">
+            <label class="form-label">비밀번호 확인</label>
+            <input class="form-input" type="password" name="password2" required>
+        </div>
+        <label class="form-checkbox">
+            <input type="checkbox" name="age_confirm" required>
+            만 19세 이상이며, 성인 콘텐츠 이용에 동의합니다.
+        </label>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">가입하기</button>
+    </form>
+
+    <div class="auth-foot">
+        이미 계정이 있으신가요? <a href="/auth/login">로그인</a>
+    </div>
+</section>

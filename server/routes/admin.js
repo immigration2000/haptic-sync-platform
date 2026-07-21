@@ -1,0 +1,118 @@
+const express = require('express');
+const router = express.Router();
+const { stmts, getSettingBool, getSetting, setSetting } = require('../db');
+const vrConfig = require('../vr_config');
+const { requireRole } = require('../middleware/auth');
+
+router.use(requireRole('admin'));
+
+// Dashboard
+router.get('/', (req, res) => {
+    const stats = {
+        users:        stmts.countUsers.get().c,
+        bjs:          stmts.countBJs.get().c,
+        contents:     stmts.countContents.get().c,
+        sumCharges:   stmts.sumCharges.get().s,
+        sumSpends:    -stmts.sumSpends.get().s,
+        dummyRooms:   stmts.listDummyRooms.all().length,
+        pendingApps:  stmts.countPendingApps.get().c,
+        openReports:  stmts.countOpenReports.get().c,
+    };
+    res.render('admin/dashboard', {
+        title: '관리자', stats,
+        dummyEnabled: getSettingBool('dummy_bj_enabled', true),
+        siteMessage:  getSetting('site_message', ''),
+        maintMode:    getSettingBool('maintenance_mode', false),
+        vrReproject:  vrConfig.get(),
+    });
+});
+
+router.get('/users', (req, res) => res.render('admin/users', { title: '회원 관리', users: stmts.recentUsers.all() }));
+router.get('/transactions', (req, res) => res.render('admin/transactions', { title: '거래 내역', txs: stmts.recentTxs.all() }));
+
+// 더미 BJ 방
+router.get('/dummy', (req, res) => {
+    res.render('admin/dummy', {
+        title: '더미 스트리머 방',
+        rooms: stmts.listDummyRooms.all(),
+        enabled: getSettingBool('dummy_bj_enabled', true),
+    });
+});
+router.post('/dummy/toggle/:id', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const room = stmts.listDummyRooms.all().find(r => r.id === id);
+    if (room) stmts.toggleDummyRoom.run(room.is_active ? 0 : 1, id);
+    res.redirect('/admin/dummy');
+});
+
+// 설정
+router.post('/settings', (req, res) => {
+    const { dummy_bj_enabled, site_message, maintenance_mode,
+            vr_hfov, vr_fisheye, vr_pitch, vr_yaw } = req.body;
+    setSetting('dummy_bj_enabled',  dummy_bj_enabled === 'on'  ? '1' : '0');
+    setSetting('maintenance_mode',  maintenance_mode === 'on' ? '1' : '0');
+    setSetting('site_message',      (site_message || '').slice(0, 200));
+    // VR 재투영 기본값 (관리자 설정 — 사용자 미조정 시 적용)
+    vrConfig.set({ hFovDeg: vr_hfov, fisheyeFovDeg: vr_fisheye, pitchDeg: vr_pitch, yawDeg: vr_yaw });
+    res.redirect('/admin?saved=1');
+});
+
+// BJ 신청 심사
+router.get('/bj-apps', (req, res) => {
+    res.render('admin/bj_apps', { title: '스트리머 신청 심사', apps: stmts.listBJApps.all() });
+});
+
+router.post('/bj-apps/:id/approve', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const app = stmts.findBJApp.get(id);
+    if (!app || app.status !== 'pending') return res.redirect('/admin/bj-apps');
+    stmts.approveBJApp.run(req.user.id, id);
+    // 사용자를 BJ 역할로 + bj_profile 생성
+    stmts.updateUserRole.run('bj', app.user_id);
+    try {
+        stmts.insertBJProfile.run(app.user_id, app.stage_name, app.description || '', 100, '#신규');
+    } catch (_) { /* 이미 있으면 무시 */ }
+    res.redirect('/admin/bj-apps');
+});
+
+router.post('/bj-apps/:id/reject', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    stmts.rejectBJApp.run(req.user.id, id);
+    res.redirect('/admin/bj-apps');
+});
+
+// 신고
+router.get('/reports', (req, res) => {
+    res.render('admin/reports', { title: '신고 내역', reports: stmts.listReports.all() });
+});
+
+router.post('/reports/:id/resolve', (req, res) => {
+    stmts.updateReportStatus.run('resolved', parseInt(req.params.id, 10));
+    res.redirect('/admin/reports');
+});
+
+// 컨텐츠 (메타 추가)
+router.get('/contents', (req, res) => {
+    res.render('admin/contents', { title: '콘텐츠 관리', contents: stmts.listAllContents.all() });
+});
+
+router.post('/contents/add', (req, res) => {
+    const { type, title, description, creator, video_path, script_path, thumbnail_path, duration_sec, price, tags, multi_axis } = req.body;
+    if (!type || !title || !video_path) {
+        return res.redirect('/admin/contents?error=missing');
+    }
+    stmts.insertContent.run(
+        type, title, description || '', creator || '',
+        video_path, script_path || null, thumbnail_path || null,
+        parseInt(duration_sec || '0', 10), parseInt(price || '0', 10),
+        tags || '', multi_axis === 'on' ? 1 : 0,
+    );
+    res.redirect('/admin/contents?added=1');
+});
+
+// 고객센터 문의 내역
+router.get('/tickets', (req, res) => {
+    res.render('admin/tickets', { title: '고객센터 문의', tickets: stmts.listTickets.all() });
+});
+
+module.exports = router;

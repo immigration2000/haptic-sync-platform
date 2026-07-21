@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PULSE 모바일 테스트</title>
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pages.css">
+<style>
+/* ===== 모바일 네비 추가분 (테스트용 — 승인 후 실제 CSS로 이식) ===== */
+.m-test-banner{background:linear-gradient(135deg,#FF2D5E,#7B2DFF);color:#fff;text-align:center;font-size:13px;padding:8px 12px;}
+.m-burger{display:none;background:none;border:none;color:#fff;font-size:24px;line-height:1;padding:4px 8px;cursor:pointer;}
+.m-tabbar{display:none;}
+.m-drawer-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .22s;z-index:200;}
+.m-drawer-ov.open{opacity:1;pointer-events:auto;}
+.m-drawer{position:fixed;top:0;bottom:0;left:0;width:270px;max-width:80vw;background:var(--bg-1);border-right:1px solid var(--border-soft);
+  transform:translateX(-100%);transition:transform .24s;z-index:201;padding:18px 16px;overflow-y:auto;}
+.m-drawer.open{transform:translateX(0);}
+.m-drawer .dh{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.m-drawer a,.m-drawer button.mlink{display:flex;align-items:center;gap:12px;width:100%;padding:14px 8px;border-bottom:1px solid var(--border-soft);
+  font-size:16px;color:var(--tx-1);background:none;border-left:none;border-right:none;border-top:none;text-align:left;cursor:pointer;}
+.m-drawer .close-x{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;}
+
+@media (max-width:900px){
+  .m-burger{display:block;}
+  .m-tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;height:60px;background:var(--bg-1);
+    border-top:1px solid var(--border-soft);z-index:50;padding-bottom:env(safe-area-inset-bottom);}
+  .m-tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    font-size:11px;color:var(--tx-3);text-decoration:none;}
+  .m-tabbar a .ic{font-size:20px;line-height:1;}
+  .m-tabbar a.active{color:var(--c-pink);}
+  main.container{padding-bottom:78px !important;}
+  .header-device-wrap{display:none;}      /* 디바이스 버튼은 드로어 안으로 */
+  .user-pill .balance{display:none;}        /* 좁은 화면에선 잔액 숨겨 압축 */
+}
+</style>
+</head>
+<body>
+
+<div class="m-test-banner">🧪 모바일 테스트 페이지 — 실제 사이트 아님 (네비/레이아웃 점검용)</div>
+
+<header class="header">
+  <div class="container header-inner">
+    <button class="m-burger" id="burger" aria-label="메뉴">☰</button>
+    <a href="#" class="brand">PULSE</a>
+    <nav class="desktop-nav">
+      <ul class="nav">
+        <li><a href="#" class="active">영상</a></li>
+        <li><a href="#">보이스</a></li>
+        <li><a href="#" style="color:#FF8080;">🔴 라이브</a></li>
+        <li><a href="#">요금제</a></li>
+        <li><a href="#" style="color:var(--c-pink);">🎬 스튜디오</a></li>
+        <li><a href="#" style="color:var(--c-yellow);">⚙ 관리자</a></li>
+      </ul>
+    </nav>
+    <div class="header-right">
+      <a href="#" class="user-pill">
+        <span class="avatar">마</span>
+        <span>마스터</span>
+        <span class="balance">99,999,999 Rb</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="m-drawer-ov" id="ov"></div>
+<aside class="m-drawer" id="drawer">
+  <div class="dh">
+    <div class="brand">PULSE</div>
+    <button class="close-x" id="closex" aria-label="닫기">×</button>
+  </div>
+  <a href="#" data-go="vod">🎬 영상</a>
+  <a href="#" data-go="voice">🎤 보이스</a>
+  <a href="#" data-go="live">🔴 라이브</a>
+  <a href="#">💳 요금제</a>
+  <a href="#" style="color:var(--c-pink);">🎬 스튜디오</a>
+  <a href="#" style="color:var(--c-yellow);">⚙ 관리자</a>
+  <a href="#">🔌 디바이스 연결</a>
+  <a href="#">↪ 로그아웃</a>
+</aside>
+
+<main class="container" style="padding-top:24px;">
+
+  <section data-sec="voice">
+    <div class="section-eyebrow" style="color:var(--c-pink);">VOICE</div>
+    <h1 class="section-title" style="margin-bottom:16px;">보이스 · 스트리머</h1>
+    <div id="streamers"></div>
+  </section>
+
+  <section data-sec="vod" style="display:none;">
+    <div class="section-eyebrow" style="color:var(--c-pink);">VIDEO</div>
+    <h1 class="section-title" style="margin-bottom:16px;">영상</h1>
+    <div class="grid-list" id="videos"></div>
+  </section>
+
+  <section data-sec="live" style="display:none;">
+    <div class="section-eyebrow" style="color:#FF8080;">LIVE</div>
+    <h1 class="section-title" style="margin-bottom:16px;">라이브</h1>
+    <div id="lives"></div>
+  </section>
+
+</main>
+
+<nav class="m-tabbar">
+  <a href="#" data-go="vod"><span class="ic">🎬</span><span>영상</span></a>
+  <a href="#" data-go="voice" class="active"><span class="ic">🎤</span><span>보이스</span></a>
+  <a href="#" data-go="live"><span class="ic">🔴</span><span>라이브</span></a>
+  <a href="#" data-go="my"><span class="ic">👤</span><span>마이</span></a>
+</nav>
+
+<script>
+var S=[['소피아',150,'#FF2D5E',1],['미나',120,'#7B2DFF',1],['유리',200,'#5EB6FF',0],['하루',100,'#5EFFB0',1]];
+document.getElementById('streamers').innerHTML=S.map(function(s){
+  return '<div class="card card-body" style="display:flex;gap:14px;align-items:center;margin-bottom:12px;">'+
+    '<div style="width:56px;height:56px;border-radius:50%;background:'+s[2]+';display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex:none;">'+s[0].charAt(0)+'</div>'+
+    '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:16px;">'+s[0]+'</div>'+
+    '<div class="text-faint" style="font-size:12px;margin:2px 0;">'+(s[3]?'<span style=color:var(--c-green)>● 대기중</span>':'오프라인')+'</div>'+
+    '<div class="mono" style="font-size:13px;color:var(--c-yellow);">'+s[1]+' Rb/분</div></div>'+
+    '<button class="btn btn-primary">통화</button></div>';
+}).join('');
+
+var V=[['VR 데모 01','VR'],['오션뷰',''],['미드나잇','4축'],['스튜디오 클립','구독'],['선셋','VR'],['네온',''],];
+document.getElementById('videos').innerHTML=V.map(function(v){
+  return '<div class="card content-card"><div class="content-thumb" style="aspect-ratio:16/10;background:linear-gradient(135deg,#26262F,#14141A);display:flex;align-items:center;justify-content:center;color:var(--tx-3);font-size:26px;position:relative;">▶'+
+    (v[1]?'<span class="duration" style="position:absolute;top:6px;left:6px;background:rgba(255,45,94,.85);color:#fff;">'+v[1]+'</span>':'')+'</div>'+
+    '<div class="content-info"><div class="content-title">'+v[0]+'</div></div></div>';
+}).join('');
+
+var L=[['소피아 LIVE',312,'#FF2D5E'],['미나 방송중',88,'#7B2DFF']];
+document.getElementById('lives').innerHTML=L.map(function(x){
+  return '<div class="card" style="overflow:hidden;margin-bottom:14px;"><div style="aspect-ratio:16/9;background:linear-gradient(135deg,'+x[2]+'33,#0A0A0E);position:relative;display:flex;align-items:center;justify-content:center;">'+
+    '<div style="width:64px;height:64px;border-radius:50%;background:'+x[2]+';display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;">'+x[0].charAt(0)+'</div>'+
+    '<span style="position:absolute;top:10px;left:10px;background:#FF2D5E;font-size:11px;padding:3px 9px;border-radius:5px;font-weight:700;">● LIVE</span>'+
+    '<span style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);font-size:11px;padding:3px 9px;border-radius:5px;">👁 '+x[1]+'</span></div>'+
+    '<div class="card-body" style="font-weight:600;">'+x[0]+'</div></div>';
+}).join('');
+
+var burger=document.getElementById('burger'),drawer=document.getElementById('drawer'),ov=document.getElementById('ov');
+function open(){drawer.classList.add('open');ov.classList.add('open');}
+function close(){drawer.classList.remove('open');ov.classList.remove('open');}
+burger.onclick=open;document.getElementById('closex').onclick=close;ov.onclick=close;
+
+function show(t){
+  if(t==='my')t='voice';
+  document.querySelectorAll('[data-sec]').forEach(function(s){s.style.display=s.getAttribute('data-sec')===t?'block':'none';});
+  document.querySelectorAll('.m-tabbar a').forEach(function(a){a.classList.toggle('active',a.getAttribute('data-go')===t);});
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('[data-go]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();var g=a.getAttribute('data-go');if(g&&g!=='my')show(g);close();});});
+</script>
+</body>
+</html>

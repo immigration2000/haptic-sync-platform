@@ -1,0 +1,36 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <h1 class="section-title">스트리머 신청 심사</h1>
+
+            <% if (!apps.length) { %>
+                <div class="text-faint text-center" style="padding: 80px 0;">신청 내역이 없습니다.</div>
+            <% } else { %>
+                <% apps.forEach(a => { %>
+                    <div class="card card-body mb-4">
+                        <div class="flex items-center gap-3 mb-3">
+                            <strong style="font-size: 16px;"><%= a.stage_name %></strong>
+                            <span class="badge" style="background: <%= a.status === 'approved' ? 'rgba(0,220,130,0.2)' : a.status === 'rejected' ? 'rgba(255,80,80,0.2)' : 'rgba(255,184,94,0.2)' %>; color: <%= a.status === 'approved' ? '#5EFFB0' : a.status === 'rejected' ? '#FF8080' : '#FFB85E' %>;">
+                                <%= a.status %>
+                            </span>
+                            <span class="text-faint mono" style="font-size: 11px; margin-left: auto;"><%= a.created_at %></span>
+                        </div>
+                        <div class="mono text-faint mb-3" style="font-size:12px; display:grid; grid-template-columns:80px 1fr; gap:4px 12px;">
+                            <span>신청자</span><span><%= a.nickname %> &lt;<%= a.email %>&gt;</span>
+                            <span>설명</span><span><%= a.description || '—' %></span>
+                            <span>한마디</span><span><%= a.intro_message || '—' %></span>
+                        </div>
+                        <% if (a.status === 'pending') { %>
+                        <div class="flex gap-2">
+                            <form method="POST" action="/admin/bj-apps/<%= a.id %>/approve"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-primary btn-sm">승인</button></form>
+                            <form method="POST" action="/admin/bj-apps/<%= a.id %>/reject"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-ghost btn-sm">거절</button></form>
+                        </div>
+                        <% } %>
+                    </div>
+                <% }) %>
+            <% } %>
+        </div>
+    </div>
+</section>

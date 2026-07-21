@@ -1,0 +1,147 @@
+<!-- HERO — 영상 배경 + 텍스트 오버레이 (원본 IWeb 패턴) -->
+<% if (featured) { %>
+<section class="nf-hero">
+    <video class="nf-hero-bg" autoplay muted loop playsinline
+           poster="<%= featured.thumbnail_path %>"
+           src="<%= featured.video_path %>"></video>
+    <div class="container nf-hero-inner">
+        <div class="nf-hero-tag"><%= featured.type === 'vr' ? 'VR · 360° / 3D · 다축 인터랙티브' : 'VOD · 인터랙티브 영상' %></div>
+        <h1><%= featured.title %></h1>
+        <p class="lead"><%= featured.description %></p>
+        <div class="nf-hero-cta">
+            <a href="/content/play/<%= featured.id %>" class="btn btn-primary">▶ 지금 재생</a>
+            <a href="<%= featured.type === 'vr' ? '/content/vr' : '/content/vod' %>" class="btn btn-secondary">전체 보기</a>
+        </div>
+    </div>
+</section>
+<% } %>
+
+<!-- ROW: VOD -->
+<section class="container">
+    <div class="row">
+        <div class="row-head">
+            <div>
+                <div class="section-eyebrow">VOD · 2D INTERACTIVE</div>
+                <h2 class="row-title">일반 영상</h2>
+            </div>
+            <a href="/content/vod" class="row-more">전체 보기 →</a>
+        </div>
+        <% if (!vods.length) { %>
+            <div class="text-faint">콘텐츠 준비 중…</div>
+        <% } else { %>
+            <div class="row-strip">
+                <% vods.forEach(c => { %>
+                    <a class="card content-card" href="/content/play/<%= c.id %>">
+                        <div class="content-thumb">
+                            <% if (c.thumbnail_path) { %><img src="<%= c.thumbnail_path %>" alt="" loading="lazy" onerror="this.style.display='none'"><% } %>
+                            <div class="duration"><%= Math.floor(c.duration_sec / 60) %>:<%= String(c.duration_sec % 60).padStart(2,'0') %></div>
+                        </div>
+                        <div class="content-info">
+                            <div class="content-title"><%= c.title %></div>
+                            <div class="content-meta"><span><%= c.creator %></span><span>·</span><span><%= (c.view_count || 0).toLocaleString() %>회</span></div>
+                            <div class="content-tags">
+                                <% (c.tags || '').split(',').filter(Boolean).slice(0,2).forEach(t => { %><span class="tag"><%= t.trim() %></span><% }) %>
+                            </div>
+                        </div>
+                    </a>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- ROW: VR -->
+    <div class="row">
+        <div class="row-head">
+            <div>
+                <div class="section-eyebrow">VR · 360° / 3D · 다축</div>
+                <h2 class="row-title">VR 영상</h2>
+            </div>
+            <a href="/content/vr" class="row-more">전체 보기 →</a>
+        </div>
+        <% if (!vrs.length) { %>
+            <div class="text-faint">VR 콘텐츠 준비 중…</div>
+        <% } else { %>
+            <div class="row-strip">
+                <% vrs.forEach(c => { %>
+                    <a class="card content-card" href="/content/play/<%= c.id %>">
+                        <div class="content-thumb">
+                            <% if (c.thumbnail_path) { %><img src="<%= c.thumbnail_path %>" alt="" loading="lazy" onerror="this.style.display='none'"><% } %>
+                            <div class="duration"><%= Math.floor(c.duration_sec / 60) %>:<%= String(c.duration_sec % 60).padStart(2,'0') %></div>
+                        </div>
+                        <div class="content-info">
+                            <div class="content-title"><%= c.title %></div>
+                            <div class="content-meta"><span><%= c.creator %></span></div>
+                            <div class="content-tags">
+                                <span class="badge badge-vr">VR</span>
+                                <% if (c.multi_axis) { %><span class="badge badge-multi">다축</span><% } %>
+                            </div>
+                        </div>
+                    </a>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- ROW: 스트리머 -->
+    <div class="row">
+        <div class="row-head">
+            <div>
+                <div class="section-eyebrow">스트리머 · LIVE & CALL</div>
+                <h2 class="row-title">스트리머 라이브 / 통화</h2>
+            </div>
+            <a href="/bj" class="row-more">전체 보기 →</a>
+        </div>
+        <% if (!bjs.length) { %>
+            <div class="text-faint">대기 중인 스트리머 없음.</div>
+        <% } else { %>
+            <div class="row-strip">
+                <% bjs.slice(0, 12).forEach(bj => { %>
+                    <a class="card bj-card" href="<%= bj.href %>" <%= bj.is_dummy ? 'style="border:1px solid rgba(255,184,94,0.3);"' : '' %>>
+                        <div class="bj-thumb" <% if (bj.is_dummy) { %>style="background: linear-gradient(135deg, #FFB85E, #FF2D5E);"<% } %>>
+                            <%= (bj.stage_name || '?').replace(/^[^가-힯a-zA-Z]+/,'').charAt(0) %>
+                        </div>
+                        <div class="bj-info">
+                            <div class="bj-name">
+                                <%= bj.stage_name %>
+                                <% if (bj.is_dummy || bj.is_online) { %>
+                                    <span class="badge" style="background:rgba(255,80,80,0.2); color:#FF8080; font-size:9px; padding:2px 6px; margin-left:6px;">🔴 LIVE</span>
+                                <% } %>
+                            </div>
+                            <div class="bj-desc"><%= bj.description %></div>
+                            <div class="bj-rate">
+                                <span>
+                                    <% if (bj.is_online) { %><span class="bj-online-dot"></span><span style="color: var(--c-green);">방송 중</span>
+                                    <% } else { %><span class="bj-offline-dot"></span>오프라인<% } %>
+                                </span>
+                                <span><%= bj.rate_per_minute %> Rb/분</span>
+                            </div>
+                        </div>
+                    </a>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- FEATURES summary -->
+    <div class="section">
+        <div class="section-eyebrow">PULSE PLATFORM</div>
+        <h2 class="row-title mb-4">5 in 1 — 양방향 인터랙티브</h2>
+        <div class="grid grid-3">
+            <div class="card card-body feature-card">
+                <div class="feature-tag">P1 · VIDEO</div>
+                <div class="feature-title">영상 + 디바이스</div>
+                <div class="feature-desc">funscript 자동 동기 · TCode V3 · OSR2+/SR6 호환</div>
+            </div>
+            <div class="card card-body feature-card">
+                <div class="feature-tag">P2 · 스트리머 CALL/COWATCH</div>
+                <div class="feature-title">스트리머 통화 · 함께보기</div>
+                <div class="feature-desc">WebRTC P2P 음성 + 스트리머가 직접 디바이스 조작</div>
+            </div>
+            <div class="card card-body feature-card">
+                <div class="feature-tag">P3·P5 · LIVE</div>
+                <div class="feature-title">스트리머 라이브</div>
+                <div class="feature-desc">비공개 1:1 풀패키지 · 공개 1:N 방송</div>
+            </div>
+        </div>
+    </div>
+</section>

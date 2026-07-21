@@ -1,0 +1,65 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">스트리머 STUDIO · 수익</div>
+            <h1 class="section-title">수익 내역</h1>
+
+            <div class="balance-card">
+                <div class="label">정산 가능 (스트리머 <%= Math.round(share*100) %>%)</div>
+                <div class="value"><%= payable.toLocaleString() %></div>
+                <div class="text-faint" style="font-size:12px;">Ruby · 다음 정산일에 출금 가능</div>
+            </div>
+
+            <div class="grid grid-3 mb-5">
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size:11px;">누적 매출 (Gross)</div>
+                    <div style="font-size: 24px; font-weight: 700; margin-top: 6px;" class="mono"><%= (stats.total_earned || 0).toLocaleString() %></div>
+                </div>
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size:11px;">플랫폼 수수료 (<%= Math.round((1-share)*100) %>%)</div>
+                    <div style="font-size: 24px; font-weight: 700; margin-top: 6px; color: var(--c-pink);" class="mono">-<%= Math.round((stats.total_earned||0)*(1-share)).toLocaleString() %></div>
+                </div>
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size:11px;">스트리머 정산 (<%= Math.round(share*100) %>%)</div>
+                    <div style="font-size: 24px; font-weight: 700; margin-top: 6px; color: var(--c-green);" class="mono">+<%= payable.toLocaleString() %></div>
+                </div>
+            </div>
+
+            <div class="card card-body mb-4">
+                <div class="panel-title">정산 안내</div>
+                <ul class="text-dim" style="padding-left: 20px; line-height: 1.8; font-size: 13px;">
+                    <li>매월 1일 ~ 15일 누적분 → 익월 5일 지급</li>
+                    <li>매월 16일 ~ 말일 누적분 → 익월 20일 지급</li>
+                    <li>최소 정산 금액: 50,000 Ruby (= 약 50,000원)</li>
+                    <li>1 Ruby = 1원 환산. 원천세 3.3% 별도 차감</li>
+                    <li>출금 계좌: 마이페이지 → 정산 설정에서 등록 (운영 시)</li>
+                </ul>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">최근 통화 수익 (최대 50건)</div>
+                <% if (!calls.length) { %>
+                    <div class="text-faint text-center" style="padding: 40px;">아직 통화 기록이 없습니다.</div>
+                <% } else { %>
+                    <table class="tx-table">
+                        <thead><tr><th>시작</th><th>종료</th><th>사용자</th><th>분</th><th>매출</th><th>정산</th></tr></thead>
+                        <tbody>
+                            <% calls.forEach(c => { %>
+                                <tr>
+                                    <td class="mono text-faint" style="font-size:11px;"><%= c.started_at %></td>
+                                    <td class="mono text-faint" style="font-size:11px;"><%= c.ended_at || '진행중' %></td>
+                                    <td><%= c.user_nick %></td>
+                                    <td class="mono"><%= Math.floor(c.duration_sec / 60) %></td>
+                                    <td class="mono"><%= (c.charged || 0).toLocaleString() %></td>
+                                    <td class="mono amt-pos">+<%= Math.floor((c.charged||0) * share).toLocaleString() %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</section>

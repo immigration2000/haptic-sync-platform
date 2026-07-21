@@ -1,0 +1,25 @@
+<section class="auth-wrap">
+    <h1>비밀번호 찾기</h1>
+    <p class="sub">가입한 이메일로 재설정 링크를 보내드립니다.</p>
+
+    <% if (error) { %><div class="flash-error"><%= error %></div><% } %>
+    <% if (typeof sent !== 'undefined' && sent) { %>
+        <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">
+            ✓ 메일을 전송했습니다. 받지 못하셨다면 스팸함을 확인해주세요.<br>
+            <span style="font-size: 11px; color: var(--tx-faint);">데모 환경 — 실제 메일 발송 비활성화. 서버 콘솔에서 토큰 확인.</span>
+        </div>
+    <% } %>
+
+    <form method="POST" action="/auth/forgot">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-row">
+            <label class="form-label">이메일</label>
+            <input class="form-input" type="email" name="email" required autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">재설정 링크 받기</button>
+    </form>
+
+    <div class="auth-foot">
+        <a href="/auth/login">로그인으로 돌아가기</a>
+    </div>
+</section>

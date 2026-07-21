@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# 런타임 데이터 (DB·세션·로그·gate.json·업로드) — 절대 커밋 금지
+data/
+
+# 실제 콘텐츠 (영상·썸네일·스트리머 업로드 — 대용량·라이선스) — 절대 커밋 금지
+public/content/
+
+# 로그
+*.log
+logs/
+
+# 환경변수·시크릿
+.env
+.env.*
+*.pem
+*.key
+
+# OS 잡파일
+.DS_Store
+Thumbs.db
+desktop.ini

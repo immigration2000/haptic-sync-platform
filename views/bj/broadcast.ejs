@@ -1,0 +1,72 @@
+<section class="container">
+    <div class="list-header">
+        <div>
+            <div class="section-eyebrow">PUBLIC LIVE · 1:N · MESH (DEMO)</div>
+            <h1 class="section-title" style="margin-bottom: 0;">공개 라이브 송출</h1>
+            <p class="text-dim mt-4">시청자 다수에게 동시 송출. 데모 — 메시(P2P 다중 페어) 토폴로지. 시청자 5명 이내 권장.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-2 mb-6" style="grid-template-columns: 1fr 360px;">
+        <div>
+            <div class="card card-body mb-4">
+                <div class="panel-title">PREVIEW</div>
+                <video id="my-video" autoplay playsinline muted style="width:100%; aspect-ratio: 16/9; background:#000; border-radius: 8px;"></video>
+                <div class="flex gap-3 mt-4">
+                    <button id="btn-start" class="btn btn-primary">📡 송출 시작</button>
+                    <button id="btn-stop"  class="btn btn-ghost hidden">송출 중지</button>
+                </div>
+                <p id="bc-status" class="text-faint mt-3" style="font-size:12px;">"송출 시작" — 카메라가 없으면 음성/디바이스 전용으로도 송출됩니다.</p>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">CHAT</div>
+                <div id="chat-log" style="height:200px; overflow-y:auto; background:var(--bg-0); border:1px solid var(--border-soft); border-radius:8px; padding:12px; font-size:13px;"></div>
+                <div class="flex gap-2 mt-3">
+                    <input id="chat-input" placeholder="채팅 입력…" style="flex:1; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:6px; color:white; padding:10px 12px; font-size:13px;">
+                    <button id="chat-send" class="btn btn-secondary btn-sm">전송</button>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="card card-body mb-4">
+                <div class="panel-title">시청자</div>
+                <div class="mono" style="font-size: 32px; font-weight: 700; background: var(--gradient-main); -webkit-background-clip: text; background-clip: text; color: transparent;" id="viewer-count">0</div>
+                <div class="text-faint mt-3" style="font-size: 11px;">동시 시청 중</div>
+            </div>
+
+            <div class="card card-body mb-4">
+                <div class="panel-title">시청자 목록</div>
+                <div id="viewer-list" style="font-family: var(--font-mono); font-size: 11px; color: var(--tx-2);">없음</div>
+            </div>
+
+            <div class="card card-body" id="bcast-device" style="opacity:0.5; pointer-events:none;">
+                <div class="panel-title">디바이스 제어 (시청자 전원)</div>
+                <p class="text-faint" style="font-size:11px; margin-bottom:6px;">송출 시작 후 활성화. 슬라이더·방향키로 시청자들의 디바이스를 동시에 제어합니다.</p>
+                <div id="bd-dev" class="text-faint" style="font-size:11px; margin-bottom:10px;">💡 우상단에서 <strong>본인 디바이스를 연결</strong>하면 같은 동작이 본인 기기에도 재생됩니다(미리보기).</div>
+                <% const AX = [['L0','스트로크 ↑↓','#FF2D5E'],['R0','롤 ←→','#7B2DFF'],['R2','피치 W/S','#5EFFB0']]; %>
+                <% AX.forEach(a => { %>
+                    <div style="margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--tx-2);">
+                            <span style="color:<%= a[2] %>; font-weight:700;"><%= a[0] %></span><span><%= a[1] %></span><span id="bd-<%= a[0] %>-v" class="mono">50</span>
+                        </div>
+                        <input type="range" id="bd-<%= a[0] %>" min="0" max="99" value="50" style="width:100%; accent-color:<%= a[2] %>;">
+                    </div>
+                <% }) %>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--tx-2); margin-top:8px;">
+                    <span>보간(속도)</span><span id="bd-interp-v" class="mono">100</span>
+                </div>
+                <input type="range" id="bd-interp" min="50" max="500" value="100" step="10" style="width:100%;">
+                <div id="bd-log" class="mono" style="margin-top:10px; height:60px; overflow:hidden; font-size:11px; color:var(--tx-3); background:var(--bg-0); border-radius:6px; padding:6px;"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+window.__BROADCAST__ = { userId: <%= user.id %>, name: "<%= profile.stage_name %>" };
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/vendor/simple-peer.min.js"></script>
+<script src="/js/pages/broadcast.js?v=2"></script>

@@ -1,0 +1,30 @@
+<section class="container section" style="max-width: 640px;">
+    <h1 class="section-title">1:1 문의</h1>
+
+    <% if (sent) { %>
+        <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">
+            ✓ 문의가 접수되었습니다. 24시간 내 답변드립니다.
+        </div>
+    <% } %>
+
+    <div class="card card-body">
+        <form method="POST" action="/support/contact">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <% if (typeof user === 'undefined' || !user) { %>
+            <div class="form-row">
+                <label class="form-label">답변 받을 이메일</label>
+                <input class="form-input" type="email" name="email" required>
+            </div>
+            <% } %>
+            <div class="form-row">
+                <label class="form-label">제목</label>
+                <input class="form-input" type="text" name="subject" maxlength="200" required>
+            </div>
+            <div class="form-row">
+                <label class="form-label">내용</label>
+                <textarea class="form-input" name="body" rows="8" maxlength="2000" required></textarea>
+            </div>
+            <button class="btn btn-primary">문의 보내기</button>
+        </form>
+    </div>
+</section>

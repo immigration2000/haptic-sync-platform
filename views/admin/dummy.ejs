@@ -1,0 +1,38 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">ADMIN · DUMMY 스트리머</div>
+            <h1 class="section-title">더미 스트리머 방 관리</h1>
+            <p class="text-dim mb-5">
+                전체 활성화 상태: <strong style="color: <%= enabled ? 'var(--c-green)' : 'var(--c-pink)' %>;">
+                <%= enabled ? '● ON (사이트에 표시됨)' : '○ OFF (숨김)' %></strong>
+                — <a href="/admin" style="color: var(--c-pink);">대시보드에서 전체 토글</a>
+            </p>
+
+            <div class="grid grid-2 mb-6">
+                <% rooms.forEach(r => { %>
+                    <div class="card card-body" style="border-color: <%= r.is_active ? 'var(--c-green)' : 'var(--border-soft)' %>; opacity: <%= r.is_active ? 1 : 0.5 %>;">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div style="font-size: 24px;"><%= r.stage_name.charAt(0) %></div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 700;"><%= r.stage_name %></div>
+                                <div class="text-faint" style="font-size: 11px;">ID #<%= r.id %> · <%= r.viewer_count %>명 시청 중 (가짜)</div>
+                            </div>
+                            <form method="POST" action="/admin/dummy/toggle/<%= r.id %>">
+                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                <button class="btn btn-sm <%= r.is_active ? 'btn-ghost' : 'btn-primary' %>"><%= r.is_active ? '비활성' : '활성' %></button>
+                            </form>
+                        </div>
+                        <div class="text-dim" style="font-size: 13px; margin-bottom: 8px;"><%= r.description %></div>
+                        <div style="font-size: 11px;">
+                            <span class="text-faint mono"><%= r.rate_per_minute %> Rb/분</span> ·
+                            <% (r.tags || '').split(',').filter(Boolean).forEach(t => { %><span class="tag"><%= t.trim() %></span><% }) %>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+        </div>
+    </div>
+</section>

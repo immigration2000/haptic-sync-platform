@@ -1,0 +1,129 @@
+<section class="container">
+    <div class="list-header">
+        <div>
+            <div class="section-eyebrow">스트리머 CONSOLE · <%= profile.stage_name %></div>
+            <h1 class="section-title" style="margin-bottom: 0;">방송 콘솔</h1>
+            <p class="text-dim mt-4">방송 시작 → 대기 풀 등록 → 사용자 통화 요청 자동 매칭. 키보드 ↑↓←→ W/S 로 디바이스 동작 송신.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-2 mb-6" style="grid-template-columns: 480px 1fr;">
+        <div>
+            <div class="card card-body mb-4">
+                <div class="panel-title">방송 세션</div>
+                <a href="/bj-studio" class="text-faint" style="font-size:12px; display:inline-block; margin-bottom:12px;">← 스튜디오</a>
+                <button id="btn-online" class="btn btn-primary btn-block btn-lg">📞 1:1 통화/함께보기/비공개 대기풀 등록</button>
+                <button id="btn-offline" class="btn btn-ghost btn-block hidden mt-4">방송 종료</button>
+                <p id="status-hint" class="text-faint mt-4" style="font-size: 12px;"></p>
+            </div>
+
+            <div class="card card-body mb-4">
+                <div class="panel-title">오디오 장비</div>
+                <div class="form-row">
+                    <label class="form-label">🎤 입력</label>
+                    <select id="dev-input" class="form-select"><option value="">자동</option></select>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">🔊 출력</label>
+                    <select id="dev-output" class="form-select"><option value="">자동</option></select>
+                </div>
+                <div class="flex gap-3 mt-4">
+                    <button id="btn-mic" class="btn btn-secondary" disabled>🎤 마이크 활성화</button>
+                    <button id="btn-monitor" class="btn btn-ghost">🔊 사용자 음성 ON</button>
+                </div>
+            </div>
+
+            <!-- 세션 컨트롤 — 통화 연결 시 활성 -->
+            <div class="card card-body" id="session-ctrl" style="opacity:0.5; pointer-events:none;">
+                <div class="panel-title">세션 컨트롤 (스트리머 주도)</div>
+
+                <div class="mb-4">
+                    <div class="text-faint mb-2" style="font-size:12px;">모드</div>
+                    <div class="flex gap-2">
+                        <button id="mode-call"  class="btn btn-primary btn-sm" style="flex:1;">📞 통화</button>
+                        <button id="mode-video" class="btn btn-ghost btn-sm" style="flex:1;">🎬 영상</button>
+                        <button id="mode-cam"   class="btn btn-ghost btn-sm" style="flex:1;">📷 캠</button>
+                    </div>
+                    <p id="cam-hint" class="text-faint mt-2 hidden" style="font-size:11px;">📷 캠 모드 — 카메라를 켜서 사용자에게 1:1 송출합니다.</p>
+                </div>
+
+                <div id="video-pick" class="mb-4 hidden">
+                    <div class="text-faint mb-2" style="font-size:12px;">사용자에게 틀 영상</div>
+                    <select id="video-select" class="form-select" style="margin-bottom:8px;"><option value="">— 영상 선택 —</option></select>
+                    <button id="btn-push-video" class="btn btn-secondary btn-sm btn-block">▶ 사용자 화면에 재생</button>
+
+                    <div class="mt-4">
+                        <div class="text-faint mb-2" style="font-size:12px;">디바이스 제어 (영상 모드)</div>
+                        <div class="flex gap-2">
+                            <button id="ctrl-script" class="btn btn-primary btn-sm" style="flex:1;">스크립트 자동</button>
+                            <button id="ctrl-manual" class="btn btn-ghost btn-sm" style="flex:1;">내가 직접</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">디바이스 가상 조작</div>
+                <p class="text-faint mb-4" style="font-size: 12px;">키보드: ↑↓ 스트로크 · ←→ 롤 · W/S 피치</p>
+
+                <div class="mb-4">
+                    <div class="flex" style="justify-content: space-between; font-size: 12px; color: var(--tx-2); margin-bottom: 6px;">
+                        <span>L0 · 스트로크</span><span id="l0-val" class="mono">50</span>
+                    </div>
+                    <input type="range" id="ax-l0" min="0" max="99" value="50" style="width:100%;">
+                </div>
+                <div class="mb-4">
+                    <div class="flex" style="justify-content: space-between; font-size: 12px; color: var(--tx-2); margin-bottom: 6px;">
+                        <span>R0 · 롤</span><span id="r0-val" class="mono">50</span>
+                    </div>
+                    <input type="range" id="ax-r0" min="0" max="99" value="50" style="width:100%;">
+                </div>
+                <div class="mb-4">
+                    <div class="flex" style="justify-content: space-between; font-size: 12px; color: var(--tx-2); margin-bottom: 6px;">
+                        <span>R2 · 피치</span><span id="r2-val" class="mono">50</span>
+                    </div>
+                    <input type="range" id="ax-r2" min="0" max="99" value="50" style="width:100%;">
+                </div>
+                <div class="mb-2">
+                    <div class="flex" style="justify-content: space-between; font-size: 12px; color: var(--tx-2); margin-bottom: 6px;">
+                        <span>전송 속도 (ms)</span><span id="interp-val" class="mono">100</span>
+                    </div>
+                    <input type="range" id="ax-interp" min="50" max="500" value="100" step="10" style="width:100%;">
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="card card-body mb-4">
+                <div class="panel-title">접속 사용자 / 세션 정보</div>
+                <div id="user-list">
+                    <div class="text-faint text-center" style="padding: 32px; border: 1px dashed var(--border-soft); border-radius: 8px;">대기 중</div>
+                </div>
+            </div>
+
+            <!-- 함께보기 / 비공개 라이브 모드 시 표시 -->
+            <div id="cowatch-panel" class="card card-body mb-4 hidden">
+                <div class="panel-title" id="cowatch-title">CO-WATCH · 사용자가 보고 있는 영상</div>
+                <div style="background: #000; border-radius: 8px; overflow: hidden; margin-bottom: 12px;">
+                    <video id="cowatch-video" muted playsinline style="width:100%; aspect-ratio: 16/9; background:#000;"></video>
+                </div>
+                <div class="mono text-faint flex gap-3" style="font-size: 11px;">
+                    <span>제목: <span id="cowatch-content-title" style="color: white;">—</span></span>
+                    <span>·</span>
+                    <span>사용자 시점: <span id="cowatch-user-time" style="color: white;">00:00</span></span>
+                </div>
+                <p class="text-faint mt-3" style="font-size:11px;">⚠ 스트리머 측 영상은 자동 음소거. 사용자 음성과 영상은 우측 로그·키보드로 응대하세요.</p>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">송신 TCode (LIVE)</div>
+                <div id="tcode-log" style="background: #000; border-radius: 8px; padding: 16px; font-family: var(--font-mono); font-size: 12px; line-height: 1.7; height: 320px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/vendor/simple-peer.min.js"></script>
+<script>window.__BJ_CONSOLE__ = { userId: <%= user.id %>, name: "<%= profile.stage_name %>" };</script>
+<script src="/js/pages/bj_console.js?v=2"></script>

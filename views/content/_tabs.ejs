@@ -1,0 +1,14 @@
+<% const CTABS = [
+    ['vod',       'VOD',          '/content/vod'],
+    ['vr',        'VR',           '/content/vr'],
+    ['videos',    '구독자전용 영상', '/content/videos'],
+    ['streamers', '스트리머 채널',  '/content/streamers'],
+]; %>
+<div style="display:flex; gap:2px; border-bottom:1px solid var(--border-soft); margin:8px 0 24px; flex-wrap:wrap;">
+    <% CTABS.forEach(t => { const on = (typeof tab !== 'undefined' && tab === t[0]); %>
+        <a href="<%= t[2] %>" style="padding:10px 16px; font-size:14px; text-decoration:none; white-space:nowrap;
+                  border-bottom:2px solid <%= on ? 'var(--c-pink)' : 'transparent' %>;
+                  color:<%= on ? 'var(--tx-1, #fff)' : 'var(--tx-3, #888)' %>;
+                  font-weight:<%= on ? '600' : '400' %>;"><%= t[1] %></a>
+    <% }) %>
+</div>

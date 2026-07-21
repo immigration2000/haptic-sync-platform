@@ -1,0 +1,39 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <h1 class="section-title">신고 처리</h1>
+
+            <% if (!reports.length) { %>
+                <div class="text-faint text-center" style="padding: 80px 0;">신고 없음.</div>
+            <% } else { %>
+                <div class="card card-body">
+                    <table class="tx-table">
+                        <thead><tr><th>일시</th><th>신고자</th><th>대상</th><th>사유</th><th>상세</th><th>상태</th><th></th></tr></thead>
+                        <tbody>
+                            <% reports.forEach(r => { %>
+                                <tr>
+                                    <td class="mono text-faint" style="font-size:11px;"><%= r.created_at %></td>
+                                    <td><%= r.reporter_name || '—' %></td>
+                                    <td><%= r.target_type %>#<%= r.target_id %></td>
+                                    <td><%= r.reason_code %></td>
+                                    <td class="text-dim"><%= r.detail %></td>
+                                    <td><span class="badge"><%= r.status %></span></td>
+                                    <td>
+                                        <% if (r.status === 'open') { %>
+                                            <form method="POST" action="/admin/reports/<%= r.id %>/resolve" style="margin:0;">
+                                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                                <button class="btn btn-sm btn-secondary">처리</button>
+                                            </form>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</section>

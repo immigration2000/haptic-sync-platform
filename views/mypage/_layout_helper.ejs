@@ -1,0 +1,22 @@
+<aside class="mypage-side">
+    <div class="profile-card">
+        <div class="avatar"><%= (user.nickname || '?').charAt(0) %></div>
+        <div class="name"><%= user.nickname %></div>
+        <div class="email"><%= user.email %></div>
+    </div>
+    <ul class="menu">
+        <li><a href="/mypage"          class="<%= path === '/mypage' ? 'active' : '' %>">대시보드</a></li>
+        <li><a href="/mypage/settings" class="<%= path.startsWith('/mypage/settings') ? 'active' : '' %>">계정 설정</a></li>
+        <li><a href="/mypage/billing"  class="<%= path.startsWith('/mypage/billing') ? 'active' : '' %>">결제 / 충전</a></li>
+        <li><a href="/mypage/history"  class="<%= path.startsWith('/mypage/history') ? 'active' : '' %>">시청 기록</a></li>
+        <% if (user.role !== 'bj' && user.role !== 'admin') { %>
+            <li><a href="/mypage/bj-apply" class="<%= path.startsWith('/mypage/bj-apply') ? 'active' : '' %>">스트리머 신청</a></li>
+        <% } %>
+        <% if (user.role === 'bj' || user.role === 'admin') { %>
+            <li style="border-top: 1px solid var(--border-soft); margin-top:8px; padding-top:8px;">
+                <a href="/bj-studio" style="color: var(--c-pink); font-weight: 600;">🎬 스트리머 스튜디오 →</a>
+            </li>
+        <% } %>
+        <li><a href="/auth/logout">로그아웃</a></li>
+    </ul>
+</aside>

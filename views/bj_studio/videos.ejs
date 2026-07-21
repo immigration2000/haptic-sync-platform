@@ -1,0 +1,75 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">스트리머 STUDIO · 내 영상</div>
+            <h1 class="section-title">내 영상 관리</h1>
+            <p class="text-dim mb-5">업로드한 영상은 통화 중 사용자에게 틀어줄 수 있습니다. funscript를 함께 올리면 디바이스 자동 연동도 가능.</p>
+
+            <% if (typeof error !== 'undefined' && error) { %><div class="flash-error"><%= error %></div><% } %>
+            <% if (typeof ok !== 'undefined' && ok) { %>
+                <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">✓ <%= ok %></div>
+            <% } %>
+
+            <div class="card card-body mb-5">
+                <div class="panel-title">영상 업로드</div>
+                <form method="POST" action="/bj-studio/videos/upload" enctype="multipart/form-data">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-row">
+                        <label class="form-label">제목</label>
+                        <input class="form-input" type="text" name="title" maxlength="80" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">영상 파일 (mp4/webm/mov, 최대 2GB)</label>
+                        <input class="form-input" type="file" name="video" accept="video/*" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">funscript (선택 — 디바이스 자동 연동용)</label>
+                        <input class="form-input" type="file" name="script" accept=".funscript,.json">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">개별구매(PPV) 가격 (Ruby) — 0이면 구독 전용</label>
+                        <input class="form-input" type="number" name="price" value="0" min="0" max="100000" step="100">
+                        <p class="text-faint mt-2" style="font-size:11px;">구독자는 무료 시청. 비구독자는 이 가격으로 개별 구매(영구 시청).</p>
+                    </div>
+                    <button class="btn btn-primary">업로드</button>
+                    <p class="text-faint mt-3" style="font-size:11px;">⚠ 본인 또는 적법한 권리가 있는 영상만 업로드하세요. 심의·저작권 위반 시 삭제·제재됩니다.</p>
+                </form>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">업로드한 영상 (<%= videos.length %>)</div>
+                <% if (!videos.length) { %>
+                    <div class="text-faint text-center" style="padding: 40px;">아직 업로드한 영상이 없습니다.</div>
+                <% } else { %>
+                    <table class="tx-table">
+                        <thead><tr><th>제목</th><th>스크립트</th><th>PPV 가격</th><th>업로드일</th><th></th></tr></thead>
+                        <tbody>
+                            <% videos.forEach(v => { %>
+                                <tr>
+                                    <td><a href="/bj/vid/<%= v.id %>" target="_blank"><%= v.title %></a></td>
+                                    <td><%= v.script_path ? '✓ 연동' : '—' %></td>
+                                    <td>
+                                        <form method="POST" action="/bj-studio/videos/<%= v.id %>/price" style="margin:0;display:flex;gap:4px;align-items:center;">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <input class="form-input" type="number" name="price" value="<%= v.price %>" min="0" max="100000" step="100" style="width:90px;padding:4px 8px;">
+                                            <button class="btn btn-sm btn-ghost">변경</button>
+                                        </form>
+                                    </td>
+                                    <td class="mono text-faint" style="font-size:11px;"><%= v.created_at %></td>
+                                    <td>
+                                        <form method="POST" action="/bj-studio/videos/<%= v.id %>/delete" style="margin:0;" onsubmit="return confirm('삭제할까요?');">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <button class="btn btn-sm btn-ghost" style="color:#FFB8B8;">삭제</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</section>

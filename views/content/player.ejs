@@ -1,0 +1,105 @@
+<section class="container">
+    <div class="player-wrap">
+        <div>
+            <% if (item.type === 'vr') { %>
+            <div class="player-video vr-stage" id="vr-stage">
+                <!-- 원본 VR 영상: 텍스처·오디오·funscript 타이밍 소스 (캔버스 뒤) -->
+                <video id="player-video" autoplay muted playsinline
+                       src="<%= item.video_path %>"
+                       poster="<%= item.thumbnail_path || '' %>"
+                       style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;"></video>
+                <canvas id="vr-canvas"></canvas>
+                <div class="vr-badge">🅥🆁 재투영 (평면 변환)</div>
+                <div class="vr-controls" id="vr-controls">
+                    <button type="button" id="vr-play" class="vr-ctrl-btn" title="재생/일시정지">⏸</button>
+                    <input type="range" id="vr-seek" class="vr-seek" min="0" max="1000" value="0">
+                    <span id="vr-time" class="vr-time mono">00:00 / 00:00</span>
+                    <button type="button" id="vr-mute" class="vr-ctrl-btn" title="음소거">🔇</button>
+                    <button type="button" id="vr-adjust" class="vr-ctrl-btn" title="화면 조절">⚙</button>
+                    <button type="button" id="vr-fs" class="vr-ctrl-btn" title="전체화면">⛶</button>
+                </div>
+            </div>
+            <% } else { %>
+            <div class="player-video">
+                <video id="player-video" controls autoplay muted playsinline
+                       src="<%= item.video_path %>"
+                       poster="<%= item.thumbnail_path || '' %>"></video>
+            </div>
+            <% } %>
+            <div class="player-info">
+                <div class="flex items-center gap-3 mb-3">
+                    <% if (item.type === 'vr') { %><span class="badge badge-vr">VR 원본 · 평면 재투영 보기</span><% } %>
+                    <% if (item.multi_axis) { %><span class="badge badge-multi">다축 (L0·R0·R2)</span><% } %>
+                    <% (item.tags || '').split(',').filter(Boolean).forEach(t => { %><span class="tag"><%= t.trim() %></span><% }) %>
+                </div>
+                <h1 class="player-title"><%= item.title %></h1>
+                <div class="player-creator"><%= item.creator %></div>
+                <p class="text-dim mt-4"><%= item.description %></p>
+            </div>
+        </div>
+
+        <aside class="player-side">
+            <div class="panel">
+                <div class="panel-title">스트리머와 함께</div>
+                <p class="text-dim mb-3" style="font-size:13px;">스트리머와 통화하면서 영상을 함께 볼 수 있습니다. 통화 중 스트리머가 영상을 틀어주고 디바이스도 조작합니다.</p>
+                <a href="/bj" class="btn btn-secondary btn-block">🎙 스트리머 통화하기 →</a>
+            </div>
+            <div class="panel">
+                <div class="panel-title">DEVICE STATUS</div>
+                <div id="player-dev-status" class="text-dim" style="font-size: 13px;">
+                    <span class="text-faint">우상단 메뉴에서 디바이스를 연결하세요.</span>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">강도 (STROKE RANGE)</div>
+                <div class="flex items-center gap-3">
+                    <input type="range" id="intensity-slider" min="20" max="100" value="100" step="5" style="flex:1;">
+                    <span id="intensity-value" class="mono" style="min-width: 48px; text-align: right;">100%</span>
+                </div>
+                <p class="text-faint" style="font-size: 11px; margin-top: 8px;">L0 스트로크 폭 조절. 회전축(R0/R2)는 그대로.</p>
+            </div>
+            <div class="panel">
+                <div class="panel-title">FUNSCRIPT</div>
+                <div class="text-dim mono" style="font-size: 12px;">
+                    <div>파일: <span id="fs-file" class="text-faint"><%= item.script_path || '없음' %></span></div>
+                    <div>축: <span id="fs-axes" class="text-faint">—</span></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<% if (item.type === 'vr') { %>
+<style>
+    .vr-stage { position: relative; background: #000; aspect-ratio: 16/9; overflow: hidden; border-radius: 12px; }
+    #vr-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; display: block; background: #000; }
+    .vr-badge {
+        position: absolute; top: 12px; left: 12px; z-index: 3;
+        background: rgba(123,45,255,0.85); color: #fff; font-size: 12px; font-weight: 700;
+        padding: 5px 10px; border-radius: 6px; letter-spacing: .3px; pointer-events: none;
+        box-shadow: 0 2px 10px rgba(0,0,0,.4);
+    }
+    .vr-controls {
+        position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+        display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+        background: linear-gradient(transparent, rgba(0,0,0,.75)); opacity: 0; transition: opacity .2s;
+    }
+    .vr-stage:hover .vr-controls, .vr-controls:focus-within { opacity: 1; }
+    .vr-ctrl-btn {
+        background: none; border: none; color: #fff; font-size: 18px; cursor: pointer;
+        line-height: 1; padding: 2px 4px;
+    }
+    .vr-seek { flex: 1; accent-color: var(--c-purple, #7B2DFF); cursor: pointer; height: 4px; }
+    .vr-time { color: #fff; font-size: 12px; min-width: 104px; text-align: right; }
+</style>
+<% } %>
+<script>
+window.__PLAYER__ = {
+    contentId: <%= item.id %>,
+    type:      "<%= item.type %>",
+    fsPath:    "<%= item.script_path || '' %>",
+    vrDefaults: <%- JSON.stringify(vrDefaults || null) %>
+};
+</script>
+<% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
+<script src="/js/pages/player.js?v=7"></script>

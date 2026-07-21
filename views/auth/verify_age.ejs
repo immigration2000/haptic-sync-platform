@@ -1,0 +1,24 @@
+<section class="auth-wrap">
+    <h1>연령 확인</h1>
+    <p class="sub">PULSE의 모든 콘텐츠는 만 19세 이상만 이용 가능합니다.</p>
+
+    <div style="background: rgba(255, 80, 80, 0.05); border: 1px solid rgba(255, 80, 80, 0.2); padding: 16px; border-radius: var(--rad-sm); margin-bottom: 24px; font-size: 13px; color: var(--tx-2); line-height: 1.6;">
+        <strong style="color: var(--c-pink);">⚠ 한국 합법 운영 — 19+</strong><br>
+        본 서비스는 청소년 보호법에 따라 만 19세 미만 이용을 제한합니다.
+        실제 운영 시에는 본인 명의 휴대폰 인증 / 신용카드 인증 / 아이핀 등 강력한 KYC가 적용됩니다.
+        (현재는 데모용 자기 확인)
+    </div>
+
+    <form method="POST" action="/auth/verify-age">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="form-checkbox">
+            <input type="checkbox" name="confirm" required>
+            본인은 만 19세 이상이며, 성인 콘텐츠 이용 책임을 인지합니다.
+        </label>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">인증 완료</button>
+    </form>
+
+    <div class="auth-foot">
+        <a href="/auth/logout">로그아웃</a>
+    </div>
+</section>

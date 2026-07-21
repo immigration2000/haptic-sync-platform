@@ -1,0 +1,30 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">ADMIN · TRANSACTIONS</div>
+            <h1 class="section-title">전체 거래 내역 (최근 30건)</h1>
+
+            <div class="card card-body">
+                <div style="overflow-x: auto;">
+                    <table class="tx-table">
+                        <thead><tr><th>일시</th><th>회원</th><th>구분</th><th>금액</th><th>잔액</th><th>설명</th></tr></thead>
+                        <tbody>
+                            <% txs.forEach(t => { %>
+                                <tr>
+                                    <td class="mono text-faint" style="font-size:11px;"><%= t.created_at %></td>
+                                    <td><%= t.nickname %></td>
+                                    <td><span class="badge"><%= t.type %></span></td>
+                                    <td class="mono <%= t.amount > 0 ? 'amt-pos' : 'amt-neg' %>"><%= t.amount > 0 ? '+' : '' %><%= t.amount.toLocaleString() %></td>
+                                    <td class="mono"><%= t.balance_after.toLocaleString() %></td>
+                                    <td class="text-dim"><%= t.description %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,25 @@
+<section class="auth-wrap">
+    <h1>로그인</h1>
+    <p class="sub">PULSE에 오신 것을 환영합니다.</p>
+
+    <% if (error) { %><div class="flash-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/auth/login">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div class="form-row">
+            <label class="form-label">아이디 / 이메일</label>
+            <input class="form-input" type="text" name="email" required autofocus>
+        </div>
+        <div class="form-row">
+            <label class="form-label">비밀번호</label>
+            <input class="form-input" type="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">로그인</button>
+    </form>
+
+    <div class="auth-foot">
+        <a href="/auth/forgot">비밀번호 찾기</a> · 계정이 없으신가요? <a href="/auth/register">회원가입</a><br>
+        <span class="text-faint mono" style="font-size:11px; margin-top: 8px; display:inline-block;">테스트: test@pulse.dev / 1234</span>
+    </div>
+</section>

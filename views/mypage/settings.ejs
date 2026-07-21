@@ -1,0 +1,81 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_layout_helper') %>
+
+        <div>
+            <h1 class="section-title">계정 설정</h1>
+
+            <% if (typeof error !== 'undefined' && error) { %><div class="flash-error"><%= error %></div><% } %>
+            <% if (typeof ok !== 'undefined' && ok) { %>
+                <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">✓ <%= ok %></div>
+            <% } %>
+
+            <div class="card card-body mb-5">
+                <div class="panel-title">계정 정보</div>
+                <div class="mono text-faint mb-4" style="font-size:13px; display:grid; grid-template-columns:100px 1fr; gap:6px 12px;">
+                    <span>이메일</span><span><%= user.email %></span>
+                    <span>가입일</span><span><%= user.created_at %></span>
+                    <span>역할</span><span><%= user.role.toUpperCase() %></span>
+                    <span>이메일 인증</span><span><%= user.age_verified ? '✓' : '미확인' %></span>
+                </div>
+
+                <form method="POST" action="/mypage/settings/nickname">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-row">
+                        <label class="form-label">닉네임</label>
+                        <input class="form-input" type="text" name="nickname" value="<%= user.nickname %>" maxlength="20" required>
+                    </div>
+                    <button class="btn btn-secondary">닉네임 변경</button>
+                </form>
+            </div>
+
+            <div class="card card-body mb-5">
+                <div class="panel-title">비밀번호 변경</div>
+                <form method="POST" action="/mypage/settings/password">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-row">
+                        <label class="form-label">현재 비밀번호</label>
+                        <input class="form-input" type="password" name="current" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">새 비밀번호 (8자 이상)</label>
+                        <input class="form-input" type="password" name="password" required minlength="8">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">새 비밀번호 확인</label>
+                        <input class="form-input" type="password" name="password2" required>
+                    </div>
+                    <button class="btn btn-primary">변경</button>
+                </form>
+            </div>
+
+            <% if (user.role !== 'bj' && user.role !== 'admin') { %>
+            <div class="card card-body mb-5" style="border-color: rgba(255, 184, 94, 0.3);">
+                <div class="panel-title" style="color: var(--c-yellow);">스트리머 신청</div>
+                <p class="text-dim mb-4" style="font-size: 13px;">스트리머가 되어 통화·라이브로 수익을 창출하세요. 관리자 심사 후 승인됩니다.</p>
+                <a href="/mypage/bj-apply" class="btn btn-ghost">신청서 작성 →</a>
+            </div>
+            <% } %>
+
+            <div class="card card-body" style="border-color: rgba(255, 80, 80, 0.3);">
+                <div class="panel-title" style="color: #FF8080;">⚠ 계정 삭제</div>
+                <p class="text-dim mb-4" style="font-size: 13px;">계정 + 모든 거래·시청 기록이 영구 삭제됩니다. 되돌릴 수 없습니다.</p>
+                <details>
+                    <summary style="cursor: pointer; color: #FFB8B8; font-size: 13px;">삭제 진행하기</summary>
+                    <form method="POST" action="/mypage/settings/delete" class="mt-4">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <div class="form-row">
+                            <label class="form-label">현재 비밀번호</label>
+                            <input class="form-input" type="password" name="password" required>
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">"계정삭제" 입력해주세요</label>
+                            <input class="form-input" type="text" name="confirm" placeholder="계정삭제" required>
+                        </div>
+                        <button class="btn btn-ghost" style="background: rgba(255, 80, 80, 0.1); border-color: rgba(255, 80, 80, 0.4); color: #FFB8B8;">계정 영구 삭제</button>
+                    </form>
+                </details>
+            </div>
+        </div>
+    </div>
+</section>

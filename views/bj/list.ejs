@@ -1,0 +1,127 @@
+<section class="container">
+    <div class="list-header">
+        <div>
+            <% if (typeof cowatchContent !== 'undefined' && cowatchContent) { %>
+                <div class="section-eyebrow">CO-WATCH · P2 · 영상 함께보기</div>
+                <h1 class="section-title" style="margin-bottom: 0;">「<%= cowatchContent.title %>」 함께 볼 스트리머 선택</h1>
+                <p class="text-dim mt-4">스트리머가 같은 영상을 모니터링하며 음성·동작으로 실시간 대응합니다.</p>
+            <% } else { %>
+                <div class="section-eyebrow">보이스 · 1:1</div>
+                <h1 class="section-title" style="margin-bottom: 0;">보이스</h1>
+                <p class="text-dim mt-4">스트리머와 음성으로 시작해서 골라보세요. 무료 체험 후 결제하면 이어지고, <strong>스트리머가 영상을 틀어주거나 캠으로 1:1, 디바이스를 직접 조작</strong>합니다.</p>
+            <% } %>
+        </div>
+    </div>
+
+    <% if (!bjs.length) { %>
+        <div class="text-center text-faint" style="padding: 80px 0;">등록된 스트리머가 없습니다.</div>
+    <% } else { %>
+        <div class="grid-list">
+            <!-- 더미 스트리머 (시연용) -->
+            <% if (typeof dummyRooms !== 'undefined' && dummyRooms.length) { %>
+                <% dummyRooms.forEach(bj => { %>
+                    <a class="card bj-card" href="/bj/dummy/<%= bj.id.replace('dummy_','') %>" style="border: 1px solid rgba(255,184,94,0.3);">
+                        <div class="bj-thumb" style="background: linear-gradient(135deg, #FFB85E, #FF2D5E);">
+                            <%= bj.stage_name.replace(/^[^가-힯a-zA-Z]+/,'').charAt(0) %>
+                        </div>
+                        <div class="bj-info">
+                            <div class="bj-name"><%= bj.stage_name %> <span class="badge" style="background:rgba(255,80,80,0.2); color:#FF8080; font-size:9px; padding:2px 6px; margin-left:6px;">🔴 LIVE</span></div>
+                            <div class="bj-desc"><%= bj.description %></div>
+                            <div class="content-tags">
+                                <% (bj.tags || '').split(',').filter(Boolean).slice(0,3).forEach(t => { %><span class="tag"><%= t.trim() %></span><% }) %>
+                            </div>
+                            <div class="bj-rate">
+                                <span>
+                                    <span class="bj-online-dot"></span><span style="color: var(--c-green);">방송 중</span>
+                                    <span style="color: var(--tx-faint); margin-left: 8px;"><%= bj.viewer_count %>명 시청</span>
+                                </span>
+                                <span><%= bj.rate_per_minute %> Rb/분</span>
+                            </div>
+                        </div>
+                    </a>
+                <% }) %>
+            <% } %>
+
+            <% bjs.forEach(bj => { %>
+                <% const baseHref = (typeof cowatchContent !== 'undefined' && cowatchContent)
+                    ? `/bj/cowatch/${bj.id}/${cowatchContent.id}`
+                    : `/bj/call/${bj.id}` %>
+                <div class="card bj-card bj-real-card <%= bj.is_online ? '' : 'bj-offline' %>"
+                     data-online="<%= bj.is_online ? '1' : '0' %>"
+                     data-name="<%= bj.stage_name %>"
+                     data-href="<%= baseHref %>"
+                     data-call="/bj/call/<%= bj.id %>"
+                     data-live="/bj/live/<%= bj.id %>"
+                     data-free="<%= bj.free_preview_sec %>"
+                     data-block="<%= bj.session_block_min %>"
+                     data-rate="<%= bj.rate_per_minute %>">
+                    <div class="bj-thumb bj-go" data-target="main"><%= (bj.stage_name || bj.nickname).replace(/^BJ-?/,'').charAt(0) %></div>
+                    <div class="bj-info">
+                        <div class="bj-go" data-target="main" style="cursor:pointer;">
+                            <div class="bj-name"><%= bj.stage_name %></div>
+                            <div class="bj-desc"><%= bj.description %></div>
+                            <div class="content-tags">
+                                <% (bj.tags || '').split(',').filter(Boolean).slice(0,3).forEach(t => { %><span class="tag"><%= t.trim() %></span><% }) %>
+                            </div>
+                            <div class="bj-rate">
+                                <span>
+                                    <% if (bj.is_online) { %><span class="bj-online-dot"></span><span style="color: var(--c-green);">온라인</span>
+                                    <% } else { %><span class="bj-offline-dot"></span>오프라인<% } %>
+                                </span>
+                                <span><%= bj.rate_per_minute %> Rb/분 · 무료 <%= bj.free_preview_sec %>초</span>
+                            </div>
+                            <div class="content-tags" style="margin-top:6px;">
+                                <span class="badge badge-multi">📞 통화</span>
+                                <% if (bj.rate_with_video > 0) { %><span class="badge badge-multi">🎬 모니터링</span><% } %>
+                                <% if (bj.rate_cam > 0) { %><span class="badge badge-multi">📷 캠</span><% } %>
+                            </div>
+                        </div>
+                        <% if (typeof cowatchContent === 'undefined' || !cowatchContent) { %>
+                            <div class="mt-3" style="border-top: 1px solid var(--border-soft); padding-top: 12px; display:flex; gap:8px;">
+                                <button class="btn btn-primary btn-sm bj-go" data-target="call" style="font-size:12px; flex:1;">📞 보이스 시작</button>
+                                <a class="btn btn-secondary btn-sm" href="/bj/<%= bj.id %>/library" style="font-size:12px;">📹 영상</a>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</section>
+
+<!-- 오프라인 안내 모달 -->
+<div id="offline-modal" class="ps-modal-backdrop" hidden>
+    <div class="ps-modal" style="text-align:center;">
+        <div style="font-size: 48px; margin-bottom: 12px;">😴</div>
+        <h3 class="ps-modal-title" id="offline-name">스트리머</h3>
+        <p class="text-dim mb-5" style="margin-top: 8px;">지금은 오프라인 상태입니다.<br>온라인일 때 다시 시도하거나 다른 스트리머를 찾아보세요.</p>
+        <button class="ps-btn-cancel" onclick="document.getElementById('offline-modal').hidden=true">확인</button>
+    </div>
+</div>
+
+<script>
+(function () {
+    const modal = document.getElementById('offline-modal');
+    const nameEl = document.getElementById('offline-name');
+
+    document.querySelectorAll('.bj-real-card .bj-go').forEach(el => {
+        el.addEventListener('click', (e) => {
+            const card = el.closest('.bj-real-card');
+            const online = card.dataset.online === '1';
+            const target = el.dataset.target; // main | call | live
+            if (!online) {
+                e.preventDefault();
+                nameEl.textContent = card.dataset.name + ' 는(은) 오프라인';
+                modal.hidden = false;
+                return;
+            }
+            // 온라인 → 이동
+            let url = card.dataset.href;
+            if (target === 'call') url = card.dataset.call;
+            if (target === 'live') url = card.dataset.live;
+            location.href = url;
+        });
+    });
+    // 더미 카드는 항상 온라인 — 별도 처리 불필요 (a href 그대로)
+})();
+</script>

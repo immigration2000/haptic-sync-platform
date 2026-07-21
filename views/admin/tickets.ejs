@@ -1,0 +1,26 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <h1 class="section-title">고객센터 문의</h1>
+            <% if (!tickets.length) { %>
+                <div class="text-faint text-center" style="padding: 80px 0;">문의 없음.</div>
+            <% } else { %>
+                <% tickets.forEach(t => { %>
+                    <div class="card card-body mb-3">
+                        <div class="flex items-center gap-3 mb-2">
+                            <strong><%= t.subject %></strong>
+                            <span class="badge"><%= t.status %></span>
+                            <span class="text-faint mono" style="font-size:11px; margin-left:auto;"><%= t.created_at %></span>
+                        </div>
+                        <div class="text-faint mono mb-3" style="font-size:11px;">
+                            <%= t.nickname || t.email || '익명' %>
+                        </div>
+                        <div class="text-dim" style="font-size:13px; white-space:pre-wrap;"><%= t.body %></div>
+                    </div>
+                <% }) %>
+            <% } %>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,52 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_layout_helper') %>
+
+        <div>
+            <div class="balance-card">
+                <div class="label">RUBY BALANCE</div>
+                <div class="value"><%= (user.credits || 0).toLocaleString() %></div>
+                <a href="/mypage/billing" class="btn btn-secondary btn-sm">충전 →</a>
+            </div>
+
+            <div class="grid grid-3 mb-6">
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size:11px;">SUBSCRIPTION</div>
+                    <div class="mt-4 mb-3" style="font-size:18px; font-weight:700;">
+                        <% if (user.subscription_until) { %>
+                            <span style="color: var(--c-green);">활성</span>
+                        <% } else { %>
+                            <span class="text-faint">미가입</span>
+                        <% } %>
+                    </div>
+                    <a href="/pricing" class="btn btn-ghost btn-sm">요금제</a>
+                </div>
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size:11px;">ROLE</div>
+                    <div class="mt-4 mb-3" style="font-size:18px; font-weight:700;"><%= user.role.toUpperCase() %></div>
+                    <div class="text-faint" style="font-size: 11px;"><%= user.role === 'bj' ? '스트리머 콘솔 사용 가능' : '일반 사용자' %></div>
+                </div>
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size:11px;">AGE</div>
+                    <div class="mt-4 mb-3" style="font-size:18px; font-weight:700;">
+                        <% if (user.age_verified) { %>
+                            <span style="color: var(--c-green);">✓ 19+</span>
+                        <% } else { %>
+                            <span style="color: var(--c-pink);">미인증</span>
+                        <% } %>
+                    </div>
+                    <% if (!user.age_verified) { %><a href="/auth/verify-age" class="btn btn-secondary btn-sm">인증하기</a><% } %>
+                </div>
+            </div>
+
+            <div class="card card-body">
+                <div class="panel-title">빠른 이동</div>
+                <div class="grid grid-3 gap-3">
+                    <a href="/content/vr" class="btn btn-ghost">VR 영상 →</a>
+                    <a href="/content/vod" class="btn btn-ghost">VOD →</a>
+                    <a href="/bj" class="btn btn-ghost">스트리머 통화 →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

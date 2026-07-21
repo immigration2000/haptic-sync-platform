@@ -1,0 +1,31 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">ADMIN · USERS</div>
+            <h1 class="section-title">회원 목록 (최근 20명)</h1>
+
+            <div class="card card-body">
+                <div style="overflow-x: auto;">
+                    <table class="tx-table">
+                        <thead><tr><th>ID</th><th>이메일</th><th>닉네임</th><th>역할</th><th>크레딧</th><th>연령</th><th>가입일</th></tr></thead>
+                        <tbody>
+                            <% users.forEach(u => { %>
+                                <tr>
+                                    <td class="mono"><%= u.id %></td>
+                                    <td><%= u.email %></td>
+                                    <td><strong><%= u.nickname %></strong></td>
+                                    <td><span class="badge"><%= u.role.toUpperCase() %></span></td>
+                                    <td class="mono"><%= (u.credits || 0).toLocaleString() %></td>
+                                    <td><%= u.age_verified ? '<span style="color: var(--c-green);">✓</span>' : '<span style="color: var(--c-pink);">✗</span>' %></td>
+                                    <td class="mono text-faint" style="font-size: 11px;"><%= u.created_at %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

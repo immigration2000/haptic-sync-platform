@@ -1,0 +1,88 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <% if (typeof req !== 'undefined') {} %>
+            <div class="section-eyebrow">ADMIN · DASHBOARD</div>
+            <h1 class="section-title">관리자 대시보드</h1>
+
+            <div class="grid grid-4 mb-6">
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size: 11px;">회원</div>
+                    <div style="font-size: 32px; font-weight: 700; margin-top: 8px;"><%= stats.users %></div>
+                </div>
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size: 11px;">스트리머</div>
+                    <div style="font-size: 32px; font-weight: 700; margin-top: 8px;"><%= stats.bjs %></div>
+                </div>
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size: 11px;">콘텐츠</div>
+                    <div style="font-size: 32px; font-weight: 700; margin-top: 8px;"><%= stats.contents %></div>
+                </div>
+                <div class="card card-body text-center">
+                    <div class="mono text-faint" style="font-size: 11px;">더미 방</div>
+                    <div style="font-size: 32px; font-weight: 700; margin-top: 8px;"><%= stats.dummyRooms %></div>
+                </div>
+            </div>
+
+            <div class="grid grid-2 mb-6">
+                <div class="card card-body">
+                    <div class="panel-title">충전 (RUBY)</div>
+                    <div style="font-size: 28px; font-weight: 700; color: var(--c-green);" class="mono">+<%= stats.sumCharges.toLocaleString() %></div>
+                </div>
+                <div class="card card-body">
+                    <div class="panel-title">사용 (RUBY)</div>
+                    <div style="font-size: 28px; font-weight: 700; color: var(--c-pink);" class="mono">-<%= stats.sumSpends.toLocaleString() %></div>
+                </div>
+            </div>
+
+            <% if (typeof req !== 'undefined' && req.query && req.query.saved) { %>
+                <div class="flash-error" style="background: rgba(0,220,130,0.1); border-color: rgba(0,220,130,0.3); color: #5EFFB0;">✓ 설정이 저장되었습니다.</div>
+            <% } %>
+
+            <div class="card card-body">
+                <div class="panel-title">사이트 설정</div>
+                <form method="POST" action="/admin/settings">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <label class="form-checkbox" style="font-size: 14px;">
+                        <input type="checkbox" name="dummy_bj_enabled" <%= dummyEnabled ? 'checked' : '' %>>
+                        <strong>더미 스트리머 방 활성화</strong> — 스트리머 목록과 LIVE 로비에 가짜 방송 표시 (시연용)
+                    </label>
+                    <label class="form-checkbox" style="font-size: 14px;">
+                        <input type="checkbox" name="maintenance_mode" <%= maintMode ? 'checked' : '' %>>
+                        점검 모드 (사용자 접근 차단)
+                    </label>
+                    <div class="form-row mt-4">
+                        <label class="form-label">사이트 전체 공지 (비우면 미표시)</label>
+                        <input class="form-input" type="text" name="site_message" value="<%= siteMessage %>" maxlength="200" placeholder="예: 6/15 정기 점검 안내…">
+                    </div>
+
+                    <div class="mt-4" style="border-top:1px solid var(--border-soft);padding-top:12px;">
+                        <div class="form-label" style="margin-bottom:8px;">VR 평면 재투영 기본값 <span class="text-faint" style="font-size:11px;">(사용자가 안 바꾸면 적용되는 초기 화면)</span></div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">확대(출력 FOV) 50~160</label>
+                                <input class="form-input" type="number" name="vr_hfov" min="50" max="160" step="1" value="<%= vrReproject.hFovDeg %>">
+                            </div>
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">직선 보정(어안 FOV) 60~230</label>
+                                <input class="form-input" type="number" name="vr_fisheye" min="60" max="230" step="1" value="<%= vrReproject.fisheyeFovDeg %>">
+                            </div>
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">상하 시점 -80~80</label>
+                                <input class="form-input" type="number" name="vr_pitch" min="-80" max="80" step="0.5" value="<%= vrReproject.pitchDeg %>">
+                            </div>
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">좌우 시점 -80~80</label>
+                                <input class="form-input" type="number" name="vr_yaw" min="-80" max="80" step="0.5" value="<%= vrReproject.yawDeg %>">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary mt-4">저장</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>

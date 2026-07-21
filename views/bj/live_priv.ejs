@@ -1,0 +1,54 @@
+<section class="container">
+    <div class="player-wrap">
+        <div>
+            <div class="player-video" style="position: relative;">
+                <video id="bj-video" autoplay playsinline style="width:100%; aspect-ratio: 16/9; background: #000;"></video>
+                <!-- 사용자 자신 카메라(작게, 우하단) -->
+                <video id="my-video" autoplay playsinline muted style="position:absolute; bottom:16px; right:16px; width:160px; aspect-ratio: 4/3; background:#000; border:2px solid rgba(255,255,255,0.2); border-radius:8px; display:none;"></video>
+            </div>
+            <div class="player-info">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="badge" style="background: rgba(255,80,80,0.2); color: #FF8080; border: 1px solid rgba(255,80,80,0.4);">🔴 PRIVATE LIVE</span>
+                </div>
+                <h1 class="player-title"><%= bj.stage_name %></h1>
+                <div class="player-creator">비공개 1:1 라이브 — 영상 + 음성 + 디바이스 풀패키지</div>
+                <p class="text-dim mt-4"><%= bj.description %></p>
+            </div>
+        </div>
+
+        <aside class="player-side">
+            <div class="panel">
+                <div class="panel-title">SESSION</div>
+                <div id="lp-state" class="text-dim mb-3" style="font-size: 13px;">스트리머 호출 중…</div>
+                <div class="mono text-faint" style="font-size: 12px; display: grid; grid-template-columns: 100px 1fr; gap: 6px 12px;">
+                    <span>요금</span><span style="color: var(--c-yellow);"><%= bj.rate_per_minute * 2 %> Rb/분 (비공개 ×2)</span>
+                    <span>시간</span><span id="lp-elapsed">00:00</span>
+                    <span>예상 차감</span><span id="lp-charge">0 Rb</span>
+                    <span>수신</span><span id="lp-recv">0 cmd</span>
+                </div>
+                <div id="lp-actions" class="flex gap-2 mt-4 hidden">
+                    <button id="btn-mic" class="btn btn-secondary btn-sm" style="flex:1;">🎤</button>
+                    <button id="btn-cam" class="btn btn-secondary btn-sm" style="flex:1;">📹 내 카메라</button>
+                    <button id="btn-hangup" class="btn btn-ghost btn-sm" style="flex:1; color:#FFB8B8; border-color:rgba(255,80,80,0.4);">종료</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">DEVICE</div>
+                <div id="player-dev-status" class="text-dim" style="font-size: 13px;"><span class="text-faint">우상단 메뉴에서 디바이스 연결</span></div>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<script>
+window.__LIVE_PRIV__ = {
+    bjUserId: <%= bj.id %>,
+    bjName:   "<%= bj.stage_name %>",
+    rate:     <%= bj.rate_per_minute * 2 %>,
+};
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/vendor/simple-peer.min.js"></script>
+<script src="/js/core/bj_session.js"></script>
+<script src="/js/pages/live_priv.js"></script>

@@ -1,0 +1,112 @@
+<%
+  var u = (typeof user !== 'undefined') ? user : null;
+  var p = (typeof path !== 'undefined' && path) ? path : '';
+  var aVod    = p.startsWith('/content');
+  var aVoice  = p === '/bj' || p.startsWith('/bj/call') || p.startsWith('/bj/cowatch') || (p.startsWith('/bj/live') && !p.startsWith('/bj/live-lobby'));
+  var aLive   = p === '/bj/live-lobby' || p.startsWith('/bj/watch');
+  var aPricing= p === '/pricing';
+  var aStudio = p.startsWith('/bj-studio') || p === '/bj/console' || p === '/bj/broadcast';
+  var aAdmin  = p.startsWith('/admin');
+  var aMy     = p.startsWith('/mypage');
+%>
+<header class="header">
+    <div class="container header-inner">
+        <button class="m-burger" id="m-burger" aria-label="메뉴">☰</button>
+        <a href="/" class="brand">PULSE</a>
+        <nav>
+            <ul class="nav">
+                <li><a href="/content/vod" class="<%= aVod ? 'active' : '' %>">영상</a></li>
+                <li><a href="/bj"          class="<%= aVoice ? 'active' : '' %>">보이스</a></li>
+                <li><a href="/bj/live-lobby" class="<%= aLive ? 'active' : '' %>" style="color: #FF8080;">🔴 라이브</a></li>
+                <li><a href="/pricing"     class="<%= aPricing ? 'active' : '' %>">요금제</a></li>
+                <% if (u && (u.role === 'bj' || u.role === 'admin')) { %>
+                    <li><a href="/bj-studio" class="<%= aStudio ? 'active' : '' %>" style="color: var(--c-pink);">🎬 스튜디오</a></li>
+                <% } %>
+                <% if (u && u.role === 'admin') { %>
+                    <li><a href="/admin" class="<%= aAdmin ? 'active' : '' %>" style="color: var(--c-yellow);">⚙ 관리자</a></li>
+                <% } %>
+            </ul>
+        </nav>
+
+        <div class="header-right">
+            <!-- 디바이스 연결 버튼 (전역 PulseDevice 바인딩) -->
+            <div class="header-device-wrap">
+                <button type="button" id="pulse-device-btn" class="pulse-device-btn">
+                    <span class="pulse-device-dot"></span>
+                    <span class="pulse-device-label">디바이스</span>
+                </button>
+                <div id="pulse-device-popover" class="pulse-device-popover" hidden>
+                    <div class="pulse-pop-arrow"></div>
+                    <div class="pulse-pop-section" id="pulse-pop-disc">
+                        <div class="pulse-pop-title">디바이스 연결</div>
+                        <p class="pulse-pop-desc">OSR2+ / SR6 / PULSE 등 TCode V3 호환 디바이스</p>
+                        <button id="pulse-btn-connect-usb" class="pulse-btn-primary">🔌 USB 연결</button>
+                        <button id="pulse-btn-connect-ble" class="pulse-btn-secondary">📡 Bluetooth 연결</button>
+                        <p class="pulse-pop-hint" id="pulse-pop-hint"></p>
+                    </div>
+                    <div class="pulse-pop-section pulse-hidden" id="pulse-pop-conn">
+                        <div class="pulse-pop-row"><span class="pulse-k">상태</span><span class="pulse-v pulse-ok">● 연결됨</span></div>
+                        <div class="pulse-pop-row"><span class="pulse-k">방식</span><span class="pulse-v" id="pulse-kind">—</span></div>
+                        <div class="pulse-pop-row"><span class="pulse-k">디바이스</span><span class="pulse-v" id="pulse-port">—</span></div>
+                        <div class="pulse-pop-row"><span class="pulse-k">송신</span><span class="pulse-v" id="pulse-sent">0 cmd</span></div>
+                        <div class="pulse-pop-divider"></div>
+                        <button id="pulse-btn-disconnect" class="pulse-btn-ghost">연결 해제</button>
+                    </div>
+                </div>
+            </div>
+
+            <% if (u) { %>
+                <a href="/mypage" class="user-pill">
+                    <span class="avatar"><%= (u.nickname || '?').charAt(0) %></span>
+                    <span><%= u.nickname %></span>
+                    <span class="balance"><%= (u.credits || 0).toLocaleString() %> Rb</span>
+                </a>
+                <a href="/auth/logout" class="icon-btn" title="로그아웃">↪</a>
+            <% } else { %>
+                <a href="/auth/login" class="btn btn-ghost btn-sm">로그인</a>
+                <a href="/auth/register" class="btn btn-primary btn-sm">회원가입</a>
+            <% } %>
+        </div>
+    </div>
+</header>
+
+<!-- 모바일 슬라이드 메뉴 (좁은 화면 전용) -->
+<div class="m-drawer-ov" id="m-drawer-ov"></div>
+<aside class="m-drawer" id="m-drawer" aria-label="메뉴">
+    <div class="m-dh">
+        <span class="brand">PULSE</span>
+        <button class="m-dx" id="m-drawer-x" aria-label="닫기">×</button>
+    </div>
+    <% if (u) { %>
+        <a href="/mypage" class="m-duser">
+            <span class="avatar"><%= (u.nickname || '?').charAt(0) %></span>
+            <span style="flex:1;"><%= u.nickname %></span>
+            <span style="color:var(--c-yellow);font-size:12px;"><%= (u.credits || 0).toLocaleString() %> Rb</span>
+        </a>
+    <% } %>
+    <a href="/content/vod"   class="<%= aVod ? 'active' : '' %>">🎬 영상</a>
+    <a href="/bj"            class="<%= aVoice ? 'active' : '' %>">🎤 보이스</a>
+    <a href="/bj/live-lobby" class="<%= aLive ? 'active' : '' %>">🔴 라이브</a>
+    <a href="/pricing"       class="<%= aPricing ? 'active' : '' %>">💳 요금제</a>
+    <% if (u && (u.role === 'bj' || u.role === 'admin')) { %>
+        <a href="/bj-studio" class="<%= aStudio ? 'active' : '' %>" style="color: var(--c-pink);">🎬 스튜디오</a>
+    <% } %>
+    <% if (u && u.role === 'admin') { %>
+        <a href="/admin" class="<%= aAdmin ? 'active' : '' %>" style="color: var(--c-yellow);">⚙ 관리자</a>
+    <% } %>
+    <a href="#" id="m-dev-connect">🔌 디바이스 연결 <span id="m-dev-state" style="margin-left:auto;font-size:12px;color:var(--tx-3);"></span></a>
+    <% if (u) { %>
+        <a href="/auth/logout">↪ 로그아웃</a>
+    <% } else { %>
+        <a href="/auth/login">로그인</a>
+        <a href="/auth/register" style="color: var(--c-pink);">회원가입</a>
+    <% } %>
+</aside>
+
+<!-- 모바일 하단 탭바 (좁은 화면 전용) -->
+<nav class="m-tabbar" aria-label="모바일 탭">
+    <a href="/content/vod"   class="<%= aVod ? 'active' : '' %>"><span class="ic">🎬</span><span>영상</span></a>
+    <a href="/bj"            class="<%= aVoice ? 'active' : '' %>"><span class="ic">🎤</span><span>보이스</span></a>
+    <a href="/bj/live-lobby" class="<%= aLive ? 'active' : '' %>"><span class="ic">🔴</span><span>라이브</span></a>
+    <a href="<%= u ? '/mypage' : '/auth/login' %>" class="<%= aMy ? 'active' : '' %>"><span class="ic">👤</span><span>마이</span></a>
+</nav>

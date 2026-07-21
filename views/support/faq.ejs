@@ -1,0 +1,21 @@
+<section class="container section" style="max-width: 800px;">
+    <h1 class="section-title">FAQ — 자주 묻는 질문</h1>
+
+    <% const FAQ = [
+        ['디바이스가 연결이 안 됩니다.', 'Chrome/Edge 89+ 데스크탑 또는 Chrome Android만 지원합니다. USB Serial 또는 Bluetooth LE (Nordic UART Service)를 사용합니다. 디바이스 가이드 참고.'],
+        ['HTTPS가 아닌데 디바이스 연결이 됩니다?', 'localhost는 예외적으로 HTTPS 없이도 동작합니다. 외부 도메인은 HTTPS 필수입니다 (Cloudflare 터널 자동 적용).'],
+        ['스트리머가 되려면?', '마이페이지 → 스트리머 신청 메뉴에서 신청서 작성. 관리자 심사 후 승인됩니다.'],
+        ['Ruby 환불은?', '결제일로부터 7일 이내, 사용하지 않은 경우 100% 환불 가능. support@pulse.local 로 문의.'],
+        ['연령 인증을 했는데도 일부 콘텐츠가 안 보입니다.', '연령 인증 + 이메일 인증 모두 완료되어야 합니다. 마이페이지 → 계정 설정에서 확인.'],
+        ['스트리머 통화/라이브 중 음성이 안 들립니다.', '마이크/스피커 권한 허용 + 스트리머 콘솔에서 "사용자 음성 듣기" 토글 확인. 같은 방에서 동시 테스트 시 헤드폰 사용.'],
+        ['시청 기록은 얼마나 보관되나요?', '최근 50건까지 보관. 더 오래된 기록은 자동 삭제.'],
+        ['외부에서 접속이 안 됩니다.', '폰 서버 환경: Cloudflare 임시 터널 URL은 폰 재부팅 시 변경됩니다. 사장님께 새 URL 문의.'],
+    ] %>
+
+    <% FAQ.forEach(([q, a]) => { %>
+        <details class="card card-body mb-3" style="cursor: pointer;">
+            <summary style="font-weight: 600; padding: 4px 0;"><%= q %></summary>
+            <p class="text-dim mt-3" style="line-height: 1.6; font-size: 14px;"><%= a %></p>
+        </details>
+    <% }) %>
+</section>

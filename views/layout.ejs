@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <title><%= typeof title !== 'undefined' ? title + ' · PULSE' : 'PULSE' %></title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/components.css?v=mnav2">
+    <link rel="stylesheet" href="/css/pulse_device.css">
+    <link rel="stylesheet" href="/css/pages.css">
+    <link rel="stylesheet" href="/css/bj_session.css">
+    <%- typeof style !== 'undefined' ? style : '' %>
+</head>
+<body>
+<div class="app">
+    <%- include('components/header') %>
+
+    <main class="main">
+        <%- body %>
+    </main>
+
+    <%- include('components/footer') %>
+</div>
+
+<script src="/js/core/device_drivers.js?v=1"></script>
+<script src="/js/core/device.js?v=2"></script>
+<script src="/js/core/funscript.js"></script>
+<script src="/js/core/header.js?v=mnav2"></script>
+<%- typeof script !== 'undefined' ? script : '' %>
+</body>
+</html>

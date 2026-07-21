@@ -1,0 +1,73 @@
+<section class="container">
+    <div class="player-wrap">
+        <div>
+            <div class="player-video">
+                <video id="player-video" controls autoplay muted playsinline
+                       src="<%= content.video_path %>"
+                       poster="<%= content.thumbnail_path || '' %>"></video>
+            </div>
+            <div class="player-info">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="badge badge-vr" style="background: linear-gradient(135deg, rgba(123,45,255,0.3), rgba(255,45,94,0.2));">CO-WATCH</span>
+                    <% if (content.type === 'vr') { %><span class="badge badge-vr">VR</span><% } %>
+                    <% if (content.multi_axis) { %><span class="badge badge-multi">다축</span><% } %>
+                </div>
+                <h1 class="player-title"><%= content.title %></h1>
+                <div class="player-creator">함께 보는 스트리머: <strong style="color: var(--c-pink);"><%= bj.stage_name %></strong></div>
+            </div>
+        </div>
+
+        <aside class="player-side">
+            <div class="panel">
+                <div class="panel-title">CO-WATCH SESSION</div>
+                <div id="cw-state" class="text-dim mb-3" style="font-size: 13px;">스트리머 호출 중…</div>
+                <div class="mono text-faint" style="font-size: 12px; display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px;">
+                    <span>스트리머</span><span><%= bj.stage_name %></span>
+                    <span>시간</span><span id="cw-elapsed">00:00</span>
+                    <span>디바이스 모드</span><span id="cw-dmode">자동 (스크립트)</span>
+                    <span>수신</span><span id="cw-recv">0 cmd</span>
+                </div>
+                <div id="cw-actions" class="flex gap-2 mt-4 hidden">
+                    <button id="btn-mic" class="btn btn-secondary btn-sm" style="flex:1;">🎤 마이크</button>
+                    <button id="btn-hangup" class="btn btn-ghost btn-sm" style="flex:1; color: #FFB8B8; border-color: rgba(255,80,80,0.4);">종료</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">DEVICE MODE — 디바이스 제어</div>
+                <p class="text-faint mb-3" style="font-size: 12px;">스크립트 자동 = funscript 따라감 · 스트리머 수동 = 스트리머가 직접 조작</p>
+                <div class="flex gap-2">
+                    <button id="btn-mode-script" class="btn btn-primary btn-sm" style="flex:1;">자동 (스크립트)</button>
+                    <button id="btn-mode-manual" class="btn btn-ghost btn-sm" style="flex:1;">스트리머 수동</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">DEVICE STATUS</div>
+                <div id="player-dev-status" class="text-dim" style="font-size: 13px;"><span class="text-faint">우상단 메뉴에서 디바이스 연결</span></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">강도</div>
+                <div class="flex items-center gap-3">
+                    <input type="range" id="intensity-slider" min="20" max="100" value="100" step="5" style="flex:1;">
+                    <span id="intensity-value" class="mono" style="min-width: 48px; text-align: right;">100%</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<script>
+window.__COWATCH__ = {
+    role: 'user',
+    bjUserId: <%= bj.id %>,
+    bjName: "<%= bj.stage_name %>",
+    contentId: <%= content.id %>,
+    fsPath: "<%= content.script_path || '' %>"
+};
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/vendor/simple-peer.min.js"></script>
+<script src="/js/core/bj_session.js"></script>
+<script src="/js/pages/cowatch.js"></script>
