@@ -23,6 +23,26 @@
     let activeId = null;
     const enc = (s) => new TextEncoder().encode(s);
 
+    /* 캐노니컬 TCode → 표준 와이어 포맷 정규화
+     *   L050I100  →  L0500I0100
+     * - 위치는 "0.xx" 소수 표기라 **우측** 패딩 3자리 (50→500, 05→050). padStart 쓰면 50→050(5%)이 되어 완전히 틀림.
+     * - 보간 I는 밀리초 **정수**라 좌측 패딩 4자리 + 1~9999 클램프 (긴 공백 구간에서 5자리 나와 파싱 깨지는 것 방지).
+     * - D1 / DSTOP 등 축 명령이 아닌 것은 그대로 통과.
+     * - 다축 동시 송신("L065I100 R055I100")은 토큰별로 정규화.
+     */
+    function normTok(tok) {
+        const m = /^([A-Z]\d)(\d+)(?:I(\d+))?$/.exec(tok);
+        if (!m) return tok;
+        const pos = (m[2] + '00').slice(0, 3);
+        let iv = '';
+        if (m[3]) {
+            const ms = Math.min(9999, Math.max(1, parseInt(m[3], 10)));
+            iv = 'I' + String(ms).padStart(4, '0');
+        }
+        return m[1] + pos + iv;
+    }
+    const normTCode = (cmd) => String(cmd).trim().split(/\s+/).map(normTok).join(' ');
+
     function register(d) {
         drivers[d.id] = d;
         if (!activeId) activeId = d.id;   // 첫 등록 드라이버가 기본
@@ -32,7 +52,7 @@
     register({
         id: 'tcode_v3',
         name: 'TCode V3 (OSR2 · SR6 · PULSE)',
-        serialBaud: 9600,
+        serialBaud: 115200,          // TCode 기기 표준. 9600이면 포트는 열리지만 기기가 명령을 못 읽어 안 움직임.
         ble: {
             service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',   // Nordic UART Service
             txChar:  '6e400002-b5a3-f393-e0a9-e50e24dcca9e',   // client → device (write)
@@ -41,7 +61,7 @@
         init: ['D1', 'L050I500'],
         stop: 'DSTOP',
         idle: 'L050I300',
-        encode(cmd) { return enc(cmd + '\n'); },                // TCode 그대로 (개행 종단)
+        encode(cmd) { return enc(normTCode(cmd) + '\n'); },     // 표준 자릿수로 정규화 후 개행 종단
     });
 
     /* ── 예시: 여성용 하드웨어 드라이버 ──────────────────────────────────────

@@ -51,7 +51,9 @@
             popConn.classList.remove('pulse-hidden');
             kindLbl.textContent = status.kind === 'serial' ? 'USB Serial' :
                                   status.kind === 'bluetooth' ? 'Bluetooth LE' : '—';
-            portLbl.textContent = status.portLabel || '—';
+            // 기기 응답이 오면 함께 표시 — 응답이 있다 = baud 맞고 실제 통신 중
+            portLbl.textContent = (status.portLabel || '—')
+                + (status.deviceInfo ? '  ↩ ' + String(status.deviceInfo).slice(0, 28) : '');
             sentLbl.textContent = status.sentCount.toLocaleString() + ' cmd';
         } else {
             btn.classList.remove('connected');

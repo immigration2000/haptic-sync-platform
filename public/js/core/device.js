@@ -23,7 +23,7 @@
 
     // 활성 하드웨어 드라이버 (device_drivers.js). 미로드 시 TCode V3 폴백.
     const FALLBACK_DRIVER = {
-        id: 'tcode_v3', name: 'TCode V3', serialBaud: 9600,
+        id: 'tcode_v3', name: 'TCode V3', serialBaud: 115200,   // TCode 표준 (9600이면 기기가 명령 못 읽음)
         ble: { service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', txChar: '6e400002-b5a3-f393-e0a9-e50e24dcca9e', write: 'withoutResponse' },
         init: ['D1', 'L050I500'], stop: 'DSTOP', idle: 'L050I300',
         encode: (cmd) => new TextEncoder().encode(cmd + '\n'),
@@ -35,9 +35,12 @@
         connected: false,
         sentCount: 0,
         portLabel: '',
+        deviceInfo: '',       // 기기가 보내온 마지막 응답 (통신 검증용)
         // serial
         port: null,
         writer: null,
+        reader: null,
+        readDone: null,
         // bluetooth
         btDevice: null,
         btChar: null,
@@ -58,12 +61,43 @@
             kind:               state.kind,
             sentCount:          state.sentCount,
             portLabel:          state.portLabel,
+            deviceInfo:         state.deviceInfo,   // 기기 응답 (있으면 통신 정상 = baud 맞음)
         };
+    }
+
+    // ─── 기기 응답 읽기 ───────────────────────────────────────
+    // baud가 맞아야 정상 텍스트가 돌아온다. 연결 직후 'D1'에 대한 펌웨어 응답이 오면
+    // "포트만 열린 게 아니라 기기와 실제로 통신 중"임이 증명된다. (진단용)
+    async function startSerialRead(port) {
+        try {
+            const dec = new TextDecoderStream();
+            state.readDone = port.readable.pipeTo(dec.writable).catch(() => {});
+            const reader = dec.readable.getReader();
+            state.reader = reader;
+            let buf = '';
+            for (;;) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buf += value;
+                let i;
+                while ((i = buf.indexOf('\n')) >= 0) {
+                    const line = buf.slice(0, i).trim();
+                    buf = buf.slice(i + 1);
+                    if (line) {
+                        state.deviceInfo = line;
+                        console.log('[PulseDevice] ← ' + line);
+                        notify();
+                    }
+                }
+                if (buf.length > 300) buf = buf.slice(-300);
+            }
+        } catch (_) { /* 연결 종료 시 정상 이탈 */ }
     }
 
     // ─── Serial 연결 ─────────────────────────────────────────
     async function openSerialInternal(port) {
         await port.open({ baudRate: drv().serialBaud });
+        startSerialRead(port);                       // 응답 수신 시작 (await 안 함)
         const writer = port.writable.getWriter();
         state.port      = port;
         state.writer    = writer;
@@ -135,6 +169,12 @@
                     try { await send(drv().stop); } catch (_) {}
                     try { state.writer.releaseLock(); } catch (_) {}
                 }
+                // 읽기 스트림 먼저 정리해야 port.close()가 걸리지 않음
+                if (state.reader) {
+                    try { await state.reader.cancel(); } catch (_) {}
+                    try { state.reader.releaseLock(); } catch (_) {}
+                }
+                if (state.readDone) { try { await state.readDone; } catch (_) {} }
                 if (state.port) {
                     try { await state.port.close(); } catch (_) {}
                 }
@@ -147,6 +187,9 @@
         } finally {
             state.port = null;
             state.writer = null;
+            state.reader = null;
+            state.readDone = null;
+            state.deviceInfo = '';
             state.btDevice = null;
             state.btChar = null;
             state.kind = null;
