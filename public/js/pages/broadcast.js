@@ -43,6 +43,11 @@
         });
         socket.on('viewer-left', ({ viewerId }) => removeViewer(viewerId));
         socket.on('chat-msg', ({ text, sender, ts }) => appendChat(sender, text, ts));
+
+        // 후원 알림 — 서버가 결제 확정 후 방송 룸에 발송 (위조 불가)
+        socket.on('donation', ({ from, amount, message }) => {
+            appendChat('💎 후원', `${from} 님이 ${Number(amount).toLocaleString()} Ruby!` + (message ? ` — ${message}` : ''), Date.now());
+        });
         socket.on('broadcast-ready', () => enableDeviceControl());
     });
 

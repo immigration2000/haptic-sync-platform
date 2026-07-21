@@ -161,6 +161,18 @@ CREATE TABLE IF NOT EXISTS bj_applications (
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 후원 (1:다수 방송 — 입장 무료 + 후원 수익 모델)
+CREATE TABLE IF NOT EXISTS donations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_bj_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount        INTEGER NOT NULL,                      -- 후원자가 낸 Ruby
+    net_amount    INTEGER NOT NULL,                      -- 스트리머 정산액 (플랫폼 수수료 제외)
+    message       TEXT,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_donations_bj ON donations(to_bj_user_id, created_at);
+
 -- 커스텀 태그 마스터 (의상·주제 등). 서비스 태그 4종과 별개 — server/tags.js
 CREATE TABLE IF NOT EXISTS tags (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

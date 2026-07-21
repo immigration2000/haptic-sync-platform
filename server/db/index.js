@@ -117,6 +117,15 @@ const stmts = {
     updateBJServices:  db.prepare('UPDATE bj_profiles SET services = ? WHERE user_id = ?'),
     updateBJFlags:     db.prepare('UPDATE bj_profiles SET device_control = ?, show_sub_videos = ? WHERE user_id = ?'),
 
+    // ── 후원 (1:다수 방송) ──
+    insertDonation:    db.prepare(`INSERT INTO donations (from_user_id, to_bj_user_id, amount, net_amount, message)
+                                   VALUES (?, ?, ?, ?, ?)`),
+    listBJDonations:   db.prepare(`SELECT d.*, u.nickname AS from_nick FROM donations d
+                                   JOIN users u ON u.id = d.from_user_id
+                                   WHERE d.to_bj_user_id = ? ORDER BY d.created_at DESC LIMIT 100`),
+    sumBJDonations:    db.prepare(`SELECT COALESCE(SUM(net_amount),0) AS net, COALESCE(SUM(amount),0) AS gross,
+                                          COUNT(*) AS cnt FROM donations WHERE to_bj_user_id = ?`),
+
     // ── 커스텀 태그 (server/tags.js) ──
     findTagByName:     db.prepare('SELECT * FROM tags WHERE name = ?'),
     insertTag:         db.prepare('INSERT INTO tags (name, category, status, created_by) VALUES (?, ?, ?, ?)'),

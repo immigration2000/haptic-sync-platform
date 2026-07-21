@@ -71,6 +71,65 @@
         chatLog.scrollTop = chatLog.scrollHeight;
     });
 
+    /* ── 후원 ──────────────────────────────────────────────
+     * 결제는 서버 API로만 이뤄지고, 알림은 서버가 방송 룸에 쏜다.
+     * (클라이언트가 소켓으로 후원을 '주장'하는 경로는 없음 — 위조 방지) */
+    const donateState = document.getElementById('donate-state');
+    const donateMsg   = document.getElementById('donate-msg');
+
+    document.querySelectorAll('.donate-amt').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const amount = parseInt(btn.dataset.amt, 10);
+            if (!confirm(`${amount.toLocaleString()} Ruby를 후원할까요?`)) return;
+            document.querySelectorAll('.donate-amt').forEach(b => b.disabled = true);
+            donateState.textContent = '후원 처리 중…';
+            try {
+                const r = await fetch('/bj/donate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-csrf-token': (document.querySelector('meta[name=csrf-token]') || {}).content || '',
+                    },
+                    body: JSON.stringify({ toBjUserId: CFG.bjUserId, amount, message: donateMsg.value.trim() }),
+                });
+                const j = await r.json();
+                if (j.ok) {
+                    donateState.innerHTML = '<span style="color:var(--c-green);">✓ 후원 완료 · 잔액 '
+                        + Number(j.balance).toLocaleString() + ' Ruby</span>';
+                    donateMsg.value = '';
+                } else if (j.reason === 'INSUFFICIENT') {
+                    donateState.innerHTML = '<span style="color:var(--c-pink);">잔액 부족 (보유 '
+                        + Number(j.balance || 0).toLocaleString() + ')</span>';
+                } else {
+                    donateState.innerHTML = '<span style="color:var(--c-pink);">후원 실패: ' + (j.reason || '오류') + '</span>';
+                }
+            } catch (_) {
+                donateState.innerHTML = '<span style="color:var(--c-pink);">네트워크 오류</span>';
+            }
+            document.querySelectorAll('.donate-amt').forEach(b => b.disabled = false);
+        });
+    });
+
+    // 서버가 결제 확정 후 보내는 후원 알림 — 방송 룸 전원이 함께 본다
+    socket.on('donation', ({ from, amount, message }) => {
+        const div = document.createElement('div');
+        div.style.cssText = 'margin:6px 0;padding:7px 9px;border-radius:7px;'
+            + 'background:rgba(255,184,94,.12);border:1px solid rgba(255,184,94,.35);';
+        const head = document.createElement('div');
+        head.style.cssText = 'color:var(--c-yellow);font-weight:700;font-size:12px;';
+        head.textContent = '💎 ' + from + ' 님이 ' + Number(amount).toLocaleString() + ' Ruby 후원!';
+        div.appendChild(head);
+        if (message) {
+            const m = document.createElement('div');
+            m.className = 'text-dim';
+            m.style.fontSize = '11px';
+            m.textContent = message;          // textContent — XSS 차단
+            div.appendChild(m);
+        }
+        chatLog.appendChild(div);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    });
+
     chatSend.addEventListener('click', sendChat);
     chatInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
     function sendChat() {

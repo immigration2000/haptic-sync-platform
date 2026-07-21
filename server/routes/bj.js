@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { stmts, getSettingBool, adjustCredits } = require('../db');
+const { stmts, getSettingBool, getSetting, adjustCredits } = require('../db');
 const { requireAgeVerified, requireRole, requireLogin } = require('../middleware/auth');
 const activeSessions = require('../signaling/active_sessions');
 const { videoAccess } = require('../access');
@@ -61,6 +61,60 @@ router.get('/session/info/:bjUserId', requireLogin, (req, res) => {
         balance: req.user.credits,
         affordable: req.user.credits >= cost,
     });
+});
+
+/* ── 후원 (1:다수 방송의 수익 모델) ───────────────────────────────
+ * 입장은 무료이고 시청자가 자발적으로 Ruby를 보낸다.
+ *
+ * 보안 원칙 (돈이 걸린 경로):
+ *  1) 금액·대상 검증을 전부 서버에서 한다. 클라이언트 값은 신뢰하지 않는다.
+ *  2) 차감/지급은 adjustCredits(DB 트랜잭션)로 원자적 처리 — 잔액 부족은 예외로 롤백.
+ *  3) 후원 알림 소켓은 **결제 성공 후 서버가 직접** 쏜다.
+ *     클라이언트가 "후원했다"고 소켓으로 알리는 경로를 두면 무료로 위조 가능하므로 만들지 않는다.
+ *  4) 자기 자신에게 후원 금지(수치 조작 방지).
+ */
+const MIN_DONATE = 10, MAX_DONATE = 1000000;
+
+router.post('/donate', requireLogin, express.json(), (req, res) => {
+    const toId   = parseInt(req.body.toBjUserId, 10);
+    const amount = parseInt(req.body.amount, 10);
+    const message = String(req.body.message || '').slice(0, 100);
+
+    if (!Number.isInteger(toId) || !Number.isInteger(amount)) {
+        return res.status(400).json({ ok: false, reason: 'BAD_REQUEST' });
+    }
+    if (amount < MIN_DONATE || amount > MAX_DONATE) {
+        return res.status(400).json({ ok: false, reason: 'BAD_AMOUNT', min: MIN_DONATE, max: MAX_DONATE });
+    }
+    if (toId === req.user.id) return res.status(400).json({ ok: false, reason: 'SELF_DONATE' });
+
+    const bj = stmts.findBJ.get(toId);
+    if (!bj) return res.status(404).json({ ok: false, reason: 'BJ_NOT_FOUND' });
+    if (req.user.credits < amount) {
+        return res.json({ ok: false, reason: 'INSUFFICIENT', balance: req.user.credits, needed: amount });
+    }
+
+    // 플랫폼 수수료 (설정값, 기본 25%)
+    const feePct = Math.min(90, Math.max(0, parseInt(getSetting('platform_fee_pct') || '25', 10) || 25));
+    const net = Math.floor(amount * (100 - feePct) / 100);
+
+    let balance;
+    try {
+        balance = adjustCredits(req.user.id, -amount, 'spend', `${bj.stage_name} 후원`);
+        adjustCredits(toId, net, 'reward', `${req.user.nickname} 후원 (수수료 ${feePct}%)`);
+        stmts.insertDonation.run(req.user.id, toId, amount, net, message);
+    } catch (e) {
+        return res.json({ ok: false, reason: 'DONATE_FAILED', message: e.message });
+    }
+
+    // 결제가 확정된 뒤 서버가 방송 룸 전체에 알림 (위조 불가 경로)
+    try {
+        require('../signaling/io_ref').toBroadcast(toId, 'donation', {
+            from: req.user.nickname, amount, message, at: Date.now(),
+        });
+    } catch (_) {}
+
+    res.json({ ok: true, amount, balance });
 });
 
 // 시간제 결제 — 한 블록(N분) 차감

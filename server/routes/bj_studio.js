@@ -118,7 +118,13 @@ router.get('/earnings', (req, res) => {
     // 정산 (운영 시 BJ 75%, 플랫폼 25%)
     const SHARE = 0.75;
     const payable = Math.floor((stats.total_earned || 0) * SHARE);
-    res.render('bj_studio/earnings', { title: '수익 내역', profile, stats, payable, calls, share: SHARE });
+    // 후원 수익 (1:다수 방송) — net_amount는 이미 수수료가 빠진 정산액
+    const donSum  = stmts.sumBJDonations.get(req.user.id) || { net: 0, gross: 0, cnt: 0 };
+    const donList = stmts.listBJDonations.all(req.user.id);
+    res.render('bj_studio/earnings', {
+        title: '수익 내역', profile, stats, payable, calls, share: SHARE,
+        donSum, donList,
+    });
 });
 
 // 통화/방송 기록

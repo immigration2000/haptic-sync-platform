@@ -18,6 +18,7 @@ module.exports = (httpServer, sessionMiddleware) => {
         cors: { origin: '*' },
         maxHttpBufferSize: 1e6,
     });
+    require('./io_ref').set(io);   // HTTP 라우트(후원 등)에서 룸 알림을 보낼 수 있게 공유
 
     // ── 소켓 핸드셰이크에서 Express 세션 검증 ──
     // 클라이언트가 보내는 userId를 신뢰하지 않고, 로그인 세션에서 신원을 끌어온다.

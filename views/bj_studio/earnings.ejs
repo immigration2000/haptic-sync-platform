@@ -60,6 +60,46 @@
                     </table>
                 <% } %>
             </div>
+
+            <!-- 후원 수익 (1:다수 방송) -->
+            <div class="card card-body mt-5" style="border-color: rgba(255,184,94,0.3);">
+                <div class="panel-title">💎 후원 수익 <span class="text-faint" style="font-size:11px;">1:다수 방송 · 입장 무료 + 후원</span></div>
+                <div class="grid grid-3 mb-4">
+                    <div class="text-center">
+                        <div class="mono text-faint" style="font-size:11px;">후원 건수</div>
+                        <div style="font-size:24px;font-weight:700;margin-top:6px;"><%= donSum.cnt %></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="mono text-faint" style="font-size:11px;">총 후원액</div>
+                        <div class="mono" style="font-size:24px;font-weight:700;margin-top:6px;"><%= (donSum.gross||0).toLocaleString() %></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="mono text-faint" style="font-size:11px;">내 정산액</div>
+                        <div class="mono" style="font-size:24px;font-weight:700;margin-top:6px;color:var(--c-yellow);"><%= (donSum.net||0).toLocaleString() %></div>
+                    </div>
+                </div>
+                <% if (!donList.length) { %>
+                    <p class="text-faint" style="font-size:13px;">아직 후원 내역이 없습니다.</p>
+                <% } else { %>
+                    <table style="width:100%;font-size:13px;">
+                        <thead><tr class="text-faint" style="font-size:11px;">
+                            <th style="text-align:left;padding:6px 0;">후원자</th><th style="text-align:left;">메시지</th>
+                            <th style="text-align:right;">후원액</th><th style="text-align:right;">정산</th><th style="text-align:right;">일시</th>
+                        </tr></thead>
+                        <tbody>
+                        <% donList.forEach(function (d) { %>
+                            <tr style="border-top:1px solid var(--border-soft);">
+                                <td style="padding:7px 0;"><%= d.from_nick %></td>
+                                <td class="text-dim" style="font-size:12px;"><%= d.message || '—' %></td>
+                                <td class="mono" style="text-align:right;"><%= d.amount.toLocaleString() %></td>
+                                <td class="mono amt-pos" style="text-align:right;">+<%= d.net_amount.toLocaleString() %></td>
+                                <td class="text-faint" style="text-align:right;font-size:11px;"><%= String(d.created_at).slice(5, 16) %></td>
+                            </tr>
+                        <% }) %>
+                        </tbody>
+                    </table>
+                <% } %>
+            </div>
         </div>
     </div>
 </section>

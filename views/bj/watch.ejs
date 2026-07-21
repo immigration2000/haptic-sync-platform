@@ -35,6 +35,19 @@
             </div>
 
             <div class="panel">
+                <div class="panel-title">💎 후원</div>
+                <p class="text-faint" style="font-size:11px;margin-bottom:8px;">입장은 무료입니다. 마음에 들면 스트리머를 후원해보세요.</p>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                    <% [100, 500, 1000, 5000].forEach(function (a) { %>
+                        <button class="btn btn-secondary btn-sm donate-amt" data-amt="<%= a %>"><%= a.toLocaleString() %></button>
+                    <% }) %>
+                </div>
+                <input id="donate-msg" placeholder="응원 메시지 (선택)" maxlength="100"
+                       style="width:100%;background:var(--bg-2);border:1px solid var(--border-soft);border-radius:6px;color:white;padding:8px 10px;font-size:12px;">
+                <div id="donate-state" class="text-faint" style="font-size:11px;margin-top:6px;min-height:16px;"></div>
+            </div>
+
+            <div class="panel">
                 <div class="panel-title">CHAT</div>
                 <div id="chat-log" style="height:240px; overflow-y:auto; background:var(--bg-0); border:1px solid var(--border-soft); border-radius:8px; padding:10px; font-size:12px;"></div>
                 <div class="flex gap-2 mt-3">
