@@ -53,6 +53,8 @@ router.get('/profile', (req, res) => {
         title: '프로필 편집', profile,
         serviceTypes: svcTypes.SERVICE_TYPES,
         mySvc: svcTypes.normalizeList(profile && profile.services),
+        approvedTags: stmts.listApprovedTags.all(),           // 골라 쓰는 공용 태그
+        tagMode: require('../tags').getMode(),                // approval | filter | open
         error: req.session.flash, ok: req.session.flashOk,
     });
     req.session.flash = null; req.session.flashOk = null;
@@ -84,7 +86,12 @@ router.post('/profile', (req, res) => {
     if (subP > 100000) subP = 100000;
     let subD = parseInt(sub_days || '30', 10);
     if (isNaN(subD) || subD < 1 || subD > 365) subD = 30;
-    stmts.updateBJProfile.run(stage_name, (description || '').slice(0, 300), rate, (tags || '').slice(0, 100),
+    // 커스텀 태그 — 운영 모드(approval/filter/open)에 따라 즉시적용·승인대기·차단으로 갈림
+    const tagEngine = require('../tags');
+    const tagRes = tagEngine.submitForStreamer(req.user.id, tags, req.user.id);
+    const tagStr = tagRes.attached.join(',').slice(0, 100);   // 레거시 표시용 컬럼도 동기화
+
+    stmts.updateBJProfile.run(stage_name, (description || '').slice(0, 300), rate, tagStr,
                               free, block, rateV, rateC, subP, subD, req.user.id);
     // 서비스 태그 — 고정 4종 enum (server/service_types.js가 단일 기준).
     // 자유입력 불가: 구 코드는 자동 변환, 유효하지 않은 값은 버림, 최소 1개 보장.
@@ -95,7 +102,11 @@ router.post('/profile', (req, res) => {
     const devCtrl  = req.body.device_control  ? 1 : 0;   // 기기 제어 제공 여부
     const showSub  = req.body.show_sub_videos ? 1 : 0;   // 구독전용 영상 카탈로그 노출
     stmts.updateBJFlags.run(devCtrl, showSub, req.user.id);
-    req.session.flashOk = '프로필 업데이트 완료.';
+
+    let msg = '프로필 업데이트 완료.';
+    if (tagRes.pending.length)  msg += ` 태그 ${tagRes.pending.length}건은 관리자 승인 대기(${tagRes.pending.join(', ')}).`;
+    if (tagRes.rejected.length) msg += ` 차단된 태그: ${tagRes.rejected.map(r => r.name + '(' + r.reason + ')').join(', ')}.`;
+    req.session.flashOk = msg;
     res.redirect('/bj-studio/profile');
 });
 

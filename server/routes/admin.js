@@ -111,6 +111,46 @@ router.post('/contents/add', (req, res) => {
 });
 
 // 고객센터 문의 내역
+// ─── 커스텀 태그 관리 (운영 모드 전환 · 승인/차단 · 금지어) ───
+const tagEngine = require('../tags');
+
+router.get('/tags', (req, res) => {
+    res.render('admin/tags', {
+        title: '태그 관리',
+        mode: tagEngine.getMode(),
+        modes: tagEngine.MODES,
+        banned: tagEngine.getBannedWords().join(', '),
+        coreBlock: tagEngine.CORE_BLOCK,
+        pending: stmts.listTagsByStatus.all('pending'),
+        approved: stmts.listTagsByStatus.all('approved'),
+        rejected: stmts.listTagsByStatus.all('rejected'),
+        ok: req.session.flashOk,
+    });
+    req.session.flashOk = null;
+});
+
+router.post('/tags/mode', (req, res) => {
+    tagEngine.setMode(req.body.mode);
+    req.session.flashOk = `태그 운영 모드를 '${req.body.mode}'로 변경했습니다.`;
+    res.redirect('/admin/tags');
+});
+
+router.post('/tags/banned', (req, res) => {
+    tagEngine.setBannedWords(req.body.banned);
+    req.session.flashOk = '금지어 목록을 저장했습니다.';
+    res.redirect('/admin/tags');
+});
+
+router.post('/tags/:id/:action', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const act = req.params.action;
+    if (act === 'approve')      stmts.setTagStatus.run('approved', id);
+    else if (act === 'reject')  stmts.setTagStatus.run('rejected', id);
+    else if (act === 'delete')  stmts.deleteTag.run(id);
+    req.session.flashOk = '처리 완료.';
+    res.redirect('/admin/tags');
+});
+
 router.get('/tickets', (req, res) => {
     res.render('admin/tickets', { title: '고객센터 문의', tickets: stmts.listTickets.all() });
 });

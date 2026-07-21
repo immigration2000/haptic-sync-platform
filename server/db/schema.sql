@@ -161,6 +161,26 @@ CREATE TABLE IF NOT EXISTS bj_applications (
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 커스텀 태그 마스터 (의상·주제 등). 서비스 태그 4종과 별개 — server/tags.js
+CREATE TABLE IF NOT EXISTS tags (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT UNIQUE NOT NULL,
+    category    TEXT NOT NULL DEFAULT '기타',            -- 의상 | 주제 | 분위기 | 컨셉 | 기타
+    status      TEXT NOT NULL DEFAULT 'pending',         -- pending | approved | rejected
+    use_count   INTEGER NOT NULL DEFAULT 0,
+    created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tags_status ON tags(status);
+
+-- 스트리머 ↔ 태그 (승인된 태그만 연결)
+CREATE TABLE IF NOT EXISTS bj_tags (
+    bj_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tag_id      INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (bj_user_id, tag_id)
+);
+CREATE INDEX IF NOT EXISTS idx_bj_tags_tag ON bj_tags(tag_id);
+
 -- 신고
 CREATE TABLE IF NOT EXISTS reports (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,

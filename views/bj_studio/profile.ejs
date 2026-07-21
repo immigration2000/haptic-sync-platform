@@ -29,7 +29,38 @@
                         </div>
                         <div class="form-row">
                             <label class="form-label">태그 (콤마 구분)</label>
-                            <input class="form-input" type="text" name="tags" value="<%= profile.tags || '' %>" placeholder="#청순,#성숙,#텍니션" maxlength="100">
+                            <input class="form-input" type="text" id="tag-input" name="tags" value="<%= profile.tags || '' %>" placeholder="예: 청순,성숙,코스프레" maxlength="100">
+                            <% if (approvedTags && approvedTags.length) { %>
+                                <div class="text-faint mt-2" style="font-size:11px;">공용 태그 — 눌러서 추가</div>
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+                                    <% approvedTags.slice(0, 30).forEach(function (t) { %>
+                                        <button type="button" class="tag tag-pick" data-tag="<%= t.name %>"
+                                                style="cursor:pointer;border:1px solid var(--border-soft);background:none;">
+                                            <%= t.name %><% if (t.use_count) { %> <span class="text-faint"><%= t.use_count %></span><% } %>
+                                        </button>
+                                    <% }) %>
+                                </div>
+                            <% } %>
+                            <p class="text-faint mt-2" style="font-size:11px;">
+                                <% if (tagMode === 'approval') { %>
+                                    현재 <strong>승인제</strong> — 공용 태그는 바로 적용되고, 새 태그는 관리자 승인 후 공개됩니다.
+                                <% } else if (tagMode === 'filter') { %>
+                                    현재 <strong>자유입력(금지어 필터)</strong> — 금지어만 아니면 즉시 적용됩니다.
+                                <% } else { %>
+                                    현재 <strong>자유입력</strong> — 입력한 태그가 즉시 적용됩니다.
+                                <% } %>
+                                최대 10개.
+                            </p>
+                            <script>
+                            document.addEventListener('click', function (e) {
+                                var b = e.target.closest && e.target.closest('.tag-pick');
+                                if (!b) return;
+                                var inp = document.getElementById('tag-input');
+                                var cur = inp.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                                var t = b.getAttribute('data-tag');
+                                if (cur.indexOf(t) === -1) { cur.push(t); inp.value = cur.join(','); }
+                            });
+                            </script>
                         </div>
                     </div>
                     <div class="grid grid-2 gap-3">

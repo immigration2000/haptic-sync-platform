@@ -117,6 +117,19 @@ const stmts = {
     updateBJServices:  db.prepare('UPDATE bj_profiles SET services = ? WHERE user_id = ?'),
     updateBJFlags:     db.prepare('UPDATE bj_profiles SET device_control = ?, show_sub_videos = ? WHERE user_id = ?'),
 
+    // ── 커스텀 태그 (server/tags.js) ──
+    findTagByName:     db.prepare('SELECT * FROM tags WHERE name = ?'),
+    insertTag:         db.prepare('INSERT INTO tags (name, category, status, created_by) VALUES (?, ?, ?, ?)'),
+    listTagsByStatus:  db.prepare('SELECT * FROM tags WHERE status = ? ORDER BY use_count DESC, name'),
+    listApprovedTags:  db.prepare("SELECT * FROM tags WHERE status = 'approved' ORDER BY use_count DESC, name"),
+    setTagStatus:      db.prepare('UPDATE tags SET status = ? WHERE id = ?'),
+    setTagCategory:    db.prepare('UPDATE tags SET category = ? WHERE id = ?'),
+    deleteTag:         db.prepare('DELETE FROM tags WHERE id = ?'),
+    clearBJTags:       db.prepare('DELETE FROM bj_tags WHERE bj_user_id = ?'),
+    addBJTag:          db.prepare('INSERT OR IGNORE INTO bj_tags (bj_user_id, tag_id) VALUES (?, ?)'),
+    listBJTags:        db.prepare(`SELECT t.* FROM tags t JOIN bj_tags b ON b.tag_id = t.id
+                                   WHERE b.bj_user_id = ? AND t.status = 'approved' ORDER BY t.name`),
+
     // BJ 개인 영상
     listBJVideos:      db.prepare('SELECT * FROM bj_videos WHERE bj_user_id = ? ORDER BY created_at DESC'),
     insertBJVideo:     db.prepare('INSERT INTO bj_videos (bj_user_id, title, video_path, script_path, price) VALUES (?, ?, ?, ?, ?)'),

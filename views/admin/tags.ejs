@@ -1,0 +1,114 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">관리자 · 태그</div>
+            <h1 class="section-title">커스텀 태그 관리</h1>
+            <p class="text-dim mb-5">의상·주제 등 정보 전달용 태그. 서비스 태그 4종(음성/영상 × 1:1/1:다수)은 고정이라 여기서 관리하지 않습니다.</p>
+
+            <% if (ok) { %><div class="flash-error mt-3" style="background:rgba(0,220,130,0.1);border-color:rgba(0,220,130,0.3);color:#5EFFB0;">✓ <%= ok %></div><% } %>
+
+            <!-- 운영 모드 -->
+            <div class="card card-body mb-4">
+                <div class="panel-title">운영 모드</div>
+                <p class="text-faint" style="font-size:12px;margin-bottom:12px;">상황에 맞게 언제든 전환하세요. 전환 즉시 적용됩니다.</p>
+                <form method="POST" action="/admin/tags/mode">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="svc-grid">
+                        <label class="svc-item">
+                            <input type="radio" name="mode" value="approval" <%= mode === 'approval' ? 'checked' : '' %>>
+                            <div><strong>🔒 승인제</strong><span>공용 태그만 즉시 적용, 새 태그는 승인 후 공개 (가장 안전)</span></div>
+                        </label>
+                        <label class="svc-item">
+                            <input type="radio" name="mode" value="filter" <%= mode === 'filter' ? 'checked' : '' %>>
+                            <div><strong>🛡 자유입력 + 금지어 필터</strong><span>금지어만 차단하고 나머지는 즉시 적용</span></div>
+                        </label>
+                        <label class="svc-item">
+                            <input type="radio" name="mode" value="open" <%= mode === 'open' ? 'checked' : '' %>>
+                            <div><strong>🔓 자유입력</strong><span>관리자 금지어 미적용 (가장 느슨)</span></div>
+                        </label>
+                    </div>
+                    <button class="btn btn-primary btn-sm mt-4">모드 저장</button>
+                </form>
+                <p class="text-faint mt-3" style="font-size:11px;">
+                    ⚠ 어떤 모드에서도 <strong>법적 차단어</strong>(미성년·불법 암시)는 항상 차단됩니다 — 운영 정책이 아니라 법적 안전장치라 끌 수 없습니다.
+                    <br><span class="mono" style="font-size:10px;color:var(--tx-3);"><%= coreBlock.slice(0, 12).join(' · ') %> … 외 <%= Math.max(0, coreBlock.length - 12) %>개</span>
+                </p>
+            </div>
+
+            <!-- 금지어 -->
+            <div class="card card-body mb-4">
+                <div class="panel-title">금지어 목록 <span class="text-faint" style="font-size:11px;">(자유입력+필터 모드에서 적용)</span></div>
+                <form method="POST" action="/admin/tags/banned">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input class="form-input" type="text" name="banned" value="<%= banned %>" placeholder="쉼표로 구분 — 예: 금지어1, 금지어2">
+                    <button class="btn btn-secondary btn-sm mt-3">저장</button>
+                </form>
+            </div>
+
+            <!-- 승인 대기 -->
+            <div class="card card-body mb-4" style="border-color: rgba(255,184,94,0.4);">
+                <div class="panel-title">승인 대기 <span style="color:var(--c-yellow);"><%= pending.length %></span></div>
+                <% if (!pending.length) { %>
+                    <p class="text-faint" style="font-size:13px;">대기 중인 태그가 없습니다.</p>
+                <% } else { %>
+                    <table style="width:100%;font-size:13px;">
+                        <% pending.forEach(function (t) { %>
+                        <tr style="border-bottom:1px solid var(--border-soft);">
+                            <td style="padding:8px 0;"><strong><%= t.name %></strong></td>
+                            <td class="text-faint" style="font-size:11px;"><%= t.created_at %></td>
+                            <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end;padding:8px 0;">
+                                <form method="POST" action="/admin/tags/<%= t.id %>/approve" style="margin:0;">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <button class="btn btn-primary btn-sm">승인</button>
+                                </form>
+                                <form method="POST" action="/admin/tags/<%= t.id %>/reject" style="margin:0;">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <button class="btn btn-ghost btn-sm">거절</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </table>
+                <% } %>
+            </div>
+
+            <!-- 승인된 태그 -->
+            <div class="card card-body mb-4">
+                <div class="panel-title">사용 중인 태그 <span class="text-faint"><%= approved.length %></span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                    <% approved.forEach(function (t) { %>
+                        <span class="tag" style="display:inline-flex;align-items:center;gap:6px;">
+                            <%= t.name %>
+                            <span class="text-faint" style="font-size:10px;"><%= t.use_count %></span>
+                            <form method="POST" action="/admin/tags/<%= t.id %>/reject" style="margin:0;display:inline;">
+                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                <button style="background:none;border:none;color:var(--tx-3);cursor:pointer;padding:0 2px;" title="차단">×</button>
+                            </form>
+                        </span>
+                    <% }) %>
+                    <% if (!approved.length) { %><span class="text-faint" style="font-size:13px;">아직 승인된 태그가 없습니다.</span><% } %>
+                </div>
+            </div>
+
+            <!-- 차단된 태그 -->
+            <% if (rejected.length) { %>
+            <div class="card card-body">
+                <div class="panel-title">차단됨 <span class="text-faint"><%= rejected.length %></span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                    <% rejected.forEach(function (t) { %>
+                        <span class="tag" style="opacity:.5;display:inline-flex;align-items:center;gap:6px;">
+                            <%= t.name %>
+                            <form method="POST" action="/admin/tags/<%= t.id %>/approve" style="margin:0;display:inline;">
+                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                <button style="background:none;border:none;color:var(--c-green);cursor:pointer;padding:0 2px;" title="다시 승인">↺</button>
+                            </form>
+                        </span>
+                    <% }) %>
+                </div>
+            </div>
+            <% } %>
+        </div>
+    </div>
+</section>
