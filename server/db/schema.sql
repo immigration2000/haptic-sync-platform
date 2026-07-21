@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS bj_profiles (
     session_block_min INTEGER NOT NULL DEFAULT 5,            -- 시간제 결제 단위(분)
     sub_price        INTEGER NOT NULL DEFAULT 0,             -- 구독권 가격 (Ruby, 0 = 구독 미제공)
     sub_days         INTEGER NOT NULL DEFAULT 30,            -- 구독 기간(일)
-    services         TEXT NOT NULL DEFAULT 'call,cowatch,live-priv,broadcast',  -- 제공 서비스 (콤마)
+    services         TEXT NOT NULL DEFAULT 'voice_1on1',                        -- 서비스 태그(고정 4종, 콤마) — server/service_types.js
+    device_control   INTEGER NOT NULL DEFAULT 1,                                -- 기기 제어 제공 여부 (서비스와 직교)
+    show_sub_videos  INTEGER NOT NULL DEFAULT 1,                                -- 구독전용 영상을 전체 카탈로그에 노출
     tags             TEXT,                                    -- comma-separated
     rating_avg       REAL NOT NULL DEFAULT 0,
     rating_count     INTEGER NOT NULL DEFAULT 0,

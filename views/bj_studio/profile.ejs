@@ -42,28 +42,40 @@
                             <input class="form-input" type="number" name="session_block_min" value="<%= profile.session_block_min %>" min="1" max="60" required>
                         </div>
                     </div>
-                    <% const svc = (profile.services || 'call,cowatch,live-priv,broadcast').split(','); %>
                     <div class="form-row">
-                        <label class="form-label">제공 서비스 (사용자가 선택 가능한 항목)</label>
+                        <label class="form-label">서비스 태그 <span style="color:var(--c-red);">*필수</span> — 어떤 방식으로 진행하나요?</label>
+                        <div class="svc-grid">
+                            <% serviceTypes.forEach(function (s) { %>
+                            <label class="svc-item">
+                                <input type="checkbox" name="services" value="<%= s.code %>" <%= mySvc.includes(s.code) ? 'checked' : '' %>>
+                                <div>
+                                    <strong><%= s.icon %> <%= s.label %></strong>
+                                    <span><%= s.desc %></span>
+                                    <span style="color:<%= s.billing === 'donation' ? 'var(--c-green)' : 'var(--c-yellow)' %>;font-size:10px;">
+                                        <%= s.billing === 'donation' ? '입장 무료 · 후원' : '분당 과금' %>
+                                    </span>
+                                </div>
+                            </label>
+                            <% }) %>
+                        </div>
+                        <p class="text-faint mt-2" style="font-size: 11px;">
+                            체크한 서비스만 사용자에게 노출되고 방송 시작이 가능합니다. 최소 1개 필요.
+                            <br>※ 의상·주제 같은 <strong>커스텀 태그</strong>는 아래 태그 항목에서 따로 지정합니다.
+                        </p>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="form-label">추가 옵션</label>
                         <div class="svc-grid">
                             <label class="svc-item">
-                                <input type="checkbox" name="services" value="call" <%= svc.includes('call') ? 'checked' : '' %>>
-                                <div><strong>📞 통화</strong><span>음성 + 디바이스</span></div>
+                                <input type="checkbox" name="device_control" value="1" <%= profile.device_control ? 'checked' : '' %>>
+                                <div><strong>🔌 기기 제어 제공</strong><span>내가 시청자 디바이스를 조작</span></div>
                             </label>
                             <label class="svc-item">
-                                <input type="checkbox" name="services" value="cowatch" <%= svc.includes('cowatch') ? 'checked' : '' %>>
-                                <div><strong>🎙 함께보기</strong><span>영상 동시 시청 + 음성</span></div>
-                            </label>
-                            <label class="svc-item">
-                                <input type="checkbox" name="services" value="live-priv" <%= svc.includes('live-priv') ? 'checked' : '' %>>
-                                <div><strong>🎬 비공개 라이브</strong><span>1:1 영상+음성+디바이스</span></div>
-                            </label>
-                            <label class="svc-item">
-                                <input type="checkbox" name="services" value="broadcast" <%= svc.includes('broadcast') ? 'checked' : '' %>>
-                                <div><strong>🔴 공개 라이브</strong><span>1:다수 송출</span></div>
+                                <input type="checkbox" name="show_sub_videos" value="1" <%= profile.show_sub_videos ? 'checked' : '' %>>
+                                <div><strong>🔓 구독전용 영상 노출</strong><span>전체 영상 목록에 잠금 상태로 표시 (구독 유도)</span></div>
                             </label>
                         </div>
-                        <p class="text-faint mt-2" style="font-size: 11px;">체크한 서비스만 사용자에게 표시되고 스튜디오에서 방송 시작 가능.</p>
                     </div>
 
                     <div class="card card-body mb-4" style="border-color: rgba(123,45,255,0.2);">

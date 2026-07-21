@@ -8,9 +8,11 @@
             <p class="text-dim mb-5"><%= profile.description || '자기소개를 입력해주세요.' %></p>
 
             <!-- 빠른 액션 -->
-            <% const svc = (profile.services || 'call,cowatch,live-priv,broadcast').split(',');
-               const labels = { call:'📞 통화', cowatch:'🎙 함께보기', 'live-priv':'🎬 비공개 라이브' };
-               const oneToOne = ['call','cowatch','live-priv'].filter(s => svc.includes(s)); %>
+            <% const svc = (profile.services || 'voice_1on1').split(',');
+               const labels = { voice_1on1:'🎤 1:1 음성통화', video_1on1:'📷 1:1 영상통화',
+                                voice_multi:'📻 음성방송', video_multi:'📺 영상방송' };
+               const oneToOne = ['voice_1on1','video_1on1'].filter(s => svc.includes(s));
+               const multi    = ['voice_multi','video_multi'].filter(s => svc.includes(s)); %>
 
             <div class="section-eyebrow" style="margin-bottom: 12px;">방송 시작 — 여기서만 가능</div>
             <div class="grid grid-2 mb-5">
@@ -25,7 +27,7 @@
                     <div class="mt-4"><span class="btn btn-primary btn-sm">방송 시작 →</span></div>
                 </a>
                 <% } %>
-                <% if (svc.includes('broadcast')) { %>
+                <% if (multi.length) { %>
                 <a href="/bj/broadcast" class="card card-body" style="border-color: #FF8080; text-decoration: none;">
                     <div style="font-size: 32px; margin-bottom: 8px;">🔴</div>
                     <div style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">공개 라이브</div>
@@ -33,7 +35,7 @@
                     <div class="mt-4"><span class="btn btn-secondary btn-sm" style="border-color: #FF8080; color: #FF8080;">송출 시작 →</span></div>
                 </a>
                 <% } %>
-                <% if (!oneToOne.length && !svc.includes('broadcast')) { %>
+                <% if (!oneToOne.length && !multi.length) { %>
                 <div class="card card-body" style="grid-column: 1/-1;">
                     <p class="text-dim">제공 서비스가 없습니다. <a href="/bj-studio/profile" style="color: var(--c-pink);">프로필에서 서비스를 선택</a>하세요.</p>
                 </div>

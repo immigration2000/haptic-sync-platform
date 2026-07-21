@@ -66,6 +66,23 @@ addColumnIfMissing('bj_profiles',    'sub_days',          'sub_days INTEGER NOT 
 addColumnIfMissing('bj_videos',      'price',             'price INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('dummy_bj_rooms', 'free_preview_sec',  'free_preview_sec INTEGER NOT NULL DEFAULT 60');
 addColumnIfMissing('dummy_bj_rooms', 'session_block_min', 'session_block_min INTEGER NOT NULL DEFAULT 5');
+// 서비스 태그 체계 개편 — 기기제어 제공 여부(서비스와 직교), 구독전용 영상 카탈로그 노출
+addColumnIfMissing('bj_profiles',    'device_control',    'device_control INTEGER NOT NULL DEFAULT 1');
+addColumnIfMissing('bj_profiles',    'show_sub_videos',   'show_sub_videos INTEGER NOT NULL DEFAULT 1');
+
+// services 값을 신규 4종 체계로 1회 변환 (call→voice_1on1, broadcast→video_multi …)
+// 이미 신규 코드면 그대로 — 멱등이라 매 부팅 실행돼도 안전.
+try {
+    const { normalizeServices } = require('../service_types');
+    const rows = db.prepare('SELECT user_id, services FROM bj_profiles').all();
+    const upd  = db.prepare('UPDATE bj_profiles SET services = ? WHERE user_id = ?');
+    let n = 0;
+    for (const r of rows) {
+        const next = normalizeServices(r.services);
+        if (next !== (r.services || '')) { upd.run(next, r.user_id); n++; }
+    }
+    if (n) console.log(`[db] migrated services → 신규 4종 체계 (${n}건)`);
+} catch (e) { console.warn('[db] services 마이그레이션 건너뜀:', e.message); }
 
 // 서버 시작 시 stale 온라인 상태 리셋 (재시작 후 모두 오프라인)
 try { db.exec('UPDATE bj_profiles SET is_online = 0'); } catch (_) {}
@@ -98,6 +115,7 @@ const stmts = {
                                    VALUES (?, ?, ?, ?, ?)`),
     setBJOnline:       db.prepare('UPDATE bj_profiles SET is_online = ? WHERE user_id = ?'),
     updateBJServices:  db.prepare('UPDATE bj_profiles SET services = ? WHERE user_id = ?'),
+    updateBJFlags:     db.prepare('UPDATE bj_profiles SET device_control = ?, show_sub_videos = ? WHERE user_id = ?'),
 
     // BJ 개인 영상
     listBJVideos:      db.prepare('SELECT * FROM bj_videos WHERE bj_user_id = ? ORDER BY created_at DESC'),

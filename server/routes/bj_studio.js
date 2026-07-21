@@ -48,7 +48,13 @@ router.get('/', (req, res) => {
 // 프로필 편집
 router.get('/profile', (req, res) => {
     const profile = stmts.findBJ.get(req.user.id);
-    res.render('bj_studio/profile', { title: '프로필 편집', profile, error: req.session.flash, ok: req.session.flashOk });
+    const svcTypes = require('../service_types');
+    res.render('bj_studio/profile', {
+        title: '프로필 편집', profile,
+        serviceTypes: svcTypes.SERVICE_TYPES,
+        mySvc: svcTypes.normalizeList(profile && profile.services),
+        error: req.session.flash, ok: req.session.flashOk,
+    });
     req.session.flash = null; req.session.flashOk = null;
 });
 
@@ -80,14 +86,15 @@ router.post('/profile', (req, res) => {
     if (isNaN(subD) || subD < 1 || subD > 365) subD = 30;
     stmts.updateBJProfile.run(stage_name, (description || '').slice(0, 300), rate, (tags || '').slice(0, 100),
                               free, block, rateV, rateC, subP, subD, req.user.id);
-    // 서비스 — 체크박스 다중값(배열) 또는 단일/없음
-    const VALID = ['call', 'cowatch', 'live-priv', 'broadcast'];
-    let svc = req.body.services;
-    if (typeof svc === 'string') svc = [svc];
-    if (!Array.isArray(svc)) svc = [];
-    svc = svc.filter(s => VALID.includes(s));
-    if (!svc.length) svc = ['call']; // 최소 1개
-    stmts.updateBJServices.run(svc.join(','), req.user.id);
+    // 서비스 태그 — 고정 4종 enum (server/service_types.js가 단일 기준).
+    // 자유입력 불가: 구 코드는 자동 변환, 유효하지 않은 값은 버림, 최소 1개 보장.
+    const svcTypes = require('../service_types');
+    stmts.updateBJServices.run(svcTypes.normalizeServices(req.body.services), req.user.id);
+
+    // 서비스와 직교하는 플래그
+    const devCtrl  = req.body.device_control  ? 1 : 0;   // 기기 제어 제공 여부
+    const showSub  = req.body.show_sub_videos ? 1 : 0;   // 구독전용 영상 카탈로그 노출
+    stmts.updateBJFlags.run(devCtrl, showSub, req.user.id);
     req.session.flashOk = '프로필 업데이트 완료.';
     res.redirect('/bj-studio/profile');
 });

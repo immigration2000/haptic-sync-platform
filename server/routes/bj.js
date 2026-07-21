@@ -99,9 +99,10 @@ router.post('/session/charge', requireLogin, express.json(), (req, res) => {
 // BJ 목록 + (옵션) 더미 방 합치기
 router.get('/', requireAgeVerified, (req, res) => {
     let bjs = stmts.listBJs.all();
-    // 함께보기 진입이면 cowatch 제공 BJ만
+    // 함께보기 진입이면 1:1 영상통화 제공 스트리머만 (함께보기는 영상통화의 기능으로 흡수됨)
     if (req.query.cowatchContent) {
-        bjs = bjs.filter(b => (b.services || '').split(',').includes('cowatch'));
+        const svcTypes = require('../service_types');
+        bjs = bjs.filter(b => svcTypes.has(b.services, 'video_1on1'));
     }
     let dummyRooms = [];
     if (getSettingBool('dummy_bj_enabled', true)) {
