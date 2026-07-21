@@ -5,21 +5,105 @@ const { requireAgeVerified } = require('../middleware/auth');
 const { videoAccess } = require('../access');
 const vrConfig = require('../vr_config');
 
-// ── 영상 탭: VOD ──
-router.get('/vod', requireAgeVerified, (req, res) => {
-    const q = (req.query.q || '').toLowerCase();
-    let items = stmts.listContents.all('vod');
-    if (q) items = items.filter(c => (c.title + c.tags + c.description).toLowerCase().includes(q));
-    res.render('content/list', { title: '영상 · VOD', tab: 'vod', kind: 'vod', items, query: q });
+/* ── 통합 영상 카탈로그 ───────────────────────────────────────────
+ * 전체 영상(사이트 VOD/VR + 스트리머 업로드)을 한 목록으로 합치고
+ * 좌측 필터(타입 · 이용방식 · 태그)로 좁힌다.
+ * 필터 규칙: 같은 카테고리 안은 OR, 카테고리끼리는 AND.
+ */
+
+// 성인 확인만 되면 비로그인도 열람 가능 — 유료 콘텐츠 노출이 신규 유입 경로이므로.
+// (로그인 계정은 age_verified, 게스트는 세션 확인. 재생·구매는 별도로 로그인 필요)
+function requireAgeOrGuest(req, res, next) {
+    if (req.user) return requireAgeVerified(req, res, next);
+    if (req.session && req.session.guestAgeOk) return next();
+    return res.redirect('/content/age?next=' + encodeURIComponent(req.originalUrl));
+}
+
+const csvList = (v) => String(v || '').split(',').map(s => s.trim()).filter(Boolean);
+const tagsOf  = (s) => csvList(s);
+
+/** 두 소스를 하나의 카드 형태로 정규화 */
+function buildCatalog(userId) {
+    const out = [];
+    for (const c of stmts.listAllContents.all()) {
+        out.push({
+            key: 'c' + c.id, href: '/content/play/' + c.id,
+            type: c.type === 'vr' ? 'vr' : 'vod',
+            title: c.title, thumb: c.thumbnail_path, duration: c.duration_sec,
+            multiAxis: !!c.multi_axis, hasScript: !!c.script_path,
+            access: c.price > 0 ? 'ppv' : 'free', price: c.price,
+            tags: tagsOf(c.tags), streamer: null,
+            locked: false, createdAt: c.created_at,
+        });
+    }
+    for (const v of stmts.listAllBJVideos.all()) {
+        const acc  = videoAccess(userId, v);
+        const kind = v.price > 0 ? 'ppv' : 'sub';
+        // 구독전용은 스트리머가 노출을 끄면 카탈로그에서 숨김.
+        // 단 이미 볼 수 있는 사람(구독자·구매자·본인)에겐 항상 보인다.
+        if (kind === 'sub' && !v.show_sub_videos && !acc.allowed) continue;
+        out.push({
+            key: 'b' + v.id, href: '/bj/vid/' + v.id,
+            type: 'vod',
+            title: v.title, thumb: null, duration: 0,
+            multiAxis: false, hasScript: !!v.script_path,
+            access: kind, price: v.price,
+            tags: tagsOf(v.streamer_tags),
+            streamer: { id: v.bj_user_id, name: v.stage_name, subPrice: v.sub_price },
+            locked: !acc.allowed, accessReason: acc.reason,
+            createdAt: v.created_at,
+        });
+    }
+    out.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return out;
+}
+
+function applyFilters(items, f) {
+    return items.filter((it) => {
+        if (f.type.length   && !f.type.includes(it.type))     return false;
+        if (f.access.length && !f.access.includes(it.access)) return false;
+        if (f.tag.length    && !f.tag.some(t => it.tags.includes(t))) return false;
+        if (f.q) {
+            const hay = (it.title + ' ' + (it.streamer ? it.streamer.name : '') + ' ' + it.tags.join(' ')).toLowerCase();
+            if (!hay.includes(f.q)) return false;
+        }
+        return true;
+    });
+}
+
+function renderCatalog(req, res, preset) {
+    const f = {
+        type:   preset && preset.type ? [preset.type] : csvList(req.query.type),
+        access: csvList(req.query.access),
+        tag:    csvList(req.query.tag),
+        q:      (req.query.q || '').toLowerCase().trim(),
+    };
+    const all   = buildCatalog(req.user ? req.user.id : null);
+    const items = applyFilters(all, f);
+    // 필터 칩에 쓸 태그 — 실제 영상에 붙어있는 것만 (빈 결과 방지)
+    const tagCount = {};
+    all.forEach(it => it.tags.forEach(t => { tagCount[t] = (tagCount[t] || 0) + 1; }));
+    const tagList = Object.keys(tagCount).sort((a, b) => tagCount[b] - tagCount[a]).slice(0, 30)
+                          .map(name => ({ name, count: tagCount[name] }));
+    res.render('content/catalog', {
+        title: '영상', tab: 'catalog', items, filters: f,
+        total: all.length, shown: items.length, tagList,
+    });
+}
+
+// 게스트 성인 확인 게이트
+router.get('/age', (req, res) => {
+    if (req.user) return res.redirect(req.query.next || '/content');
+    res.render('content/age', { title: '성인 확인', next: req.query.next || '/content' });
+});
+router.post('/age', (req, res) => {
+    req.session.guestAgeOk = true;
+    res.redirect(req.body.next || '/content');
 });
 
-// ── 영상 탭: VR ──
-router.get('/vr', requireAgeVerified, (req, res) => {
-    const q = (req.query.q || '').toLowerCase();
-    let items = stmts.listContents.all('vr');
-    if (q) items = items.filter(c => (c.title + c.tags + c.description).toLowerCase().includes(q));
-    res.render('content/list', { title: '영상 · VR', tab: 'vr', kind: 'vr', items, query: q });
-});
+router.get('/',    requireAgeOrGuest, (req, res) => renderCatalog(req, res, null));
+router.get('/vod', requireAgeOrGuest, (req, res) => renderCatalog(req, res, { type: 'vod' }));
+router.get('/vr',  requireAgeOrGuest, (req, res) => renderCatalog(req, res, { type: 'vr' }));
 
 // ── 영상 탭: 구독자전용 영상 (전체 스트리머 업로드 영상, 접근상태 표시) ──
 router.get('/videos', requireAgeVerified, (req, res) => {

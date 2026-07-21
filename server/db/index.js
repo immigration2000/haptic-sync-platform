@@ -171,7 +171,8 @@ const stmts = {
                                        HAVING video_count > 0
                                        ORDER BY video_count DESC`),
     // 전체 스트리머 업로드 영상 (구독자전용 영상 탭 — 스트리머명 포함)
-    listAllBJVideos:       db.prepare(`SELECT v.*, b.stage_name, b.sub_price
+    listAllBJVideos:       db.prepare(`SELECT v.*, b.stage_name, b.sub_price,
+                                              b.show_sub_videos, b.tags AS streamer_tags
                                        FROM bj_videos v
                                        JOIN bj_profiles b ON b.user_id = v.bj_user_id
                                        ORDER BY v.created_at DESC`),

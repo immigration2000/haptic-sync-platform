@@ -1,0 +1,138 @@
+<%
+  // 현재 필터 상태를 유지하면서 값 하나만 토글하는 URL 생성
+  function toggleUrl(key, val) {
+      var cur = (filters[key] || []).slice();
+      var i = cur.indexOf(val);
+      if (i >= 0) cur.splice(i, 1); else cur.push(val);
+      var p = [];
+      ['type', 'access', 'tag'].forEach(function (k) {
+          var v = (k === key) ? cur : (filters[k] || []);
+          if (v.length) p.push(k + '=' + encodeURIComponent(v.join(',')));
+      });
+      if (filters.q) p.push('q=' + encodeURIComponent(filters.q));
+      return '/content' + (p.length ? '?' + p.join('&') : '');
+  }
+  var on = function (key, val) { return (filters[key] || []).indexOf(val) >= 0; };
+  var activeCount = (filters.type.length + filters.access.length + filters.tag.length);
+%>
+<section class="container">
+    <div class="list-header" style="align-items:flex-end;">
+        <div>
+            <div class="section-eyebrow">VIDEO</div>
+            <h1 class="section-title" style="margin-bottom:4px;">영상</h1>
+            <p class="text-dim" style="margin:0;font-size:13px;">
+                전체 <%= total %>편<% if (shown !== total) { %> 중 <strong style="color:var(--c-pink);"><%= shown %>편</strong> 표시<% } %>
+            </p>
+        </div>
+        <form method="GET" action="/content" style="display:flex;gap:6px;">
+            <% (filters.type||[]).forEach(function(v){ %><input type="hidden" name="type" value="<%= v %>"><% }) %>
+            <input class="form-input" type="text" name="q" value="<%= filters.q || '' %>" placeholder="🔍 제목·스트리머·태그" style="width:220px;">
+            <button class="btn btn-secondary btn-sm">검색</button>
+        </form>
+    </div>
+
+    <div class="catalog-wrap">
+        <!-- 좌측 필터 -->
+        <aside class="catalog-filter">
+            <div class="cf-head">
+                <span>필터</span>
+                <% if (activeCount) { %><a href="/content" class="text-faint" style="font-size:11px;">초기화</a><% } %>
+            </div>
+
+            <div class="cf-group">
+                <div class="cf-title">영상 타입</div>
+                <a class="cf-item <%= on('type','vod') ? 'on' : '' %>" href="<%= toggleUrl('type','vod') %>">🎬 일반 영상</a>
+                <a class="cf-item <%= on('type','vr') ? 'on' : '' %>"  href="<%= toggleUrl('type','vr') %>">🥽 VR 영상</a>
+            </div>
+
+            <div class="cf-group">
+                <div class="cf-title">이용 방식</div>
+                <a class="cf-item <%= on('access','free') ? 'on' : '' %>" href="<%= toggleUrl('access','free') %>">무료</a>
+                <a class="cf-item <%= on('access','ppv') ? 'on' : '' %>"  href="<%= toggleUrl('access','ppv') %>">개별 구매</a>
+                <a class="cf-item <%= on('access','sub') ? 'on' : '' %>"  href="<%= toggleUrl('access','sub') %>">구독 전용</a>
+            </div>
+
+            <% if (tagList && tagList.length) { %>
+            <div class="cf-group">
+                <div class="cf-title">태그</div>
+                <div class="cf-tags">
+                    <% tagList.forEach(function (t) { %>
+                        <a class="cf-tag <%= on('tag', t.name) ? 'on' : '' %>" href="<%= toggleUrl('tag', t.name) %>">
+                            <%= t.name %> <span class="text-faint"><%= t.count %></span>
+                        </a>
+                    <% }) %>
+                </div>
+            </div>
+            <% } %>
+        </aside>
+
+        <!-- 영상 그리드 -->
+        <div>
+            <% if (!items.length) { %>
+                <div class="text-center text-faint" style="padding:80px 0;">
+                    조건에 맞는 영상이 없습니다.<br>
+                    <a href="/content" style="color:var(--c-pink);">필터 초기화</a>
+                </div>
+            <% } else { %>
+            <div class="grid-list">
+                <% items.forEach(function (it) { %>
+                <a href="<%= it.href %>" class="card content-card" style="text-decoration:none;">
+                    <div class="content-thumb" style="position:relative;">
+                        <% if (it.thumb) { %>
+                            <img src="<%= it.thumb %>" alt="" style="width:100%;height:100%;object-fit:cover;">
+                        <% } else { %>
+                            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--bg-3),var(--bg-1));color:var(--tx-3);font-size:26px;">▶</div>
+                        <% } %>
+                        <% if (it.type === 'vr') { %><span class="badge badge-multi" style="position:absolute;top:6px;left:6px;">VR</span><% } %>
+                        <% if (it.locked) { %>
+                            <span style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:1px solid var(--border-accent);color:var(--c-pink);font-size:10px;padding:2px 7px;border-radius:5px;">🔒 <%= it.access === 'sub' ? '구독' : '구매' %></span>
+                        <% } %>
+                        <% if (it.hasScript) { %><span class="duration">✓ 디바이스</span><% } %>
+                    </div>
+                    <div class="content-info">
+                        <div class="content-title"><%= it.title %></div>
+                        <% if (it.streamer) { %>
+                            <div class="text-faint" style="font-size:11px;margin-top:2px;"><%= it.streamer.name %></div>
+                        <% } %>
+                        <div class="content-tags" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+                            <% if (it.locked) { %>
+                                <span class="btn btn-sm btn-primary" style="pointer-events:none;">
+                                    <%= it.access === 'sub' ? '구독하고 보기' : (it.price ? it.price.toLocaleString() + ' Ruby' : '구매하고 보기') %>
+                                </span>
+                            <% } else if (it.access === 'free') { %>
+                                <span class="tag">무료</span>
+                            <% } else { %>
+                                <span class="badge badge-multi">시청 가능</span>
+                            <% } %>
+                            <% it.tags.slice(0, 2).forEach(function (t) { %><span class="tag" style="font-size:10px;"><%= t %></span><% }) %>
+                        </div>
+                    </div>
+                </a>
+                <% }) %>
+            </div>
+            <% } %>
+        </div>
+    </div>
+</section>
+
+<style>
+.catalog-wrap { display: grid; grid-template-columns: 210px 1fr; gap: var(--sp-5); align-items: start; padding-bottom: var(--sp-6); }
+.catalog-filter { position: sticky; top: 84px; background: var(--bg-1); border: 1px solid var(--border-soft); border-radius: var(--rad-md); padding: 14px; }
+.cf-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.cf-group { border-top: 1px solid var(--border-soft); padding-top: 10px; margin-top: 10px; }
+.cf-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.cf-title { font-size: 11px; color: var(--tx-3); margin-bottom: 6px; }
+.cf-item { display: block; padding: 7px 9px; border-radius: 6px; font-size: 13px; color: var(--tx-2); }
+.cf-item:hover { background: rgba(255,255,255,.04); color: var(--tx-1); }
+.cf-item.on { background: rgba(255,45,94,.14); color: var(--c-pink); }
+.cf-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.cf-tag { font-size: 11px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--border-soft); color: var(--tx-2); }
+.cf-tag.on { background: rgba(255,45,94,.14); border-color: var(--border-accent); color: var(--c-pink); }
+@media (max-width: 900px) {
+    .catalog-wrap { grid-template-columns: 1fr; }
+    .catalog-filter { position: static; }
+    .cf-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .cf-title { width: 100%; margin-bottom: 2px; }
+    .cf-item { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-soft); }
+}
+</style>

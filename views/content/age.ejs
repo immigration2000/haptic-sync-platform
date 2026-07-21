@@ -1,0 +1,22 @@
+<section class="container" style="max-width:520px;padding:80px 16px;">
+    <div class="card card-body text-center">
+        <div style="font-size:44px;margin-bottom:12px;">🔞</div>
+        <h1 class="section-title" style="font-size:22px;margin-bottom:8px;">성인 확인</h1>
+        <p class="text-dim" style="font-size:14px;line-height:1.7;">
+            이 사이트는 <strong>만 19세 이상</strong>만 이용할 수 있는 성인 콘텐츠를 포함합니다.<br>
+            미성년자의 이용은 법적으로 금지되어 있습니다.
+        </p>
+
+        <form method="POST" action="/content/age" style="margin-top:24px;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="next" value="<%= next %>">
+            <button class="btn btn-primary btn-lg btn-block">만 19세 이상입니다 · 입장</button>
+        </form>
+        <a href="/" class="btn btn-ghost btn-sm btn-block mt-3">나가기</a>
+
+        <p class="text-faint mt-4" style="font-size:11px;line-height:1.6;">
+            입장 후에도 영상 재생·구매·구독에는 로그인이 필요합니다.<br>
+            운영 시에는 본인인증 기반 성인인증으로 대체됩니다.
+        </p>
+    </div>
+</section>

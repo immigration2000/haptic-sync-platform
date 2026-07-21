@@ -15,7 +15,7 @@
         <a href="/" class="brand">PULSE</a>
         <nav>
             <ul class="nav">
-                <li><a href="/content/vod" class="<%= aVod ? 'active' : '' %>">영상</a></li>
+                <li><a href="/content" class="<%= aVod ? 'active' : '' %>">영상</a></li>
                 <li><a href="/bj/live-lobby" class="<%= (aLive || aVoice) ? 'active' : '' %>" style="color: #FF8080;">🔴 라이브</a></li>
                 <li><a href="/pricing"     class="<%= aPricing ? 'active' : '' %>">요금제</a></li>
                 <% if (u && (u.role === 'bj' || u.role === 'admin')) { %>
@@ -83,7 +83,7 @@
             <span style="color:var(--c-yellow);font-size:12px;"><%= (u.credits || 0).toLocaleString() %> Rb</span>
         </a>
     <% } %>
-    <a href="/content/vod"   class="<%= aVod ? 'active' : '' %>">🎬 영상</a>
+    <a href="/content"   class="<%= aVod ? 'active' : '' %>">🎬 영상</a>
     <a href="/bj/live-lobby" class="<%= (aLive || aVoice) ? 'active' : '' %>">🔴 라이브</a>
     <a href="/pricing"       class="<%= aPricing ? 'active' : '' %>">💳 요금제</a>
     <% if (u && (u.role === 'bj' || u.role === 'admin')) { %>
@@ -103,7 +103,7 @@
 
 <!-- 모바일 하단 탭바 (좁은 화면 전용) -->
 <nav class="m-tabbar" aria-label="모바일 탭">
-    <a href="/content/vod"   class="<%= aVod ? 'active' : '' %>"><span class="ic">🎬</span><span>영상</span></a>
+    <a href="/content"   class="<%= aVod ? 'active' : '' %>"><span class="ic">🎬</span><span>영상</span></a>
     <a href="/bj/live-lobby" class="<%= (aLive || aVoice) ? 'active' : '' %>"><span class="ic">🔴</span><span>라이브</span></a>
     <a href="<%= u ? '/mypage' : '/auth/login' %>" class="<%= aMy ? 'active' : '' %>"><span class="ic">👤</span><span>마이</span></a>
 </nav>
