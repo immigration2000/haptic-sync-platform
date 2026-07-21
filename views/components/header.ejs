@@ -8,6 +8,7 @@
   var aStudio = p.startsWith('/bj-studio') || p === '/bj/console' || p === '/bj/broadcast';
   var aAdmin  = p.startsWith('/admin');
   var aMy     = p.startsWith('/mypage');
+  var aFeed   = p.startsWith('/feed');
 %>
 <header class="header">
     <div class="container header-inner">
@@ -17,6 +18,7 @@
             <ul class="nav">
                 <li><a href="/content" class="<%= aVod ? 'active' : '' %>">영상</a></li>
                 <li><a href="/bj/live-lobby" class="<%= (aLive || aVoice) ? 'active' : '' %>" style="color: #FF8080;">🔴 라이브</a></li>
+                <li><a href="/feed"        class="<%= aFeed ? 'active' : '' %>">피드</a></li>
                 <li><a href="/pricing"     class="<%= aPricing ? 'active' : '' %>">요금제</a></li>
                 <% if (u && (u.role === 'bj' || u.role === 'admin')) { %>
                     <li><a href="/bj-studio" class="<%= aStudio ? 'active' : '' %>" style="color: var(--c-pink);">🎬 스튜디오</a></li>
@@ -85,6 +87,7 @@
     <% } %>
     <a href="/content"   class="<%= aVod ? 'active' : '' %>">🎬 영상</a>
     <a href="/bj/live-lobby" class="<%= (aLive || aVoice) ? 'active' : '' %>">🔴 라이브</a>
+    <a href="/feed"          class="<%= aFeed ? 'active' : '' %>">💬 피드</a>
     <a href="/pricing"       class="<%= aPricing ? 'active' : '' %>">💳 요금제</a>
     <% if (u && (u.role === 'bj' || u.role === 'admin')) { %>
         <a href="/bj-studio" class="<%= aStudio ? 'active' : '' %>" style="color: var(--c-pink);">🎬 스튜디오</a>
@@ -105,5 +108,6 @@
 <nav class="m-tabbar" aria-label="모바일 탭">
     <a href="/content"   class="<%= aVod ? 'active' : '' %>"><span class="ic">🎬</span><span>영상</span></a>
     <a href="/bj/live-lobby" class="<%= (aLive || aVoice) ? 'active' : '' %>"><span class="ic">🔴</span><span>라이브</span></a>
+    <a href="/feed" class="<%= aFeed ? 'active' : '' %>"><span class="ic">💬</span><span>피드</span></a>
     <a href="<%= u ? '/mypage' : '/auth/login' %>" class="<%= aMy ? 'active' : '' %>"><span class="ic">👤</span><span>마이</span></a>
 </nav>

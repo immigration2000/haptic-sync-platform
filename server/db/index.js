@@ -117,6 +117,32 @@ const stmts = {
     updateBJServices:  db.prepare('UPDATE bj_profiles SET services = ? WHERE user_id = ?'),
     updateBJFlags:     db.prepare('UPDATE bj_profiles SET device_control = ?, show_sub_videos = ? WHERE user_id = ?'),
 
+    // ── SNS 피드 ──
+    insertPost:        db.prepare(`INSERT INTO posts (author_id, body, video_source, video_id, clip_start, clip_end)
+                                   VALUES (?, ?, ?, ?, ?, ?)`),
+    listPosts:         db.prepare(`SELECT p.*, u.nickname, b.stage_name
+                                   FROM posts p
+                                   JOIN users u ON u.id = p.author_id
+                                   LEFT JOIN bj_profiles b ON b.user_id = p.author_id
+                                   ORDER BY p.created_at DESC LIMIT 100`),
+    listPostsByAuthor: db.prepare(`SELECT p.*, u.nickname, b.stage_name
+                                   FROM posts p
+                                   JOIN users u ON u.id = p.author_id
+                                   LEFT JOIN bj_profiles b ON b.user_id = p.author_id
+                                   WHERE p.author_id = ? ORDER BY p.created_at DESC LIMIT 100`),
+    findPost:          db.prepare('SELECT * FROM posts WHERE id = ?'),
+    deletePost:        db.prepare('DELETE FROM posts WHERE id = ?'),
+    hasPostLike:       db.prepare('SELECT 1 AS x FROM post_likes WHERE post_id = ? AND user_id = ?'),
+    addPostLike:       db.prepare('INSERT OR IGNORE INTO post_likes (post_id, user_id) VALUES (?, ?)'),
+    delPostLike:       db.prepare('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?'),
+    syncPostLikes:     db.prepare('UPDATE posts SET like_count = (SELECT COUNT(*) FROM post_likes WHERE post_id = ?) WHERE id = ?'),
+    myLikedPosts:      db.prepare('SELECT post_id FROM post_likes WHERE user_id = ?'),
+    insertComment:     db.prepare('INSERT INTO post_comments (post_id, user_id, body) VALUES (?, ?, ?)'),
+    listComments:      db.prepare(`SELECT c.*, u.nickname FROM post_comments c
+                                   JOIN users u ON u.id = c.user_id
+                                   WHERE c.post_id = ? ORDER BY c.created_at LIMIT 50`),
+    syncPostComments:  db.prepare('UPDATE posts SET comment_count = (SELECT COUNT(*) FROM post_comments WHERE post_id = ?) WHERE id = ?'),
+
     // ── 후원 (1:다수 방송) ──
     insertDonation:    db.prepare(`INSERT INTO donations (from_user_id, to_bj_user_id, amount, net_amount, message)
                                    VALUES (?, ?, ?, ?, ?)`),

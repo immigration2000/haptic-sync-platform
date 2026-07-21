@@ -198,6 +198,7 @@ app.use('/mypage',  require('./routes/mypage'));
 app.use('/admin',     require('./routes/admin'));
 app.use('/bj-studio', require('./routes/bj_studio'));
 app.use('/support',   require('./routes/support'));
+app.use('/feed',      require('./routes/feed'));
 
 // 정적 페이지
 app.get('/pricing', (req, res) => res.render('pricing', { title: '요금제' }));

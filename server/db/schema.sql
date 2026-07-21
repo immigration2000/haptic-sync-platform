@@ -161,6 +161,36 @@ CREATE TABLE IF NOT EXISTS bj_applications (
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- SNS 피드 — 스트리머가 올리는 홍보 포스트 (클립은 기존 영상의 구간 지정, 새 파일 없음)
+CREATE TABLE IF NOT EXISTS posts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body          TEXT NOT NULL,
+    video_source  TEXT,                                   -- 'content'(사이트) | 'bj'(스트리머 업로드)
+    video_id      INTEGER,                                -- 연결된 영상
+    clip_start    INTEGER NOT NULL DEFAULT 0,             -- 클립 시작(초)
+    clip_end      INTEGER NOT NULL DEFAULT 0,             -- 클립 끝(초). 0이면 클립 없음
+    like_count    INTEGER NOT NULL DEFAULT 0,
+    comment_count INTEGER NOT NULL DEFAULT 0,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS post_likes (
+    post_id  INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (post_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS post_comments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body       TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_post_comments ON post_comments(post_id, created_at);
+
 -- 후원 (1:다수 방송 — 입장 무료 + 후원 수익 모델)
 CREATE TABLE IF NOT EXISTS donations (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,

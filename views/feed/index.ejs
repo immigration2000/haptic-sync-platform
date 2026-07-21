@@ -1,0 +1,146 @@
+<section class="container" style="max-width:720px;padding-bottom:60px;">
+    <div class="section-eyebrow">FEED</div>
+    <h1 class="section-title" style="margin-bottom:4px;">피드</h1>
+    <p class="text-dim" style="margin:0 0 20px;font-size:13px;">스트리머의 소식과 미리보기 클립. 마음에 들면 전체 영상으로 이어집니다.</p>
+
+    <% if (error) { %><div class="flash-error mb-4"><%= error %></div><% } %>
+    <% if (ok) { %><div class="flash-error mb-4" style="background:rgba(0,220,130,.1);border-color:rgba(0,220,130,.3);color:#5EFFB0;">✓ <%= ok %></div><% } %>
+
+    <% if (canPost) { %>
+    <div class="card card-body mb-5" style="border-color:rgba(255,45,94,.25);">
+        <div class="panel-title">새 포스트</div>
+        <form method="POST" action="/feed">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <textarea name="body" rows="3" maxlength="500" required placeholder="소식이나 홍보 문구를 적어주세요"
+                      style="width:100%;background:var(--bg-2);border:1px solid var(--border-soft);border-radius:8px;color:white;padding:10px;font-size:14px;resize:vertical;"></textarea>
+
+            <% if (myVideos && myVideos.length) { %>
+            <div class="mt-3" style="background:var(--bg-2);border-radius:8px;padding:12px;">
+                <div class="text-faint" style="font-size:11px;margin-bottom:8px;">
+                    미리보기 클립 — 내 영상의 <strong>구간만 지정</strong>합니다 (새 파일이 만들어지지 않습니다)
+                </div>
+                <select name="video_id" class="form-select" style="margin-bottom:8px;">
+                    <option value="">— 연결 안 함 —</option>
+                    <% myVideos.forEach(function (v) { %>
+                        <option value="<%= v.id %>"><%= v.title %></option>
+                    <% }) %>
+                </select>
+                <input type="hidden" name="video_source" value="bj">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <label class="text-faint" style="font-size:11px;">시작(초)</label>
+                    <input type="number" name="clip_start" value="0" min="0" class="form-input" style="width:90px;">
+                    <label class="text-faint" style="font-size:11px;">끝(초)</label>
+                    <input type="number" name="clip_end" value="30" min="0" class="form-input" style="width:90px;">
+                    <span class="text-faint" style="font-size:11px;">최대 60초</span>
+                </div>
+            </div>
+            <% } %>
+
+            <div class="flex gap-3 mt-3" style="align-items:center;">
+                <button class="btn btn-primary btn-sm">게시</button>
+                <span class="text-faint" style="font-size:11px;">외부 링크·연락처(카톡·텔레그램 등)는 등록할 수 없습니다.</span>
+            </div>
+        </form>
+    </div>
+    <% } %>
+
+    <% if (!items.length) { %>
+        <div class="text-center text-faint" style="padding:70px 0;">아직 게시물이 없습니다.</div>
+    <% } %>
+
+    <% items.forEach(function (p) { %>
+    <article class="card card-body mb-4">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:38px;height:38px;border-radius:50%;background:var(--gradient-main);display:flex;align-items:center;justify-content:center;font-weight:700;">
+                <%= (p.stage_name || p.nickname || '?').charAt(0) %>
+            </div>
+            <div style="flex:1;">
+                <div style="font-weight:700;font-size:14px;"><%= p.stage_name || p.nickname %></div>
+                <div class="text-faint" style="font-size:11px;"><%= String(p.created_at).slice(5, 16) %></div>
+            </div>
+            <% if (user && (user.id === p.author_id || user.role === 'admin')) { %>
+                <form method="POST" action="/feed/<%= p.id %>/delete" style="margin:0;" onsubmit="return confirm('삭제할까요?');">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="text-faint" style="background:none;border:none;cursor:pointer;font-size:16px;">×</button>
+                </form>
+            <% } %>
+        </div>
+
+        <p style="font-size:14px;line-height:1.6;margin:0 0 10px;white-space:pre-wrap;"><%= p.body %></p>
+
+        <% if (p.video && p.clip_end > p.clip_start) { %>
+            <div style="border-radius:10px;overflow:hidden;background:#000;position:relative;">
+                <video class="feed-clip" src="<%= p.video.src %>" muted playsinline loop preload="metadata"
+                       data-start="<%= p.clip_start %>" data-end="<%= p.clip_end %>"
+                       style="width:100%;aspect-ratio:16/9;object-fit:contain;background:#000;"></video>
+                <span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.7);color:#fff;font-size:10px;padding:3px 8px;border-radius:5px;">
+                    ▶ 미리보기 <%= p.clip_end - p.clip_start %>초
+                </span>
+            </div>
+            <a href="<%= p.video.href %>" class="btn btn-primary btn-sm btn-block mt-3">
+                <%= p.video.locked ? '🔒 전체 영상 보기 (구독/구매)' : '전체 영상 보기' %> — <%= p.video.title %>
+            </a>
+        <% } else if (p.video) { %>
+            <a href="<%= p.video.href %>" class="btn btn-secondary btn-sm btn-block">🎬 <%= p.video.title %></a>
+        <% } %>
+
+        <div style="display:flex;gap:14px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);">
+            <button class="like-btn" data-id="<%= p.id %>" data-liked="<%= p.likedByMe ? '1' : '0' %>"
+                    style="background:none;border:none;cursor:pointer;font-size:13px;color:<%= p.likedByMe ? 'var(--c-pink)' : 'var(--tx-3)' %>;">
+                ♥ <span class="like-count"><%= p.like_count %></span>
+            </button>
+            <span class="text-faint" style="font-size:13px;">💬 <%= p.comment_count %></span>
+        </div>
+
+        <% if (p.comments && p.comments.length) { %>
+            <div style="margin-top:10px;">
+                <% p.comments.forEach(function (c) { %>
+                    <div style="font-size:12px;margin-bottom:5px;">
+                        <span style="color:var(--c-pink);font-weight:600;"><%= c.nickname %></span>
+                        <span class="text-dim"><%= c.body %></span>
+                    </div>
+                <% }) %>
+            </div>
+        <% } %>
+
+        <form method="POST" action="/feed/<%= p.id %>/comment" style="display:flex;gap:6px;margin-top:10px;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input name="body" maxlength="200" required placeholder="댓글 달기…"
+                   style="flex:1;background:var(--bg-2);border:1px solid var(--border-soft);border-radius:6px;color:white;padding:7px 10px;font-size:12px;">
+            <button class="btn btn-secondary btn-sm">등록</button>
+        </form>
+    </article>
+    <% }) %>
+</section>
+
+<script>
+// 클립 = 원본 영상의 구간 재생. 화면에 보일 때만 재생하고 end에 닿으면 start로 되감는다.
+document.querySelectorAll('.feed-clip').forEach(function (v) {
+    var s = parseFloat(v.dataset.start) || 0, e = parseFloat(v.dataset.end) || 0;
+    v.addEventListener('loadedmetadata', function () { try { v.currentTime = s; } catch (_) {} });
+    v.addEventListener('timeupdate', function () { if (e && v.currentTime >= e) v.currentTime = s; });
+    v.addEventListener('click', function () { v.muted = !v.muted; });
+});
+if ('IntersectionObserver' in window) {
+    var io2 = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+            if (en.isIntersecting) en.target.play().catch(function () {});
+            else en.target.pause();
+        });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.feed-clip').forEach(function (v) { io2.observe(v); });
+}
+
+document.querySelectorAll('.like-btn').forEach(function (b) {
+    b.addEventListener('click', async function () {
+        var r = await fetch('/feed/' + b.dataset.id + '/like', {
+            method: 'POST',
+            headers: { 'x-csrf-token': (document.querySelector('meta[name=csrf-token]') || {}).content || '' },
+        });
+        var j = await r.json();
+        if (!j.ok) return;
+        b.querySelector('.like-count').textContent = j.count;
+        b.style.color = j.liked ? 'var(--c-pink)' : 'var(--tx-3)';
+    });
+});
+</script>
