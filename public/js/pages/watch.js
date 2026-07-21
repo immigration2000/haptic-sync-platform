@@ -36,8 +36,15 @@
 
     socket.emit('viewer-join', { broadcasterUserId: CFG.bjUserId });
 
-    socket.on('viewer-ready', ({ broadcasterId, broadcasterName }) => {
-        stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● LIVE</span> — ${broadcasterName}`;
+    socket.on('viewer-ready', ({ broadcasterId, broadcasterName, mode }) => {
+        const isVoice = (mode === 'voice');
+        stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● LIVE</span> — ${broadcasterName}`
+            + (isVoice ? ' <span class="text-faint" style="font-size:11px;">📻 음성 방송</span>' : '');
+        // 음성 방송이면 검은 비디오 대신 안내 화면을 보여준다 (오디오는 그대로 재생)
+        if (isVoice) {
+            const ph = document.getElementById('w-voice-ph');
+            if (ph) { ph.style.display = 'flex'; bjVideo.style.height = '0'; }
+        }
         peer = new SimplePeer({ initiator: false, trickle: true });
         peer.on('signal', (d) => socket.emit('bcast-signal', { to: broadcasterId, data: d }));
         peer.on('stream', (stream) => {

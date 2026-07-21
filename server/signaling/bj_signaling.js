@@ -153,19 +153,31 @@ module.exports = (httpServer, sessionMiddleware) => {
         socket.on('hangup', () => releasePair(socket.id));
 
         // ── 공개 라이브 ──
-        socket.on('broadcast-start', () => {
+        socket.on('broadcast-start', (opts) => {
             if (socket.userRole !== 'bj' && socket.userRole !== 'admin') return; // 권한 검증
             const userId = socket.userId;
             const profile = stmts.findBJ.get(userId);
             const name = (profile && profile.stage_name) || socket.userNick || 'BJ';
+
+            // 방송 모드(voice=음성방송 · video=영상방송)는 서비스 태그로 서버가 검증한다.
+            // 클라이언트가 제공하지 않는 모드를 주장해도 실제 제공 태그로 교정.
+            const svcTypes = require('../service_types');
+            const svc = profile ? profile.services : '';
+            const canVoice = svcTypes.has(svc, 'voice_multi');
+            const canVideo = svcTypes.has(svc, 'video_multi');
+            let mode = (opts && opts.mode === 'voice') ? 'voice' : 'video';
+            if (mode === 'video' && !canVideo) mode = canVoice ? 'voice' : 'video';
+            if (mode === 'voice' && !canVoice) mode = canVideo ? 'video' : 'voice';
+
             role = 'broadcaster';
             socket.join(`broadcast-${userId}`);
             socket.broadcasterUserId = userId;
             socket.broadcasterName = name;
+            socket.broadcastMode = mode;
             socket.viewers = new Set();
             try { stmts.setBJOnline.run(1, userId); } catch (_) {}
             io.to('broadcast-lobby').emit('broadcast-list-update', listBroadcasters());
-            socket.emit('broadcast-ready');
+            socket.emit('broadcast-ready', { mode });
         });
         socket.on('broadcast-stop', () => endBroadcast(socket));
 
@@ -183,7 +195,8 @@ module.exports = (httpServer, sessionMiddleware) => {
             socket.viewingRoom = `broadcast-${broadcasterUserId}`;
             socket.join(socket.viewingRoom);   // 채팅 룸 합류 — 시청자도 chat-msg 수신
             bcaster.emit('viewer-incoming', { viewerId: socket.id });
-            socket.emit('viewer-ready', { broadcasterId: bcaster.id, broadcasterName: bcaster.broadcasterName });
+            socket.emit('viewer-ready', { broadcasterId: bcaster.id, broadcasterName: bcaster.broadcasterName,
+                                          mode: bcaster.broadcastMode || 'video' });
             io.to(`broadcast-${broadcasterUserId}`).emit('viewer-count', { count: bcaster.viewers.size });
             bcaster.emit('viewer-count', { count: bcaster.viewers.size });
         });
@@ -271,7 +284,8 @@ module.exports = (httpServer, sessionMiddleware) => {
     function listBroadcasters() {
         return Array.from(io.sockets.sockets.values())
             .filter(s => s.broadcasterUserId)
-            .map(s => ({ broadcasterUserId: s.broadcasterUserId, name: s.broadcasterName, viewerCount: s.viewers ? s.viewers.size : 0 }));
+            .map(s => ({ broadcasterUserId: s.broadcasterUserId, name: s.broadcasterName,
+                          mode: s.broadcastMode || 'video', viewerCount: s.viewers ? s.viewers.size : 0 }));
     }
 
     console.log('Signaling ready (Socket.IO) — call · cowatch · live-priv · broadcast');

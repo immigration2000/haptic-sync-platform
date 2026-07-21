@@ -20,18 +20,36 @@
     const viewerPeers = new Map(); // viewerId → peer
 
     btnStart.addEventListener('click', async () => {
-        // 카메라 → 실패 시 음성만 → 그것도 실패면 미디어 없이(디바이스 전용 송출). 어떤 경우든 송출은 시작.
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: AUDIO });
-            myVideo.srcObject = stream;
-        } catch (e) {
-            try { stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO }); if (stream) myVideo.srcObject = stream; }
-            catch (e2) { stream = null; }
+        // 방송 모드 — voice(음성방송·스푼형) | video(영상방송). 화면에서 고른 값.
+        // 최종 확정은 서버가 서비스 태그로 검증해서 broadcast-ready로 돌려준다.
+        const sel = document.querySelector('input[name="bcast-mode"]:checked');
+        const wantMode = sel ? sel.value : 'video';
+
+        if (wantMode === 'voice') {
+            // 음성 방송은 카메라를 아예 요청하지 않는다 (불필요한 권한 요청 방지)
+            try { stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO }); }
+            catch (e) { stream = null; }
+        } else {
+            // 카메라 → 실패 시 음성만 → 그것도 실패면 미디어 없이(디바이스 전용 송출).
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: AUDIO });
+                myVideo.srcObject = stream;
+            } catch (e) {
+                try { stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO }); if (stream) myVideo.srcObject = stream; }
+                catch (e2) { stream = null; }
+            }
         }
         socket = io();
-        socket.emit('broadcast-start', { userId: CFG.userId, name: CFG.name });
-        socket.on('broadcast-ready', () => {
-            bcStatus.innerHTML = '<span style="color: var(--c-green);">● 송출 중</span> — 시청자 대기 중';
+        socket.emit('broadcast-start', { mode: wantMode });
+        socket.on('broadcast-ready', (info) => {
+            const mode = (info && info.mode) || wantMode;
+            if (mode === 'voice') {
+                myVideo.style.display = 'none';
+                const ph = document.getElementById('voice-placeholder');
+                if (ph) ph.style.display = 'flex';
+            }
+            bcStatus.innerHTML = '<span style="color: var(--c-green);">● 송출 중</span> — '
+                + (mode === 'voice' ? '📻 음성 방송' : '📺 영상 방송') + ' · 시청자 대기 중';
             btnStart.classList.add('hidden');
             btnStop.classList.remove('hidden');
         });
