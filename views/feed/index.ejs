@@ -14,27 +14,47 @@
             <textarea name="body" rows="3" maxlength="500" required placeholder="소식이나 홍보 문구를 적어주세요"
                       style="width:100%;background:var(--bg-2);border:1px solid var(--border-soft);border-radius:8px;color:white;padding:10px;font-size:14px;resize:vertical;"></textarea>
 
-            <% if (myVideos && myVideos.length) { %>
             <div class="mt-3" style="background:var(--bg-2);border-radius:8px;padding:12px;">
                 <div class="text-faint" style="font-size:11px;margin-bottom:8px;">
-                    미리보기 클립 — 내 영상의 <strong>구간만 지정</strong>합니다 (새 파일이 만들어지지 않습니다)
+                    미리보기 클립 — 영상의 <strong>구간만 지정</strong>합니다 (새 파일이 만들어지지 않습니다)
                 </div>
-                <select name="video_id" class="form-select" style="margin-bottom:8px;">
+                <select name="video_ref" id="clip-src" class="form-select" style="margin-bottom:10px;">
                     <option value="">— 연결 안 함 —</option>
-                    <% myVideos.forEach(function (v) { %>
-                        <option value="<%= v.id %>"><%= v.title %></option>
-                    <% }) %>
+                    <% if (myVideos && myVideos.length) { %>
+                        <optgroup label="내 영상">
+                            <% myVideos.forEach(function (v) { %>
+                                <option value="bj:<%= v.id %>" data-src="<%= v.video_path %>"><%= v.title %></option>
+                            <% }) %>
+                        </optgroup>
+                    <% } %>
+                    <% if (siteVideos && siteVideos.length) { %>
+                        <optgroup label="사이트 콘텐츠">
+                            <% siteVideos.forEach(function (c) { %>
+                                <option value="content:<%= c.id %>" data-src="<%= c.video_path %>">[<%= c.type.toUpperCase() %>] <%= c.title %></option>
+                            <% }) %>
+                        </optgroup>
+                    <% } %>
                 </select>
-                <input type="hidden" name="video_source" value="bj">
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <label class="text-faint" style="font-size:11px;">시작(초)</label>
-                    <input type="number" name="clip_start" value="0" min="0" class="form-input" style="width:90px;">
-                    <label class="text-faint" style="font-size:11px;">끝(초)</label>
-                    <input type="number" name="clip_end" value="30" min="0" class="form-input" style="width:90px;">
-                    <span class="text-faint" style="font-size:11px;">최대 60초</span>
+
+                <div id="clip-editor" style="display:none;">
+                    <video id="clip-preview" muted playsinline preload="metadata"
+                           style="width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;"></video>
+                    <div style="margin-top:8px;">
+                        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx-2);">
+                            <span>시작 <b id="cs-label">0:00</b></span>
+                            <span>길이 <b id="cd-label">30</b>초</span>
+                        </div>
+                        <input id="cs-range" type="range" min="0" max="100" value="0" step="1" style="width:100%;accent-color:var(--c-pink);">
+                        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--tx-2);margin-top:4px;">
+                            <span>클립 길이 (최대 60초)</span>
+                        </div>
+                        <input id="cd-range" type="range" min="5" max="60" value="30" step="1" style="width:100%;accent-color:var(--c-purple);">
+                        <button type="button" id="clip-play" class="btn btn-ghost btn-sm mt-2">▶ 이 구간 미리듣기</button>
+                    </div>
                 </div>
+                <input type="hidden" name="clip_start" id="clip-start" value="0">
+                <input type="hidden" name="clip_end"   id="clip-end"   value="30">
             </div>
-            <% } %>
 
             <div class="flex gap-3 mt-3" style="align-items:center;">
                 <button class="btn btn-primary btn-sm">게시</button>
@@ -44,8 +64,26 @@
     </div>
     <% } %>
 
+    <% if (allTags && allTags.length) { %>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;align-items:center;">
+        <span class="text-faint" style="font-size:11px;">태그</span>
+        <a href="/feed" class="cf-tag <%= activeTags.length ? '' : 'on' %>"
+           style="font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--border-soft);<%= activeTags.length ? 'color:var(--tx-2);' : 'background:rgba(255,45,94,.14);border-color:var(--border-accent);color:var(--c-pink);' %>">전체</a>
+        <% allTags.forEach(function (t) {
+             var on = activeTags.indexOf(t.name) >= 0;
+             var next = on ? activeTags.filter(function(x){return x!==t.name;}) : activeTags.concat([t.name]);
+             var href = next.length ? '/feed?tag=' + encodeURIComponent(next.join(',')) : '/feed';
+        %>
+            <a href="<%= href %>" style="font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid <%= on ? 'var(--border-accent)' : 'var(--border-soft)' %>;<%= on ? 'background:rgba(255,45,94,.14);color:var(--c-pink);' : 'color:var(--tx-2);' %>"><%= t.name %></a>
+        <% }) %>
+    </div>
+    <% } %>
+
     <% if (!items.length) { %>
-        <div class="text-center text-faint" style="padding:70px 0;">아직 게시물이 없습니다.</div>
+        <div class="text-center text-faint" style="padding:70px 0;">
+            <%= activeTags.length ? '이 태그의 게시물이 없습니다.' : '아직 게시물이 없습니다.' %>
+            <% if (activeTags.length) { %><br><a href="/feed" style="color:var(--c-pink);">필터 초기화</a><% } %>
+        </div>
     <% } %>
 
     <% items.forEach(function (p) { %>
@@ -90,6 +128,13 @@
                 ♥ <span class="like-count"><%= p.like_count %></span>
             </button>
             <span class="text-faint" style="font-size:13px;">💬 <%= p.comment_count %></span>
+            <% (p.authorTags || []).forEach(function (t) { %>
+                <a href="/feed?tag=<%= encodeURIComponent(t) %>" class="tag" style="font-size:10px;"><%= t %></a>
+            <% }) %>
+            <% if (!user || user.id !== p.author_id) { %>
+                <button class="report-btn text-faint" data-id="<%= p.id %>" title="신고"
+                        style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;">🚩 신고</button>
+            <% } %>
         </div>
 
         <% if (p.comments && p.comments.length) { %>
@@ -130,6 +175,73 @@ if ('IntersectionObserver' in window) {
     }, { threshold: 0.5 });
     document.querySelectorAll('.feed-clip').forEach(function (v) { io2.observe(v); });
 }
+
+/* 클립 구간 편집 — 슬라이더로 시작점·길이를 잡고 그 구간만 미리듣기 */
+(function () {
+    var sel = document.getElementById('clip-src');
+    if (!sel) return;
+    var box = document.getElementById('clip-editor');
+    var vid = document.getElementById('clip-preview');
+    var cs = document.getElementById('cs-range'), cd = document.getElementById('cd-range');
+    var csL = document.getElementById('cs-label'), cdL = document.getElementById('cd-label');
+    var hStart = document.getElementById('clip-start'), hEnd = document.getElementById('clip-end');
+    var dur = 0, timer = null;
+
+    function fmt(s) { s = Math.floor(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+    function sync() {
+        var start = parseInt(cs.value, 10) || 0;
+        var len   = parseInt(cd.value, 10) || 30;
+        if (dur && start + len > dur) start = Math.max(0, Math.floor(dur - len));
+        csL.textContent = fmt(start);
+        cdL.textContent = len;
+        hStart.value = start;
+        hEnd.value = start + len;
+    }
+    cs.addEventListener('input', sync);
+    cd.addEventListener('input', sync);
+
+    sel.addEventListener('change', function () {
+        var opt = sel.options[sel.selectedIndex];
+        var src = opt && opt.getAttribute('data-src');
+        if (!src) { box.style.display = 'none'; hStart.value = 0; hEnd.value = 0; return; }
+        box.style.display = 'block';
+        vid.src = src;
+        vid.addEventListener('loadedmetadata', function once() {
+            vid.removeEventListener('loadedmetadata', once);
+            dur = vid.duration || 0;
+            cs.max = Math.max(0, Math.floor(dur) - 5);
+            sync();
+            try { vid.currentTime = parseInt(hStart.value, 10) || 0; } catch (_) {}
+        });
+    });
+
+    document.getElementById('clip-play').addEventListener('click', function () {
+        var s = parseInt(hStart.value, 10) || 0, e = parseInt(hEnd.value, 10) || 30;
+        clearInterval(timer);
+        try { vid.currentTime = s; } catch (_) {}
+        vid.play().catch(function () {});
+        timer = setInterval(function () {
+            if (vid.currentTime >= e) { vid.pause(); clearInterval(timer); }
+        }, 200);
+    });
+})();
+
+/* 신고 */
+document.querySelectorAll('.report-btn').forEach(function (b) {
+    b.addEventListener('click', async function () {
+        var reason = prompt('신고 사유를 선택하세요:\n1) 스팸  2) 불법  3) 욕설/괴롭힘  4) 미성년 관련  5) 기타\n번호 입력:');
+        if (!reason) return;
+        var map = { '1': 'spam', '2': 'illegal', '3': 'abuse', '4': 'underage', '5': 'other' };
+        var code = map[String(reason).trim()] || 'other';
+        var r = await fetch('/feed/' + b.dataset.id + '/report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-csrf-token': (document.querySelector('meta[name=csrf-token]') || {}).content || '' },
+            body: JSON.stringify({ kind: 'post', reason: code }),
+        });
+        var j = await r.json();
+        alert(j.ok ? '신고가 접수되었습니다. 관리자가 확인합니다.' : '신고 실패');
+    });
+});
 
 document.querySelectorAll('.like-btn').forEach(function (b) {
     b.addEventListener('click', async function () {

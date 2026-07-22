@@ -34,17 +34,42 @@ function attachVideo(p, userId) {
 
 // ── 피드 ──
 router.get('/', requireAgeVerified, (req, res) => {
-    const posts = stmts.listPosts.all();
+    let posts = stmts.listPosts.all();
+
+    // 태그 필터 — 작성자(스트리머)의 태그 기준. 영상·라이브와 같은 태그 어휘를 공유한다.
+    const wantTags = String(req.query.tag || '').split(',').map(s => s.trim()).filter(Boolean);
+    const tagCache = new Map();
+    const tagsOfAuthor = (uid) => {
+        if (!tagCache.has(uid)) {
+            let t = [];
+            try { t = stmts.listBJTags.all(uid).map(x => x.name); } catch (_) {}
+            tagCache.set(uid, t);
+        }
+        return tagCache.get(uid);
+    };
+    if (wantTags.length) {
+        posts = posts.filter(p => tagsOfAuthor(p.author_id).some(t => wantTags.includes(t)));
+    }
+
     const liked = new Set(stmts.myLikedPosts.all(req.user.id).map(r => r.post_id));
     const items = posts.map(p => Object.assign({}, p, {
         video: attachVideo(p, req.user.id),
         likedByMe: liked.has(p.id),
         comments: stmts.listComments.all(p.id),
+        authorTags: tagsOfAuthor(p.author_id).slice(0, 3),
     }));
-    // 작성용 — 내 영상 목록 (스트리머만)
+
+    // 필터 칩 — 승인된 태그
+    let allTags = [];
+    try { allTags = stmts.listApprovedTags.all().slice(0, 20); } catch (_) {}
+
+    // 작성용 — 내 영상 + 사이트 콘텐츠(VOD/VR)도 클립 소스로 사용 가능
     const myVideos = isStreamer(req.user) ? stmts.listBJVideos.all(req.user.id) : [];
+    const siteVideos = isStreamer(req.user) ? stmts.listAllContents.all().slice(0, 50) : [];
+
     res.render('feed/index', {
-        title: '피드', items, canPost: isStreamer(req.user), myVideos,
+        title: '피드', items, canPost: isStreamer(req.user), myVideos, siteVideos,
+        allTags, activeTags: wantTags,
         error: req.session.flash, ok: req.session.flashOk,
     });
     req.session.flash = null; req.session.flashOk = null;
@@ -61,20 +86,22 @@ router.post('/', requireLogin, (req, res) => {
         req.session.flash = `게시 실패 — ${f.blocked.join(', ')}는 등록할 수 없습니다. (외부 연락처·링크 금지)`;
         return res.redirect('/feed');
     }
-    let vid = parseInt(req.body.video_id, 10);
-    let src = req.body.video_source === 'content' ? 'content' : 'bj';
+    // 영상 선택값은 "bj:12" 또는 "content:5" 형식 — 소스와 id를 함께 받는다
+    const raw = String(req.body.video_ref || '');
+    const m = /^(bj|content):(\d+)$/.exec(raw);
+    let src = m ? m[1] : null;
+    let vid = m ? parseInt(m[2], 10) : null;
     let start = Math.max(0, parseInt(req.body.clip_start, 10) || 0);
     let end   = Math.max(0, parseInt(req.body.clip_end, 10) || 0);
-    if (!Number.isInteger(vid) || vid <= 0) { vid = null; src = null; start = 0; end = 0; }
+
     // 클립은 최대 60초 (쇼츠 성격 유지)
     if (end && end <= start) end = start + 30;
     if (end - start > 60) end = start + 60;
 
-    // 내 영상만 연결 가능 (남의 영상 도용 방지)
-    if (vid && src === 'bj') {
-        const mine = stmts.findBJVideo.get(vid, req.user.id);
-        if (!mine) { vid = null; src = null; start = 0; end = 0; }
-    }
+    // 스트리머 영상은 본인 것만 연결 가능 (남의 영상 도용 방지)
+    if (vid && src === 'bj' && !stmts.findBJVideo.get(vid, req.user.id)) { vid = null; src = null; }
+    if (vid && src === 'content' && !stmts.findContent.get(vid))         { vid = null; src = null; }
+    if (!vid || !src) { vid = null; src = null; start = 0; end = 0; }
 
     stmts.insertPost.run(req.user.id, f.text, src, vid, start, end);
     req.session.flashOk = '게시했습니다.';
@@ -105,6 +132,19 @@ router.post('/:id/comment', requireLogin, (req, res) => {
     stmts.insertComment.run(id, req.user.id, f.text);
     stmts.syncPostComments.run(id, id);
     res.redirect('/feed');
+});
+
+// ── 신고 (포스트·댓글) — 관리자 신고함으로 들어감 ──
+router.post('/:id/report', requireLogin, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const kind = req.body.kind === 'comment' ? 'comment' : 'post';
+    if (!stmts.findPost.get(id)) return res.status(404).json({ ok: false });
+    const REASONS = ['spam', 'illegal', 'abuse', 'underage', 'other'];
+    const reason = REASONS.includes(req.body.reason) ? req.body.reason : 'other';
+    try {
+        stmts.insertReport.run(req.user.id, kind, id, reason, String(req.body.detail || '').slice(0, 500));
+    } catch (_) { return res.json({ ok: false }); }
+    res.json({ ok: true });
 });
 
 // ── 삭제 (작성자 또는 관리자) ──

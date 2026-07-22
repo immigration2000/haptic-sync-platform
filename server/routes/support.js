@@ -3,7 +3,7 @@ const router = express.Router();
 const { stmts } = require('../db');
 const { requireLogin } = require('../middleware/auth');
 
-const REPORT_TARGETS = ['content', 'bj', 'user', 'other'];
+const REPORT_TARGETS = ['content', 'bj', 'user', 'post', 'comment', 'other'];
 const REPORT_REASONS = ['illegal', 'underage', 'abuse', 'spam', 'copyright', 'other'];
 function isEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s || ''); }
 
