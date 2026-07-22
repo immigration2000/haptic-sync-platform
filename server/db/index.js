@@ -69,6 +69,10 @@ addColumnIfMissing('dummy_bj_rooms', 'session_block_min', 'session_block_min INT
 // 서비스 태그 체계 개편 — 기기제어 제공 여부(서비스와 직교), 구독전용 영상 카탈로그 노출
 addColumnIfMissing('bj_profiles',    'device_control',    'device_control INTEGER NOT NULL DEFAULT 1');
 addColumnIfMissing('bj_profiles',    'show_sub_videos',   'show_sub_videos INTEGER NOT NULL DEFAULT 1');
+// 이미지 — 저장소 추상화(server/storage.js) 키를 저장. 절대경로/도메인 금지(AWS 이전 대비)
+addColumnIfMissing('posts',          'image_key',         'image_key TEXT');
+addColumnIfMissing('bj_profiles',    'avatar_key',        'avatar_key TEXT');
+addColumnIfMissing('bj_videos',      'thumb_key',         'thumb_key TEXT');
 
 // services 값을 신규 4종 체계로 1회 변환 (call→voice_1on1, broadcast→video_multi …)
 // 이미 신규 코드면 그대로 — 멱등이라 매 부팅 실행돼도 안전.
@@ -118,8 +122,8 @@ const stmts = {
     updateBJFlags:     db.prepare('UPDATE bj_profiles SET device_control = ?, show_sub_videos = ? WHERE user_id = ?'),
 
     // ── SNS 피드 ──
-    insertPost:        db.prepare(`INSERT INTO posts (author_id, body, video_source, video_id, clip_start, clip_end)
-                                   VALUES (?, ?, ?, ?, ?, ?)`),
+    insertPost:        db.prepare(`INSERT INTO posts (author_id, body, video_source, video_id, clip_start, clip_end, image_key)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?)`),
     listPosts:         db.prepare(`SELECT p.*, u.nickname, b.stage_name
                                    FROM posts p
                                    JOIN users u ON u.id = p.author_id

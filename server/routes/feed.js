@@ -7,11 +7,29 @@
  * 보호: 외부 링크·연락처는 content_filter로 차단(플랫폼 이탈 방지).
  */
 const express = require('express');
+const multer  = require('multer');
 const router = express.Router();
 const { stmts } = require('../db');
 const { requireLogin, requireAgeVerified } = require('../middleware/auth');
+const { doubleCsrfProtection } = require('../middleware/csrf');
 const filter = require('../content_filter');
 const { videoAccess } = require('../access');
+const storage = require('../storage');
+
+/* 사진 업로드 — 저장 위치는 storage.js가 결정한다(로컬 ↔ S3 전환 대비).
+ * DB에는 논리 키만 저장하고, 화면에서는 storage.publicUrl(key)로 URL을 만든다. */
+const IMAGE_RE = /\.(jpe?g|png|webp|gif)$/i;
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: (req, file, cb) => cb(null, storage.localDir('feed', req.user.id)),
+        filename:    (req, file, cb) => cb(null, storage.safeName(file.originalname)),
+    }),
+    limits: { fileSize: 8 * 1024 * 1024 },      // 8MB — 사진이라 넉넉히 잡되 폰 서버 보호
+    fileFilter: (req, file, cb) => {
+        const ok = IMAGE_RE.test(file.originalname);
+        cb(ok ? null : new Error('이미지 파일만 업로드할 수 있습니다'), ok);
+    },
+});
 
 const isStreamer = (u) => u && (u.role === 'bj' || u.role === 'admin');
 
@@ -57,6 +75,7 @@ router.get('/', requireAgeVerified, (req, res) => {
         likedByMe: liked.has(p.id),
         comments: stmts.listComments.all(p.id),
         authorTags: tagsOfAuthor(p.author_id).slice(0, 3),
+        imageUrl: p.image_key ? storage.publicUrl(p.image_key) : null,   // 저장소 무관 URL
     }));
 
     // 필터 칩 — 승인된 태그
@@ -76,13 +95,34 @@ router.get('/', requireAgeVerified, (req, res) => {
 });
 
 // ── 포스트 작성 (스트리머만) ──
-router.post('/', requireLogin, (req, res) => {
+// 멀티파트라 글로벌 CSRF를 지나치므로 multer 뒤에서 직접 검증한다(업로드 라우트 공통 패턴).
+router.post('/', requireLogin, (req, res, next) => {
+    upload.single('image')(req, res, (err) => {
+        if (err) { req.session.flash = err.message || '업로드 실패'; return res.redirect('/feed'); }
+        next();
+    });
+}, (req, res, next) => {
+    // multer는 CSRF 검증 '전에' 파일을 디스크에 쓴다. 이후 단계에서 거부(403 등)되면
+    // 핸들러가 실행되지 않아 파일만 남는다 → 반복 요청으로 디스크를 채울 수 있음.
+    // 응답이 실패로 끝나면 업로드 파일을 되돌린다.
+    res.on('finish', () => {
+        if (res.statusCode >= 400 && req.file) {
+            storage.remove(`feed/${req.user.id}/${req.file.filename}`);
+        }
+    });
+    next();
+}, doubleCsrfProtection, (req, res) => {
+    const imgKey = req.file ? `feed/${req.user.id}/${req.file.filename}` : null;
+    const dropImage = () => { if (imgKey) storage.remove(imgKey); };
+
     if (!isStreamer(req.user)) {
+        dropImage();
         req.session.flash = '스트리머만 게시할 수 있습니다.';
         return res.redirect('/feed');
     }
     const f = filter.check(req.body.body, { maxLen: 500 });
     if (!f.ok) {
+        dropImage();   // 본문이 거부되면 올라간 파일도 남기지 않는다
         req.session.flash = `게시 실패 — ${f.blocked.join(', ')}는 등록할 수 없습니다. (외부 연락처·링크 금지)`;
         return res.redirect('/feed');
     }
@@ -103,7 +143,7 @@ router.post('/', requireLogin, (req, res) => {
     if (vid && src === 'content' && !stmts.findContent.get(vid))         { vid = null; src = null; }
     if (!vid || !src) { vid = null; src = null; start = 0; end = 0; }
 
-    stmts.insertPost.run(req.user.id, f.text, src, vid, start, end);
+    stmts.insertPost.run(req.user.id, f.text, src, vid, start, end, imgKey);
     req.session.flashOk = '게시했습니다.';
     res.redirect('/feed');
 });
@@ -151,7 +191,10 @@ router.post('/:id/report', requireLogin, (req, res) => {
 router.post('/:id/delete', requireLogin, (req, res) => {
     const id = parseInt(req.params.id, 10);
     const p = stmts.findPost.get(id);
-    if (p && (p.author_id === req.user.id || req.user.role === 'admin')) stmts.deletePost.run(id);
+    if (p && (p.author_id === req.user.id || req.user.role === 'admin')) {
+        if (p.image_key) storage.remove(p.image_key);   // 고아 파일 방지
+        stmts.deletePost.run(id);
+    }
     res.redirect('/feed');
 });
 

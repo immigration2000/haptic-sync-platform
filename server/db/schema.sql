@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS posts (
     video_id      INTEGER,                                -- 연결된 영상
     clip_start    INTEGER NOT NULL DEFAULT 0,             -- 클립 시작(초)
     clip_end      INTEGER NOT NULL DEFAULT 0,             -- 클립 끝(초). 0이면 클립 없음
+    image_key     TEXT,                                   -- 첨부 사진 (storage.js 논리 키 — 절대경로/도메인 금지)
     like_count    INTEGER NOT NULL DEFAULT 0,
     comment_count INTEGER NOT NULL DEFAULT 0,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
