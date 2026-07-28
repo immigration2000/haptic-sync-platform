@@ -22,17 +22,31 @@ function requireAgeOrGuest(req, res, next) {
 const csvList = (v) => String(v || '').split(',').map(s => s.trim()).filter(Boolean);
 const tagsOf  = (s) => csvList(s);
 
-/** 두 소스를 하나의 카드 형태로 정규화 */
+/** 두 소스를 하나의 카드 형태로 정규화
+ *  태그 우선순위: 영상 자체 태그 > (스트리머 영상이면) 스트리머 태그 > 레거시 문자열 컬럼 */
 function buildCatalog(userId) {
     const out = [];
+
+    // 영상별 태그를 한 번에 읽어 맵으로 (영상마다 쿼리하지 않도록)
+    const vtMap = new Map();
+    try {
+        for (const r of stmts.listAllVideoTags.all()) {
+            const k = r.source + ':' + r.video_id;
+            if (!vtMap.has(k)) vtMap.set(k, []);
+            vtMap.get(k).push(r.name);
+        }
+    } catch (_) {}
+    const ownTags = (src, id) => vtMap.get(src + ':' + id) || [];
+
     for (const c of stmts.listAllContents.all()) {
+        const own = ownTags('content', c.id);
         out.push({
             key: 'c' + c.id, href: '/content/play/' + c.id,
             type: c.type === 'vr' ? 'vr' : 'vod',
             title: c.title, thumb: c.thumbnail_path, duration: c.duration_sec,
             multiAxis: !!c.multi_axis, hasScript: !!c.script_path,
             access: c.price > 0 ? 'ppv' : 'free', price: c.price,
-            tags: tagsOf(c.tags), streamer: null,
+            tags: own.length ? own : tagsOf(c.tags), streamer: null,
             locked: false, createdAt: c.created_at,
         });
     }
@@ -42,13 +56,14 @@ function buildCatalog(userId) {
         // 구독전용은 스트리머가 노출을 끄면 카탈로그에서 숨김.
         // 단 이미 볼 수 있는 사람(구독자·구매자·본인)에겐 항상 보인다.
         if (kind === 'sub' && !v.show_sub_videos && !acc.allowed) continue;
+        const own = ownTags('bj', v.id);
         out.push({
             key: 'b' + v.id, href: '/bj/vid/' + v.id,
             type: 'vod',
             title: v.title, thumb: null, duration: 0,
             multiAxis: false, hasScript: !!v.script_path,
             access: kind, price: v.price,
-            tags: tagsOf(v.streamer_tags),
+            tags: own.length ? own : tagsOf(v.streamer_tags),
             streamer: { id: v.bj_user_id, name: v.stage_name, subPrice: v.sub_price },
             locked: !acc.allowed, accessReason: acc.reason,
             createdAt: v.created_at,

@@ -216,6 +216,18 @@ CREATE TABLE IF NOT EXISTS tags (
 );
 CREATE INDEX IF NOT EXISTS idx_tags_status ON tags(status);
 
+-- 영상 ↔ 태그 (영상마다 개별 태그). source로 두 종류의 영상을 한 테이블에서 다룬다.
+--   source='content' → contents.id (사이트 VOD/VR)
+--   source='bj'      → bj_videos.id (스트리머 업로드)
+-- 영상에 태그가 없으면 카탈로그는 스트리머 태그로 폴백한다.
+CREATE TABLE IF NOT EXISTS video_tags (
+    source     TEXT NOT NULL,
+    video_id   INTEGER NOT NULL,
+    tag_id     INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (source, video_id, tag_id)
+);
+CREATE INDEX IF NOT EXISTS idx_video_tags_tag ON video_tags(tag_id);
+
 -- 스트리머 ↔ 태그 (승인된 태그만 연결)
 CREATE TABLE IF NOT EXISTS bj_tags (
     bj_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

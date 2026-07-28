@@ -61,7 +61,7 @@
                 <div class="panel-title">전체 콘텐츠 (<%= contents.length %>)</div>
                 <div style="overflow-x: auto;">
                     <table class="tx-table">
-                        <thead><tr><th>ID</th><th>타입</th><th>제목</th><th>제작자</th><th>길이</th><th>가격</th><th>조회</th></tr></thead>
+                        <thead><tr><th>ID</th><th>타입</th><th>제목</th><th>제작자</th><th>길이</th><th>가격</th><th>조회</th><th>태그</th></tr></thead>
                         <tbody>
                             <% contents.forEach(c => { %>
                                 <tr>
@@ -72,6 +72,14 @@
                                     <td class="mono"><%= Math.floor(c.duration_sec/60) %>:<%= String(c.duration_sec%60).padStart(2,'0') %></td>
                                     <td class="mono"><%= c.price %></td>
                                     <td class="mono"><%= c.view_count %></td>
+                                    <td>
+                                        <form method="POST" action="/admin/contents/<%= c.id %>/tags" style="margin:0;display:flex;gap:4px;align-items:center;">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <input class="form-input ctag-input" type="text" name="tags" value="<%= c.tagStr %>"
+                                                   placeholder="태그(쉼표)" maxlength="120" style="width:160px;padding:4px 8px;font-size:12px;">
+                                            <button class="btn btn-sm btn-ghost">저장</button>
+                                        </form>
+                                    </td>
                                 </tr>
                             <% }) %>
                         </tbody>
@@ -81,3 +89,35 @@
         </div>
     </div>
 </section>
+
+<% if (typeof approvedTags !== 'undefined' && approvedTags.length) { %>
+<div class="container">
+    <div class="card card-body mb-6">
+        <div class="text-faint" style="font-size:11px;margin-bottom:8px;">공용 태그 — 클릭하면 마지막으로 선택한 콘텐츠의 태그 칸에 추가됩니다</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <% approvedTags.forEach(function (t) { %>
+                <button type="button" class="tag ctag-pick" data-tag="<%= t.name %>"
+                        style="cursor:pointer;border:1px solid var(--border-soft);background:none;"><%= t.name %></button>
+            <% }) %>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var last = null;
+    document.querySelectorAll('.ctag-input').forEach(function (i) {
+        i.addEventListener('focus', function () { last = i; });
+    });
+    document.querySelectorAll('.ctag-pick').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var t = last || document.querySelector('.ctag-input');
+            if (!t) return;
+            var cur = t.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+            var n = b.getAttribute('data-tag');
+            if (cur.indexOf(n) === -1) { cur.push(n); t.value = cur.join(','); }
+            t.focus();
+        });
+    });
+})();
+</script>
+<% } %>

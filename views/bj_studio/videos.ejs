@@ -44,7 +44,7 @@
                     <div class="text-faint text-center" style="padding: 40px;">아직 업로드한 영상이 없습니다.</div>
                 <% } else { %>
                     <table class="tx-table">
-                        <thead><tr><th>제목</th><th>스크립트</th><th>PPV 가격</th><th>업로드일</th><th></th></tr></thead>
+                        <thead><tr><th>제목</th><th>스크립트</th><th>PPV 가격</th><th>태그</th><th>업로드일</th><th></th></tr></thead>
                         <tbody>
                             <% videos.forEach(v => { %>
                                 <tr>
@@ -55,6 +55,14 @@
                                             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                                             <input class="form-input" type="number" name="price" value="<%= v.price %>" min="0" max="100000" step="100" style="width:90px;padding:4px 8px;">
                                             <button class="btn btn-sm btn-ghost">변경</button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <form method="POST" action="/bj-studio/videos/<%= v.id %>/tags" style="margin:0;display:flex;gap:4px;align-items:center;">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <input class="form-input vtag-input" type="text" name="tags" value="<%= v.tagStr %>"
+                                                   placeholder="태그(쉼표)" maxlength="120" style="width:170px;padding:4px 8px;font-size:12px;">
+                                            <button class="btn btn-sm btn-ghost">저장</button>
                                         </form>
                                     </td>
                                     <td class="mono text-faint" style="font-size:11px;"><%= v.created_at %></td>
@@ -73,3 +81,35 @@
         </div>
     </div>
 </section>
+
+<% if (approvedTags && approvedTags.length) { %>
+<div class="card card-body mt-4">
+    <div class="text-faint" style="font-size:11px;margin-bottom:8px;">공용 태그 — 클릭하면 마지막으로 클릭한 영상의 태그 칸에 추가됩니다</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <% approvedTags.forEach(function (t) { %>
+            <button type="button" class="tag vtag-pick" data-tag="<%= t.name %>"
+                    style="cursor:pointer;border:1px solid var(--border-soft);background:none;"><%= t.name %></button>
+        <% }) %>
+    </div>
+</div>
+<% } %>
+
+<script>
+// 마지막으로 포커스한 태그 입력칸을 기억했다가 공용 태그 클릭 시 거기에 추가
+(function () {
+    var last = null;
+    document.querySelectorAll('.vtag-input').forEach(function (i) {
+        i.addEventListener('focus', function () { last = i; });
+    });
+    document.querySelectorAll('.vtag-pick').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var t = last || document.querySelector('.vtag-input');
+            if (!t) return;
+            var cur = t.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+            var name = b.getAttribute('data-tag');
+            if (cur.indexOf(name) === -1) { cur.push(name); t.value = cur.join(','); }
+            t.focus();
+        });
+    });
+})();
+</script>

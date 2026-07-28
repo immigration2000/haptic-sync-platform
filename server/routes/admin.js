@@ -3,6 +3,7 @@ const router = express.Router();
 const { stmts, getSettingBool, getSetting, setSetting } = require('../db');
 const vrConfig = require('../vr_config');
 const { requireRole } = require('../middleware/auth');
+const tagEngine = require('../tags');
 
 router.use(requireRole('admin'));
 
@@ -93,7 +94,27 @@ router.post('/reports/:id/resolve', (req, res) => {
 
 // 컨텐츠 (메타 추가)
 router.get('/contents', (req, res) => {
-    res.render('admin/contents', { title: '콘텐츠 관리', contents: stmts.listAllContents.all() });
+    const contents = stmts.listAllContents.all().map(c => {
+        let t = [];
+        try { t = stmts.listVideoTags.all('content', c.id).map(x => x.name); } catch (_) {}
+        return Object.assign({}, c, { tagStr: t.join(',') });
+    });
+    res.render('admin/contents', {
+        title: '콘텐츠 관리', contents,
+        approvedTags: stmts.listApprovedTags.all().slice(0, 30),
+        ok: req.session.flashOk,
+    });
+    req.session.flashOk = null;
+});
+
+// 사이트 콘텐츠 영상별 태그 — 스트리머 영상과 같은 태그 마스터를 공유
+router.post('/contents/:id/tags', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (stmts.findContent.get(id)) {
+        tagEngine.submitForVideo('content', id, req.body.tags, req.user.id);
+        req.session.flashOk = '콘텐츠 태그를 저장했습니다.';
+    }
+    res.redirect('/admin/contents');
 });
 
 router.post('/contents/add', (req, res) => {
@@ -112,7 +133,6 @@ router.post('/contents/add', (req, res) => {
 
 // 고객센터 문의 내역
 // ─── 커스텀 태그 관리 (운영 모드 전환 · 승인/차단 · 금지어) ───
-const tagEngine = require('../tags');
 
 router.get('/tags', (req, res) => {
     res.render('admin/tags', {

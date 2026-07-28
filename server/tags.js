@@ -116,8 +116,44 @@ function submitForStreamer(userId, rawList, createdBy) {
     return { attached, pending, rejected, mode };
 }
 
+/**
+ * 영상 1편의 태그 제출 (기존 연결은 교체)
+ * 스트리머 태그와 같은 마스터·모드·차단 규칙을 쓴다.
+ * @param source 'content'(사이트 VOD/VR) | 'bj'(스트리머 업로드)
+ * @returns { attached, pending, rejected, mode }
+ */
+function submitForVideo(source, videoId, rawList, createdBy) {
+    const mode = getMode();
+    const src = source === 'content' ? 'content' : 'bj';
+    let names = rawList;
+    if (typeof names === 'string') names = names.split(',');
+    if (!Array.isArray(names)) names = [];
+    names = [...new Set(names.map(normalizeName).filter(Boolean))].slice(0, 8);
+
+    const attached = [], pending = [], rejected = [];
+    const tagIds = [];
+
+    for (const name of names) {
+        const r = judge(name, mode);
+        if (r.action === 'reject') { rejected.push({ name, reason: r.reason }); continue; }
+        let tagId = r.tagId;
+        if (!tagId) {
+            const ins = stmts.insertTag.run(name, '기타', r.status || 'pending', createdBy || null);
+            tagId = Number(ins.lastInsertRowid);
+        }
+        if (r.action === 'attach') { attached.push(name); tagIds.push(tagId); }
+        else pending.push(name);
+    }
+
+    stmts.clearVideoTags.run(src, videoId);
+    for (const id of tagIds) {
+        try { stmts.addVideoTag.run(src, videoId, id); } catch (_) {}
+    }
+    return { attached, pending, rejected, mode };
+}
+
 module.exports = {
     MODES, DEFAULT_MODE, CORE_BLOCK, CATEGORIES,
     normalizeName, getMode, setMode, getBannedWords, setBannedWords,
-    judge, submitForStreamer,
+    judge, submitForStreamer, submitForVideo,
 };

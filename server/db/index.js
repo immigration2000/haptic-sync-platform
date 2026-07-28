@@ -177,6 +177,15 @@ const stmts = {
     addBJTag:          db.prepare('INSERT OR IGNORE INTO bj_tags (bj_user_id, tag_id) VALUES (?, ?)'),
     listBJTags:        db.prepare(`SELECT t.* FROM tags t JOIN bj_tags b ON b.tag_id = t.id
                                    WHERE b.bj_user_id = ? AND t.status = 'approved' ORDER BY t.name`),
+    // 영상별 태그
+    clearVideoTags:    db.prepare('DELETE FROM video_tags WHERE source = ? AND video_id = ?'),
+    addVideoTag:       db.prepare('INSERT OR IGNORE INTO video_tags (source, video_id, tag_id) VALUES (?, ?, ?)'),
+    listVideoTags:     db.prepare(`SELECT t.* FROM tags t JOIN video_tags v ON v.tag_id = t.id
+                                   WHERE v.source = ? AND v.video_id = ? AND t.status = 'approved'
+                                   ORDER BY t.name`),
+    listAllVideoTags:  db.prepare(`SELECT v.source, v.video_id, t.name FROM video_tags v
+                                   JOIN tags t ON t.id = v.tag_id
+                                   WHERE t.status = 'approved'`),
 
     // BJ 개인 영상
     listBJVideos:      db.prepare('SELECT * FROM bj_videos WHERE bj_user_id = ? ORDER BY created_at DESC'),

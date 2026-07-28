@@ -136,9 +136,32 @@ router.get('/calls', (req, res) => {
 // ── 내 영상 관리 ──
 router.get('/videos', (req, res) => {
     const profile = stmts.findBJ.get(req.user.id);
-    const videos = stmts.listBJVideos.all(req.user.id);
-    res.render('bj_studio/videos', { title: '내 영상', profile, videos, error: req.session.flash, ok: req.session.flashOk });
+    const videos = stmts.listBJVideos.all(req.user.id).map(v => {
+        let tags = [];
+        try { tags = stmts.listVideoTags.all('bj', v.id).map(t => t.name); } catch (_) {}
+        return Object.assign({}, v, { tagStr: tags.join(',') });
+    });
+    res.render('bj_studio/videos', {
+        title: '내 영상', profile, videos,
+        approvedTags: stmts.listApprovedTags.all().slice(0, 30),
+        error: req.session.flash, ok: req.session.flashOk,
+    });
     req.session.flash = null; req.session.flashOk = null;
+});
+
+// 영상별 태그 저장 — 스트리머 태그와 같은 마스터·운영모드·차단 규칙 적용
+router.post('/videos/:id/tags', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!stmts.findBJVideo.get(id, req.user.id)) {   // 내 영상만
+        req.session.flash = '내 영상이 아닙니다.';
+        return res.redirect('/bj-studio/videos');
+    }
+    const r = require('../tags').submitForVideo('bj', id, req.body.tags, req.user.id);
+    let msg = '영상 태그를 저장했습니다.';
+    if (r.pending.length)  msg += ` 승인 대기: ${r.pending.join(', ')}.`;
+    if (r.rejected.length) msg += ` 차단됨: ${r.rejected.map(x => x.name).join(', ')}.`;
+    req.session.flashOk = msg;
+    res.redirect('/bj-studio/videos');
 });
 
 router.post('/videos/upload',
