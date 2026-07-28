@@ -110,14 +110,14 @@
                     </div>
 
                     <div class="card card-body mb-4" style="border-color: rgba(123,45,255,0.2);">
-                        <div class="panel-title">보이스 제공 옵션 (능력별 요금)</div>
-                        <p class="text-faint" style="font-size:11px; margin-bottom:10px;">통화는 항상 제공(위 '분당 요금'). 모니터링·캠은 0이면 미제공이며, 제공 시 사용자가 진입할 때 옵션으로 골라 그 요율로 결제합니다.</p>
-                        <div class="form-row" style="margin:0 0 10px;">
-                            <label class="form-label">🎬 모니터링 (사용자 영상 시청 + 스트리머 제어) 분당 — 0=미제공</label>
-                            <input class="form-input" type="number" name="rate_with_video" value="<%= profile.rate_with_video %>" min="0" max="2000" step="10">
-                        </div>
+                        <div class="panel-title">1:1 서비스 요금</div>
+                        <p class="text-faint" style="font-size:11px; margin-bottom:10px;">
+                            🎤 <strong>1:1 음성통화</strong>는 위의 <strong>분당 요금</strong>으로 결제됩니다.<br>
+                            📷 <strong>1:1 영상통화</strong>는 아래 요율로 결제됩니다. (0이면 위 분당 요금과 동일하게 적용)<br>
+                            📻📺 <strong>방송(1:다수)</strong>은 입장 무료이며 <strong>후원</strong>으로 수익이 발생합니다.
+                        </p>
                         <div class="form-row" style="margin:0;">
-                            <label class="form-label">📷 캠 (1:1 화상) 분당 — 0=미제공</label>
+                            <label class="form-label">📷 1:1 영상통화 분당 요금</label>
                             <input class="form-input" type="number" name="rate_cam" value="<%= profile.rate_cam %>" min="0" max="2000" step="10">
                         </div>
                     </div>

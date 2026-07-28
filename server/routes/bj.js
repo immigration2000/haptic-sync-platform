@@ -4,6 +4,7 @@ const { stmts, getSettingBool, getSetting, adjustCredits } = require('../db');
 const { requireAgeVerified, requireRole, requireLogin } = require('../middleware/auth');
 const activeSessions = require('../signaling/active_sessions');
 const { videoAccess } = require('../access');
+const svcTypes = require('../service_types');
 
 // BJ(실제/더미) 요금 정보 조회 헬퍼
 function resolveBJ(bjUserId) {
@@ -15,7 +16,7 @@ function resolveBJ(bjUserId) {
             id: bjUserId, isDummy: true,
             stage_name: d.stage_name,
             rate_per_minute: d.rate_per_minute,
-            rate_with_video: 0, rate_cam: 0,   // 더미는 추가 옵션 없음
+            rate_cam: 0,   // 더미는 1:1 영상통화 미제공
             free_preview_sec: d.free_preview_sec,
             session_block_min: d.session_block_min,
         };
@@ -26,19 +27,15 @@ function resolveBJ(bjUserId) {
         id: b.user_id, isDummy: false,
         stage_name: b.stage_name,
         rate_per_minute: b.rate_per_minute,
-        rate_with_video: b.rate_with_video || 0,
         rate_cam: b.rate_cam || 0,
         free_preview_sec: b.free_preview_sec,
         session_block_min: b.session_block_min,
     };
 }
 
-// 활성 세션의 옵션(tier)에 맞는 분당요율 — 통화/모니터링(video)/캠(cam)
-function tierRate(bj, tier) {
-    if (tier === 'cam'   && bj.rate_cam > 0)        return bj.rate_cam;
-    if (tier === 'video' && bj.rate_with_video > 0) return bj.rate_with_video;
-    return bj.rate_per_minute;
-}
+// 활성 세션의 서비스(tier)에 맞는 분당요율 — 매핑은 service_types.js가 단일 기준.
+// tier 값은 서비스 코드(voice_1on1 | video_1on1). 구 값(call/video/cam)도 자동 변환된다.
+const tierRate = (bj, tier) => svcTypes.rateOf(bj, tier);
 
 // 세션 요금 정보 (무료체험·결제단위·가격·잔액)
 // 활성 통화 세션이 있으면 그 BJ 기준으로 산정 (클라이언트 파라미터 신뢰 안 함)
@@ -46,7 +43,7 @@ router.get('/session/info/:bjUserId', requireLogin, (req, res) => {
     const sess = activeSessions.get(req.user.id);
     const bj = resolveBJ(sess ? sess.bjUserId : req.params.bjUserId);
     if (!bj) return res.status(404).json({ ok: false, reason: 'BJ_NOT_FOUND' });
-    const tier = sess ? (sess.tier || 'call') : 'call';
+    const tier = svcTypes.normalizeTier(sess && sess.tier);
     const ratePerMin = tierRate(bj, tier);
     const cost = bj.session_block_min * ratePerMin;
     res.json({
@@ -56,7 +53,7 @@ router.get('/session/info/:bjUserId', requireLogin, (req, res) => {
         blockMin: bj.session_block_min,
         ratePerMin,
         tier,
-        withVideo: tier === 'video' && bj.rate_with_video > 0,
+        withVideo: tier === 'video_1on1' && (bj.rate_cam || 0) > 0,
         cost,
         balance: req.user.credits,
         affordable: req.user.credits >= cost,
@@ -124,7 +121,7 @@ router.post('/session/charge', requireLogin, express.json(), (req, res) => {
     if (!sess) return res.status(403).json({ ok: false, reason: 'NO_ACTIVE_SESSION' });
     const bj = resolveBJ(sess.bjUserId);
     if (!bj) return res.status(404).json({ ok: false, reason: 'BJ_NOT_FOUND' });
-    const cost = bj.session_block_min * tierRate(bj, sess.tier || 'call');
+    const cost = bj.session_block_min * tierRate(bj, sess.tier);
     if (req.user.credits < cost) {
         return res.json({ ok: false, reason: 'INSUFFICIENT', balance: req.user.credits, needed: cost });
     }
@@ -155,7 +152,6 @@ router.get('/', requireAgeVerified, (req, res) => {
     let bjs = stmts.listBJs.all();
     // 함께보기 진입이면 1:1 영상통화 제공 스트리머만 (함께보기는 영상통화의 기능으로 흡수됨)
     if (req.query.cowatchContent) {
-        const svcTypes = require('../service_types');
         bjs = bjs.filter(b => svcTypes.has(b.services, 'video_1on1'));
     }
     let dummyRooms = [];

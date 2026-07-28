@@ -66,4 +66,34 @@ const normalizeServices = (input) => normalizeList(input).join(',');
 /** 해당 스트리머가 이 서비스를 제공하는가 */
 const has = (services, code) => normalizeList(services).includes(code);
 
-module.exports = { SERVICE_TYPES, CODES, BY_CODE, LEGACY_MAP, normalizeList, normalizeServices, has };
+/* ── 요율 ──────────────────────────────────────────────────────
+ * 서비스 코드 ↔ DB 요율 컬럼 매핑을 여기서만 한다.
+ *   voice_1on1 → rate_per_minute   (항상 제공, 기본 요율)
+ *   video_1on1 → rate_cam          (0이면 미제공)
+ *   *_multi    → 요율 없음(입장 무료 + 후원)
+ * ⚠ rate_with_video(옛 '모니터링')는 video_1on1로 흡수되어 더 이상 쓰지 않는다.
+ *   DB 컬럼은 과거 데이터 보존을 위해 남겨두되, 값은 마이그레이션에서 rate_cam으로 옮긴다.
+ */
+const LEGACY_TIER = { call: 'voice_1on1', video: 'video_1on1', cam: 'video_1on1' };
+
+/** 결제 tier 값 정규화 — 구 값('call'/'video'/'cam')도 받아 서비스 코드로 통일 */
+function normalizeTier(t) {
+    const v = String(t || '').trim();
+    if (LEGACY_TIER[v]) return LEGACY_TIER[v];
+    return CODES.includes(v) && BY_CODE[v].audience === '1on1' ? v : 'voice_1on1';
+}
+
+/** 서비스 코드에 해당하는 분당 요율. 미제공(0)이면 기본 요율로 폴백. */
+function rateOf(profile, code) {
+    if (!profile) return 0;
+    const s = BY_CODE[normalizeTier(code)];
+    const base = profile.rate_per_minute || 0;
+    if (!s || !s.rateField) return base;
+    const v = profile[s.rateField] || 0;
+    return v > 0 ? v : base;
+}
+
+module.exports = {
+    SERVICE_TYPES, CODES, BY_CODE, LEGACY_MAP, LEGACY_TIER,
+    normalizeList, normalizeServices, has, normalizeTier, rateOf,
+};

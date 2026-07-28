@@ -60,7 +60,7 @@
             if (!bj) return;
             attempted = true;
             const tierEl = document.querySelector('input[name=tier]:checked');
-            const tier = tierEl ? tierEl.value : 'call';
+            const tier = tierEl ? tierEl.value : 'voice_1on1';
             socket.emit('user-call', { bjSocketId: bj.id, bjUserIdTarget: CFG.bjId, kind: 'call', context: { tier } });
             stateEl.textContent = '연결 중…';
         });

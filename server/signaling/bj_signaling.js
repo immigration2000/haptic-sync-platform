@@ -120,8 +120,9 @@ module.exports = (httpServer, sessionMiddleware) => {
             pairs.set(socket.id, bj.socketId);
             pairs.set(bj.socketId, socket.id);
             // 결제 권위 세션 기록: 이 사용자는 이 BJ와 통화 중 (요금은 서버가 이 값으로만 산정)
-            // tier: 'call'(통화) | 'video'(모니터링/영상) | 'cam'(캠) — 사용자가 진입 시 선택
-            const tier = (context && ['video', 'cam'].includes(context.tier)) ? context.tier : 'call';
+            // tier = 1:1 서비스 코드(voice_1on1 | video_1on1). 구 값(call/video/cam)도 자동 변환.
+            // 요금은 서버가 이 값으로만 산정하므로 여기서 정규화해 저장한다.
+            const tier = require('../service_types').normalizeTier(context && context.tier);
             activeSessions.set(socket.userId, { bjUserId: bj.userId, kind: kind || 'call', socketId: socket.id, tier });
             broadcastLobby();
             const ctx = context || {};

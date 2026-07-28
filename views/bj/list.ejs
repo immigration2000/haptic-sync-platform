@@ -71,9 +71,15 @@
                                 <span><%= bj.rate_per_minute %> Rb/분 · 무료 <%= bj.free_preview_sec %>초</span>
                             </div>
                             <div class="content-tags" style="margin-top:6px;">
-                                <span class="badge badge-multi">📞 통화</span>
-                                <% if (bj.rate_with_video > 0) { %><span class="badge badge-multi">🎬 모니터링</span><% } %>
-                                <% if (bj.rate_cam > 0) { %><span class="badge badge-multi">📷 캠</span><% } %>
+                                <%
+                                   // 제공 서비스 배지 — 서비스 태그가 기준 (요율 필드가 아니라)
+                                   var bsvc = (bj.services || 'voice_1on1').split(',');
+                                   var LBL = { voice_1on1:'🎤 음성통화', video_1on1:'📷 영상통화',
+                                               voice_multi:'📻 음성방송', video_multi:'📺 영상방송' };
+                                %>
+                                <% ['voice_1on1','video_1on1','voice_multi','video_multi'].forEach(function (c) { %>
+                                    <% if (bsvc.indexOf(c) >= 0) { %><span class="badge badge-multi"><%= LBL[c] %></span><% } %>
+                                <% }) %>
                             </div>
                         </div>
                         <% if (typeof cowatchContent === 'undefined' || !cowatchContent) { %>

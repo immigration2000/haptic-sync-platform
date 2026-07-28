@@ -62,7 +62,7 @@ router.get('/profile', (req, res) => {
 
 router.post('/profile', (req, res) => {
     const { stage_name, description, rate_per_minute, tags, free_preview_sec, session_block_min,
-            rate_with_video, rate_cam, sub_price, sub_days } = req.body;
+            rate_cam, sub_price, sub_days } = req.body;
     if (!stage_name || stage_name.length < 2 || stage_name.length > 30) {
         req.session.flash = '활동명 2~30자.'; return res.redirect('/bj-studio/profile');
     }
@@ -74,10 +74,9 @@ router.post('/profile', (req, res) => {
     let block = parseInt(session_block_min || '5', 10);
     if (isNaN(free)  || free  < 0 || free  > 120) free  = 60;
     if (isNaN(block) || block < 1 || block > 60)  block = 5;
-    // 능력별 분당요율: 0이면 미제공 (모니터링=영상, 캠)
-    let rateV = parseInt(rate_with_video || '0', 10);
-    if (isNaN(rateV) || rateV < 0) rateV = 0;
-    if (rateV > 2000) rateV = 2000;
+    // 1:1 영상통화 분당요율 (0 = 미제공). 음성통화는 위 '분당 요금'(rate_per_minute).
+    // rate_with_video(옛 모니터링)는 영상통화로 흡수돼 더 이상 입력받지 않는다.
+    const rateV = 0;
     let rateC = parseInt(rate_cam || '0', 10);
     if (isNaN(rateC) || rateC < 0) rateC = 0;
     if (rateC > 2000) rateC = 2000;

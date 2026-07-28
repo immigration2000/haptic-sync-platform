@@ -74,6 +74,15 @@ addColumnIfMissing('posts',          'image_key',         'image_key TEXT');
 addColumnIfMissing('bj_profiles',    'avatar_key',        'avatar_key TEXT');
 addColumnIfMissing('bj_videos',      'thumb_key',         'thumb_key TEXT');
 
+// 요율 정리 — 옛 '모니터링'(rate_with_video)은 1:1 영상통화(rate_cam)로 흡수됐다.
+// 영상통화 요율이 비어 있고 모니터링 값만 있는 스트리머는 값을 옮겨준다(요금 유실 방지).
+try {
+    const r = db.prepare(`UPDATE bj_profiles SET rate_cam = rate_with_video
+                          WHERE (rate_cam IS NULL OR rate_cam = 0) AND rate_with_video > 0`).run();
+    const n = r && (r.changes != null ? r.changes : 0);
+    if (n) console.log(`[db] migrated rate_with_video → rate_cam (${n}건)`);
+} catch (e) { /* 컬럼 없으면 무시 */ }
+
 // services 값을 신규 4종 체계로 1회 변환 (call→voice_1on1, broadcast→video_multi …)
 // 이미 신규 코드면 그대로 — 멱등이라 매 부팅 실행돼도 안전.
 try {
