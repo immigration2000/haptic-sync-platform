@@ -2,7 +2,7 @@
 
 > 새 대화를 시작하면 **이 파일을 먼저 읽으라**고 Claude에게 요청하세요.
 > 함께 `PROJECT_STATUS.md`도 읽으면 전체 맥락이 복원됩니다.
-> 마지막 업데이트: 2026-06-10
+> 마지막 업데이트: **2026-07-28**
 
 ---
 
@@ -15,8 +15,18 @@ pulse/HANDOFF.md 와 pulse/PROJECT_STATUS.md 먼저 읽고 맥락 파악해줘.
 ---
 
 ## 1. 한 줄 요약
-PULSE = BJ↔사용자 양방향 인터랙티브 성인 디바이스 플랫폼(투자 시연 + 실서비스 수준).
-**통화가 허브** → 무료체험 → 결제 → 통화/영상 모드 + **BJ가 사용자 디바이스 제어**.
+스트리머↔사용자 양방향 인터랙티브 성인 디바이스 플랫폼 (투자 시연 + 실서비스 수준).
+서비스 주소 **https://syncra.uk** · 레포 `immigration2000/haptic-sync-platform`(private).
+
+**서비스 3축** — 태그로 서로 연결(교차 유입):
+| 축 | 내용 |
+|---|---|
+| **영상** | 통합 카탈로그 + 좌측 필터(타입·이용방식·태그). 무료/PPV/구독전용 |
+| **라이브** | 서비스 태그 4종 = 매체(음성/영상) × 대상(1:1/1:다수). 1:1은 분당, 1:N은 무료입장+후원 |
+| **피드** | 스트리머 홍보 SNS. 구간 클립·사진 → "전체 영상 보기" 유입 동선 |
+
+라이브 4종: `voice_1on1` `video_1on1` `voice_multi`(스푼형) `video_multi`(인터넷방송형)
+→ **`server/service_types.js`가 단일 기준**(고정 enum). 함께보기·비공개방은 video_1on1에 흡수됨.
 
 ## 2. 작업 위치
 - **작업 폴더(신규 사이트):** `D:\Leeminsoo\Project\Website\IWeb\IRealverse-main\pulse`
@@ -31,12 +41,14 @@ PULSE = BJ↔사용자 양방향 인터랙티브 성인 디바이스 플랫폼(�
 | `pulse-phone-deployer` | 폰(5501) 배포·재기동·점검 | setsid/pkill 패턴 등 사고이력 규칙 내장 |
 
 ## 3. 현재 상태 (DONE)
-신규 사이트 task #19~#48 전부 완료. 핵심 워크플로우 구현·배포·외부검증 끝.
-- 통화 세션룸 통합(BJ 주도 모드/영상/제어) ✅
-- BJ 영상 업로드(multer) ✅
-- 진입 통화 일원화 ✅
-- 결제(무료체험→결제→연장) ✅
+- 서비스 태그 4종 체계 · 커스텀 태그(운영모드 3종) · 통합 영상 카탈로그 ✅
+- 후원(1:N 수익화) · 음성방송(스푼형) ✅
+- SNS 피드(구간 클립·사진·댓글·신고) + 저장소 추상화(AWS 대비) ✅
+- 결제(무료체험→분당결제→연장) · 구독 · PPV ✅
+- **하드웨어 실기기 검증 완료**(2026-07-28) ✅
+- 모바일 네비(드로어+하단탭) · 출입게이트 · 마스터계정 ✅
 - 보안/운영/관리자/스튜디오 ✅
+→ 상세 이력은 `PROJECT_STATUS.md` §9
 
 ## 4. 배포 — 가장 중요 ⚠️
 | 서비스 | 포트 | 비고 |
@@ -89,22 +101,39 @@ cd D:/.../pulse && tar -cf - <파일들> | \
 5. 모달 숨김: `.ps-modal-backdrop[hidden]{display:none!important}` 유지
 6. Windows curl은 Git Bash `/tmp` 경로 못 읽음 → 업로드 테스트 시 절대경로 사용
 7. CSP는 현재 비활성(인라인 스크립트 多) — 운영 전 nonce 도입 필요
-8. **사이트 출입 게이트(Basic 인증)** — `server/middleware/gate.js`, app.js 최상단(morgan 직후) 마운트. 허가 계정만 사이트 진입(앱 회원로그인과 별개 앞단 관문). 계정은 폰 `~/pulse/data/gate.json`(`{enabled,realm,users:[{user,pass}]}`)에서 관리 — **파일만 고치면 5초 내 자동 반영(watchFile), 재시작 불필요**. `/health`·`/favicon.ico`만 게이트 우회. 현재 계정: `1111` / `2222`(2026-06-18 단순화, 마스터 로그인과 동일). 끄려면 gate.json `enabled:false`. 검증: 무인증 401, 정상 200.
+8. **뷰/정적 파일만 바꿨으면 서버 재시작 불필요** (EJS는 매 요청 읽음). 단 **CSS/JS는 1일 캐시**라 `views/layout.ejs`의 `?v=` 값을 올려야 반영됨.
+9. **멀티파트 업로드는 CSRF를 라우트에서 직접 검증** (글로벌은 스킵). multer가 CSRF보다 먼저 파일을 쓰므로, 거부 시 파일을 지우는 처리가 필요 — 피드 업로드에 적용됨.
+10. **서비스/태그/요율 값을 하드코딩하지 말 것** — `service_types.js`·`tags.js`를 거칠 것. 서비스 태그는 고정 enum이라 자유입력이 들어오면 버려짐.
+11. **사이트 출입 게이트(Basic 인증)** — `server/middleware/gate.js`, app.js 최상단(morgan 직후) 마운트. 허가 계정만 사이트 진입(앱 회원로그인과 별개 앞단 관문). 계정은 폰 `~/pulse/data/gate.json`(`{enabled,realm,users:[{user,pass}]}`)에서 관리 — **파일만 고치면 5초 내 자동 반영(watchFile), 재시작 불필요**. `/health`·`/favicon.ico`만 게이트 우회. 현재 계정: `1111` / `2222`(2026-06-18 단순화, 마스터 로그인과 동일). 끄려면 gate.json `enabled:false`. 검증: 무인증 401, 정상 200.
 
 ## 8. 핵심 파일 지도
 ```
-server/app.js                      # 메인 서버 (포트/보안/라우트 마운트)
-server/db/index.js, schema.sql     # DB 어댑터·마이그레이션·쿼리
-server/signaling/bj_signaling.js   # WebRTC 시그널링 (available/busy 모델)
-server/routes/bj.js                # BJ 목록/세션룸/콘솔/세션결제 API
-server/routes/bj_studio.js         # BJ 스튜디오 + 영상 업로드(multer)
-views/bj/call.ejs                  # 사용자 세션룸
-views/bj/console.ejs               # BJ 콘솔 (모드/영상/제어 패널)
-views/bj/list.ejs                  # BJ 통화 목록 (통화 일원화)
-public/js/core/bj_session.js       # 결제 모듈
-public/js/pages/bj_call.js         # 사용자측 세션 수신
-public/js/pages/bj_console.js      # BJ측 세션 송신
-PROJECT_STATUS.md                  # 전체 상세 현황
+── 단일 기준(SSOT) 모듈 — 값을 바꾸려면 여기부터
+server/service_types.js            # 서비스 4종 enum·tier 정규화·요율 매핑(rateOf)
+server/tags.js                     # 태그 엔진(운영모드 3종·CORE_BLOCK·제출)
+server/content_filter.js           # 피드 텍스트 필터(외부링크·연락처 차단)
+server/storage.js                  # 파일 저장소 추상화(로컬↔S3, DB엔 논리키만)
+server/access.js                   # 영상 접근권한(OWNER/SUBSCRIBED/PURCHASED)
+
+── 서버
+server/app.js                      # 메인 (게이트→CSRF→라우트 마운트 순서 주의)
+server/db/index.js, schema.sql     # DB 어댑터·마이그레이션(멱등)·쿼리
+server/middleware/gate.js          # 사이트 출입 Basic 인증
+server/signaling/bj_signaling.js   # WebRTC 시그널링 + 방송 모드 검증
+server/signaling/io_ref.js         # HTTP→소켓 룸 알림(후원 알림은 서버만 발송)
+server/routes/{bj,bj_studio,content,feed,admin}.js
+
+── 뷰 / 클라
+views/content/catalog.ejs          # 통합 카탈로그 + 좌측 필터
+views/feed/index.ejs               # SNS 피드(클립 슬라이더·사진·태그)
+views/bj/{call,console,broadcast,watch}.ejs
+views/admin/tags.ejs               # 태그 운영모드·승인
+public/js/core/{device_drivers,device,funscript,bj_session,header}.js
+public/js/pages/{bj_call,bj_console,broadcast,watch,player,vr_reproject}.js
+
+── 문서
+PROJECT_STATUS.md                  # 전체 현황 + §9 개편 상세 이력
+DEPLOY.md                          # 폰 배포 전용 가이드
 ```
 
 ## 8-1. 하드웨어 (검증 완료)
