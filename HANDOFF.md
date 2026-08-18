@@ -2,7 +2,7 @@
 
 > 새 대화를 시작하면 **이 파일을 먼저 읽으라**고 Claude에게 요청하세요.
 > 함께 `PROJECT_STATUS.md`도 읽으면 전체 맥락이 복원됩니다.
-> 마지막 업데이트: **2026-07-28**
+> 마지막 업데이트: **2026-08-18**
 
 ---
 
@@ -29,16 +29,25 @@ pulse/HANDOFF.md 와 pulse/PROJECT_STATUS.md 먼저 읽고 맥락 파악해줘.
 → **`server/service_types.js`가 단일 기준**(고정 enum). 함께보기·비공개방은 video_1on1에 흡수됨.
 
 ## 2. 작업 위치
-- **작업 폴더(신규 사이트):** `D:\Leeminsoo\Project\Website\IWeb\IRealverse-main\pulse`
-- 옛 데모 사이트: `IRealverse-main` 루트 (`app.js` = IWeb, 별개)
+
+- **작업 폴더(= git 저장소):** `C:\Users\user\Documents\GitHub\haptic-sync-platform`
+  원격 `immigration2000/haptic-sync-platform` (private)
+- ⚠ **옛 사본이 아직 남아 있다:** `D:\Leeminsoo\Project\Website\IWeb\IRealverse-main\pulse`.
+  삭제되지 않았으므로 **엉뚱한 쪽을 고치지 않도록 주의.** git 저장소는 `C:` 쪽이다.
+- 데스크톱 릴레이 앱 `haptic-relay-desktop`은 **노트북(Codex) 담당** — PC에서 건드리지 않는다.
 - OS: Windows 11 / PowerShell (Bash 도구도 사용 가능)
 
-### 전용 서브에이전트 (IWeb/.claude/agents/ — 2026-06-10 셋팅)
-| 에이전트 | 용도 | 비고 |
-|---|---|---|
-| `pulse-security-reviewer` | 코드 변경 후 보안 리뷰 (읽기 전용) | 새 라우트/폼/업로드/쿼리 추가 시 사용 |
-| `pulse-e2e-tester` | 로컬 5502 기동 + 스모크/시그널링/WebRTC 2탭 e2e | 검증된 e2e 절차 내장 |
-| `pulse-phone-deployer` | 폰(5501) 배포·재기동·점검 | setsid/pkill 패턴 등 사고이력 규칙 내장 |
+### AI 공유 노트 (필수 — 매 작업)
+PC(Claude Code)와 노트북(Codex)이 번갈아 작업한다.
+공유 노트: `C:\Users\user\AI_NOTES` (원격 `immigration2000/AI_NOTES`).
+**전체 작업 흐름과 규칙은 이 저장소 `CLAUDE.md`에 있다 — 작업 시작 전 반드시 볼 것.**
+특히 `RULES.md` R-1(폰 pkill 충돌) · R-4(T-Code 포맷)는 실제 사고 이력이다.
+
+### 전용 서브에이전트
+`D:\Leeminsoo\Project\Website\IWeb\.claude\agents\` 에 3종이 있다
+(`pulse-security-reviewer` · `pulse-e2e-tester` · `pulse-phone-deployer`).
+⚠ **옛 폴더에 있어서 지금 작업 폴더(`C:`)에서는 로드되지 않는다.**
+쓰려면 이 저장소 `.claude/agents/`로 복사해야 한다.
 
 ## 3. 현재 상태 (DONE)
 - 서비스 태그 4종 체계 · 커스텀 태그(운영모드 3종) · 통합 영상 카탈로그 ✅
@@ -71,13 +80,16 @@ pulse/HANDOFF.md 와 pulse/PROJECT_STATUS.md 먼저 읽고 맥락 파악해줘.
 ssh -o StrictHostKeyChecking=no -p 8022 u0_a870@192.168.219.108 \
   "cd ~/pulse && setsid env PORT=5501 BEHIND_PROXY=1 node server/app.js > data/logs/run.log 2>&1 < /dev/null & disown; echo spawned"
 ```
-**중지:** `pkill -f 'server/app.js'` (← 반드시 `server/app.js` 패턴. IWeb은 `app.js`라 안전)
+**중지:** `pkill -f 'server/app.js'` (← 반드시 이 패턴)
+⚠ **폰 한 대에 PULSE(5501)와 노트북의 relay 테스트(4174)가 함께 돈다.**
+`pkill -f node` / `pkill -f cloudflared` 같은 넓은 패턴은 **남의 프로젝트를 죽인다**
+(2026-08-18 실제 사고). 터널도 `pkill -f 'run syncra'`로 좁힐 것. AI_NOTES `RULES.md` R-1.
 **health:** `curl -s http://localhost:5501/health`
 
 ## 5. 로컬 테스트
 ```bash
 # PowerShell에서 기존 node 정리 후
-cd D:/Leeminsoo/Project/Website/IWeb/IRealverse-main/pulse
+cd /c/Users/user/Documents/GitHub/haptic-sync-platform
 PORT=5502 node server/app.js     # Bash 도구로
 # health: curl http://localhost:5502/health
 ```
@@ -87,7 +99,7 @@ PORT=5502 node server/app.js     # Bash 도구로
 ## 6. 폰 배포 절차 (코드 변경 후)
 ```bash
 # 1) 변경 파일 tar로 전송 (예시)
-cd D:/.../pulse && tar -cf - <파일들> | \
+tar -cf - <파일들> | \
   ssh -p 8022 u0_a870@192.168.219.108 "cd ~/pulse && tar -xf -"
 # 2) package.json 바뀌었으면: npm install --omit=optional --production
 # 3) 4번 절차로 재기동
@@ -154,7 +166,12 @@ DEPLOY.md                          # 폰 배포 전용 가이드
 - [ ] (틀만 만듦) 실 성인인증·실 PG — `server/services/{age_verification,payment_gateway}.js` 스텁 + config `ageVerification.provider`/`pg.provider`(기본 none). 운영 시 공급자 연동 + auth.js/mypage.js 경유 교체
 
 ⚠ **폰 재기동은 `~/pulse/restart_pulse.sh` 사용** — SSH 명령에 직접 `pkill -f 'server/app.js'`를 넣으면 그 문자열이 SSH 자기 명령줄과 매칭돼 세션이 죽음(exit 255). 스크립트로 분리하면 안전.
-⚠ **PC 개발: `npm install --omit=optional` 금지** — better-sqlite3(PC 필수) 프루닝됨. 복구: `npm install better-sqlite3 --no-save`. cookie-parser=런타임 의존성, socket.io-client=devDependency.
+ℹ **`npm install --omit=optional`** — better-sqlite3가 프루닝되지만 Node 22+ 는
+`node:sqlite` 내장으로 폴백하므로 지금은 치명적이지 않다.
+**2026-08-18 확인: 이 PC(Node v24)에는 better-sqlite3가 아예 없고 `node:sqlite`로 정상 동작 중.**
+과거 "PC는 better-sqlite3 필수" 안내는 Node 20 시절 것이라 더 이상 맞지 않는다.
+성능이 필요하면 `npm install better-sqlite3 --no-save`.
+cookie-parser=런타임 의존성, socket.io-client=devDependency.
 
 ## 10. WebRTC 데이터채널 프로토콜 (참고)
 `MODE:call`/`MODE:video` · `VIDEO:<path>|<fs>` · `CTRL:script`/`CTRL:manual` · `L0xxIyyy`(TCode)
