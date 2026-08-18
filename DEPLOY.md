@@ -52,6 +52,49 @@ ssh -o StrictHostKeyChecking=no -p 8022 u0_a870@192.168.219.108 'bash ~/pulse/re
 
 ---
 
+## 3-1. ⚠️ 다중 프로젝트 공존 규칙 (2026-08-18 추가)
+
+이 폰에는 **PULSE 외의 다른 프로젝트도 동시에 돌 수 있다.** (실제로 2026-08-18 기준
+다른 노트북에서 올린 테스트 서버가 포트 4174 + 자체 cloudflared quick 터널로 가동 중)
+
+### 절대 쓰면 안 되는 pkill 패턴
+```bash
+pkill -f "cloudflared tunnel"   # ❌ 남의 터널까지 죽음
+pkill -f "node"                 # ❌ 남의 서버까지 죽음
+pkill -f "cloudflared"          # ❌ 최악
+```
+
+### 반드시 이 프로젝트만 가리키는 좁은 패턴
+```bash
+pkill -f "run syncra"     # ✅ PULSE 터널만 (restart_named.sh / restart_syncra_only.sh)
+pkill -f "server/app.js"  # ✅ PULSE 서버만 (restart_pulse.sh)
+```
+
+### 현재 스크립트 상태
+| 스크립트 | pkill 패턴 | 안전 |
+|---|---|---|
+| `restart_pulse.sh` | `server/app.js` | ✅ |
+| `restart_named.sh` | `run syncra` | ✅ (2026-08-18 수정) |
+| `restart_syncra_only.sh` | `run syncra` | ✅ |
+| `restart_cf.sh` | — | 🚫 **폐기**(실행 시 거부). 넓은 pkill이라 비활성화 |
+
+### 포트 대장
+| 포트 | 용도 |
+|---|---|
+| 5500 | (옛) IWeb 데모 |
+| **5501** | **PULSE** → syncra.uk |
+| 4174 | 타 프로젝트 테스트 서버(relay-server) — **건드리지 말 것** |
+| 5502 | 로컬(PC) 테스트 전용 |
+
+### 검증 방법
+재시작 스크립트를 고쳤으면 **PID로 격리를 확인**할 것:
+```bash
+# 재시작 전후로 남의 PID가 그대로여야 정상
+ssh -p 8022 u0_a870@192.168.219.108 'ps -ef | grep -E "run syncra|4174" | grep -v grep'
+```
+
+---
+
 ## 4. 코드 변경 → 폰 배포 (핵심 패턴)
 PC에서 변경한 파일만 tar로 전송. **`data/`·`node_modules`는 절대 전송 금지**(폰 DB/세션 덮어쓰기 위험).
 ```bash
