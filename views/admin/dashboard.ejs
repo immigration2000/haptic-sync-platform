@@ -43,6 +43,23 @@
 
             <div class="card card-body">
                 <div class="panel-title">사이트 설정</div>
+                <!-- 저장공간 -->
+                <div class="card card-body" style="margin-bottom:16px; <%= disk.low ? 'border-color:var(--c-yellow);' : '' %>">
+                    <div class="form-label" style="margin-bottom:8px;">
+                        저장공간 <% if (disk.low) { %><span style="color:var(--c-yellow);">⚠ 여유 부족</span><% } %>
+                    </div>
+                    <table class="tx-table">
+                        <tr><td class="text-faint" style="width:130px;">남은 디스크</td>
+                            <td class="mono <%= disk.low ? '' : '' %>" style="<%= disk.low ? 'color:var(--c-yellow);' : 'color:var(--c-green);' %>">
+                                <strong><%= disk.freeText %></strong></td></tr>
+                        <tr><td class="text-faint">콘텐츠 사용량</td><td class="mono"><%= disk.contentText %></td></tr>
+                    </table>
+                    <p class="text-faint" style="font-size:11px; margin:8px 0 0;">
+                        업로드는 압축을 거치지 않습니다. 남은 공간이 <strong><%= disk.minFreeGB %>GB</strong> 밑으로 내려가면
+                        업로드가 자동으로 거부됩니다. 작업자에게는 <strong>PC에서 압축 후 업로드</strong>를 안내하세요.
+                    </p>
+                </div>
+
                 <form method="POST" action="/admin/settings">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <label class="form-checkbox" style="font-size: 14px;">
@@ -56,6 +73,25 @@
                     <div class="form-row mt-4">
                         <label class="form-label">사이트 전체 공지 (비우면 미표시)</label>
                         <input class="form-input" type="text" name="site_message" value="<%= siteMessage %>" maxlength="200" placeholder="예: 6/15 정기 점검 안내…">
+                    </div>
+
+                    <div class="form-row mt-4">
+                        <div class="form-label" style="margin-bottom:8px;">업로드 용량 가드
+                            <span class="text-faint" style="font-size:11px;">(폰 저장공간 보호)</span></div>
+                        <div class="grid grid-3 gap-3">
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">파일 1개 상한 (MB)</label>
+                                <input class="form-input" type="number" name="upload_max_file_mb" min="50" max="4000" step="50" value="<%= disk.maxFileMB %>">
+                            </div>
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">계정별 총량 (GB)</label>
+                                <input class="form-input" type="number" name="upload_quota_user_gb" min="1" max="500" step="1" value="<%= disk.quotaPerUserGB %>">
+                            </div>
+                            <div class="form-row" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">최소 여유 (GB)</label>
+                                <input class="form-input" type="number" name="upload_min_free_gb" min="1" max="200" step="1" value="<%= disk.minFreeGB %>">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mt-4" style="border-top:1px solid var(--border-soft);padding-top:12px;">

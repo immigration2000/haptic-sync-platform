@@ -12,6 +12,8 @@ const multer  = require('multer');
 const router  = express.Router();
 const { stmts } = require('../db');
 const { requireRole } = require('../middleware/auth');
+const diskGuard = require('../disk_guard');
+const fileStore = require('../storage');   // multer의 storage와 이름이 겹쳐 별칭 사용
 const { doubleCsrfProtection } = require('../middleware/csrf');
 
 router.use(requireRole('bj'));
@@ -35,12 +37,23 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
     storage,
-    limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2GB
+    // 가드(disk_guard)가 Content-Length로 먼저 거르지만, 스트리밍 중 초과를 막는 이중 방어.
+    // 설정(upload_max_file_mb)보다 여유를 둬서 가드 쪽 문구가 먼저 뜨게 한다.
+    limits: { fileSize: () => (diskGuard.limits().maxFileMB + 64) * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const ok = /\.(mp4|webm|mov|m4v|funscript|json)$/i.test(file.originalname);
         cb(ok ? null : new Error('지원하지 않는 파일'), ok);
     },
 });
+
+/** 이번 요청으로 올라간 파일을 지운다 (검증 실패·거부 시) */
+function dropUploads(req) {
+    if (!req.files || !req.user) return;
+    for (const field of ['video', 'script']) {
+        const f = req.files[field] && req.files[field][0];
+        if (f) fileStore.remove(`bj/${req.user.id}/${f.filename}`);
+    }
+}
 
 // 대시보드
 router.get('/', (req, res) => {
@@ -169,13 +182,34 @@ router.post('/videos/:id/tags', (req, res) => {
 });
 
 router.post('/videos/upload',
-    upload.fields([{ name: 'video', maxCount: 1 }, { name: 'script', maxCount: 1 }]),
+    diskGuard.guardUpload,  // 디스크가 써지기 전에 용량·할당량으로 먼저 거른다
+    (req, res, next) => {
+        upload.fields([{ name: 'video', maxCount: 1 }, { name: 'script', maxCount: 1 }])(req, res, (err) => {
+            if (err) {
+                req.session.flash = err.code === 'LIMIT_FILE_SIZE'
+                    ? `파일이 너무 큽니다. 상한은 ${diskGuard.limits().maxFileMB}MB입니다.`
+                    : (err.message || '업로드 실패');
+                return res.redirect('/bj-studio/videos');
+            }
+            next();
+        });
+    },
+    (req, res, next) => {
+        // multer는 CSRF 검증 '전에' 파일을 디스크에 쓴다. 이후 단계에서 거부(403 등)되면
+        // 핸들러가 실행되지 않아 파일만 남는다 → 반복 요청으로 디스크를 채울 수 있음.
+        // (feed.js와 같은 패턴)
+        res.on('finish', () => {
+            if (res.statusCode >= 400) dropUploads(req);
+        });
+        next();
+    },
     doubleCsrfProtection,   // multer가 _csrf 필드를 파싱한 뒤 CSRF 검증 (글로벌은 멀티파트 스킵)
     (req, res) => {
         const title = (req.body.title || '').trim().slice(0, 80);
         const vf = req.files && req.files.video && req.files.video[0];
         const sf = req.files && req.files.script && req.files.script[0];
         if (!title || !vf) {
+            dropUploads(req);   // 검증 실패 — 올라간 파일을 남기지 않는다
             req.session.flash = '제목과 영상 파일은 필수입니다.';
             return res.redirect('/bj-studio/videos');
         }

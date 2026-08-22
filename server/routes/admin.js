@@ -5,6 +5,7 @@ const vrConfig = require('../vr_config');
 const { requireRole } = require('../middleware/auth');
 const tagEngine = require('../tags');
 const { provisionStreamer } = require('../services/account_provision');
+const diskGuard = require('../disk_guard');
 
 router.use(requireRole('admin'));
 
@@ -22,6 +23,7 @@ router.get('/', (req, res) => {
     };
     res.render('admin/dashboard', {
         title: '관리자', stats,
+        disk: diskGuard.status(),
         dummyEnabled: getSettingBool('dummy_bj_enabled', true),
         siteMessage:  getSetting('site_message', ''),
         maintMode:    getSettingBool('maintenance_mode', false),
@@ -50,7 +52,16 @@ router.post('/dummy/toggle/:id', (req, res) => {
 // 설정
 router.post('/settings', (req, res) => {
     const { dummy_bj_enabled, site_message, maintenance_mode,
-            vr_hfov, vr_fisheye, vr_pitch, vr_yaw } = req.body;
+            vr_hfov, vr_fisheye, vr_pitch, vr_yaw,
+            upload_max_file_mb, upload_quota_user_gb, upload_min_free_gb } = req.body;
+    // 업로드 용량 가드 (server/disk_guard.js) — 0 이하/비숫자는 무시하고 기존값 유지
+    const numSet = (key, v, min, max) => {
+        const n = parseFloat(v);
+        if (!isNaN(n) && n >= min && n <= max) setSetting(key, String(n));
+    };
+    numSet('upload_max_file_mb',   upload_max_file_mb,   50, 4000);
+    numSet('upload_quota_user_gb', upload_quota_user_gb,  1,  500);
+    numSet('upload_min_free_gb',   upload_min_free_gb,    1,  200);
     setSetting('dummy_bj_enabled',  dummy_bj_enabled === 'on'  ? '1' : '0');
     setSetting('maintenance_mode',  maintenance_mode === 'on' ? '1' : '0');
     setSetting('site_message',      (site_message || '').slice(0, 200));
