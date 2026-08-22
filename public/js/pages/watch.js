@@ -30,8 +30,11 @@
     }
     if (Dev) { renderDev(Dev.getStatus()); Dev.onChange(renderDev); }
     socket.on('bcast-tcode', ({ cmd }) => {
-        if (Dev && Dev.isConnected) Dev.send(cmd);
-        devRecv++; if (devRecvEl) devRecvEl.textContent = devRecv.toLocaleString();
+        // 원격 입력이므로 sendRemote로 검증한다. 서버는 길이 제한만 걸고 내용은 안 본다.
+        if (!Dev || !Dev.isConnected) return;
+        const n = Dev.sendRemote(cmd);
+        if (!n) return;                                  // 거부된 명령은 카운트도 하지 않는다
+        devRecv += n; if (devRecvEl) devRecvEl.textContent = devRecv.toLocaleString();
     });
 
     socket.emit('viewer-join', { broadcasterUserId: CFG.bjUserId });

@@ -298,6 +298,35 @@
         }
     }
 
+    // ─── 원격 수신 명령 전용 송신 ─────────────────────────────
+    // ⚠ 드라이버의 정규화 함수는 **검증기가 아니다.** 축 패턴과 안 맞는 토큰은
+    //   그대로 통과시켜 시리얼 포트로 내보낸다(D1/DSTOP을 통과시키기 위한 설계).
+    //   따라서 원격(WebRTC 데이터채널·방송 소켓)에서 받은 문자열을 send()에 바로 넣으면
+    //   임의 문자열이 기기로 나간다. 원격 입력은 반드시 이 함수를 쓴다.
+    //
+    //   허용: 축 명령만 (L0500I0100, 다축 한 줄 묶음)
+    //   차단: D1/DSTOP 등 제어 명령 포함 그 외 전부 — 원격이 기기 상태를 바꾸게 두지 않는다
+    const AXIS_CMD  = /^[LR][0-9]\d{1,4}(?:I\d{1,5})?$/;
+    const MAX_TOKENS = 6;                  // 축 6개(L0/L1/L2/R0/R1/R2)가 상한
+    let rejectCount = 0;
+
+    /** 원격 명령 송신. 반환값: 보낸 토큰 수 (0이면 거부됨) */
+    function sendRemote(cmd) {
+        const line = String(cmd == null ? '' : cmd).trim();
+        if (!line) return 0;
+        const toks = line.split(/\s+/);
+        // 하나라도 이상하면 줄 전체를 버린다. 조작된 명령의 일부만 실행되는 게 더 위험하다.
+        if (toks.length > MAX_TOKENS || !toks.every(t => AXIS_CMD.test(t))) {
+            rejectCount++;
+            if (rejectCount === 1 || rejectCount % 100 === 0) {
+                console.warn(`[PulseDevice] 원격 명령 거부 (${rejectCount}건째): ` + line.slice(0, 40));
+            }
+            return 0;
+        }
+        send(line);                         // 다축은 한 줄로 — 드라이버가 토큰별 정규화
+        return toks.length;
+    }
+
     // ─── 자동 재연결 (Serial만 가능) ─────────────────────────
     async function tryAutoReconnect() {
         const intent = sessionStorage.getItem(KEY_INTENT);
@@ -339,6 +368,8 @@
         connectBluetooth,
         disconnect,
         send,
+        sendRemote,
+        get rejectedCount() { return rejectCount; },
         get isConnected() { return state.connected; },
         get kind()        { return state.kind; },
         get sentCount()   { return state.sentCount; },

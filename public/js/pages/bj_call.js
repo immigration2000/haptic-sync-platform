@@ -127,14 +127,13 @@
             if (t.startsWith('MODE:'))      setMode(t.slice(5));
             else if (t.startsWith('VIDEO:')) loadVideo(t.slice(6));
             else if (t.startsWith('CTRL:'))  setCtrl(t.slice(5));
-            else if (/^[LR][0-9]\d{1,3}I\d+/.test(t)) {
-                // BJ 수동 TCode — 통화모드 또는 영상 manual일 때 적용
-                if (mode === 'call' || ctrl === 'manual') {
-                    for (const cmd of t.split(/\s+/)) {
-                        if (!cmd) continue;
-                        recvCount++; recvEl.textContent = recvCount.toLocaleString() + ' cmd';
-                        if (Dev && Dev.isConnected) Dev.send(cmd);
-                    }
+            else if (/^[LR][0-9]/.test(t)) {
+                // 스트리머 수동 TCode — 통화모드 또는 영상 manual일 때 적용.
+                // ⚠ 예전에는 줄 앞부분만 정규식으로 보고 토큰을 전부 보냈다.
+                //    'L050I100 <임의문자열>' 같은 줄이 통과했다. 이제 토큰별로 검증한다.
+                if ((mode === 'call' || ctrl === 'manual') && Dev && Dev.isConnected) {
+                    const n = Dev.sendRemote(t);
+                    if (n) { recvCount += n; recvEl.textContent = recvCount.toLocaleString() + ' cmd'; }
                 }
             }
         }
