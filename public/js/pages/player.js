@@ -197,12 +197,14 @@
         if (!vizLimit || !window.PulseFunscript) return;
         const FSx = window.PulseFunscript;
 
-        // 허용 구간
-        vizLimit.style.left  = pct(stroke.outMin);
-        vizLimit.style.width = pct(stroke.outMax - stroke.outMin);
+        // 세로 막대 — 아래가 0(얕음), 위가 100(깊음)이라 bottom/height로 배치한다
+        vizLimit.style.bottom = pct(stroke.outMin);
+        vizLimit.style.height = pct(stroke.outMax - stroke.outMin);
 
         if (!strokeAxis) {                       // 스크립트 로드 전
-            vizActual.style.left = vizActual.style.width = '0%';
+            vizActual.style.bottom = vizActual.style.height = '0%';
+            if (vizSrc) vizSrc.style.height = '0%';
+            if (vizSrcLbl) vizSrcLbl.textContent = '';
             if (vizText) vizText.textContent = '스크립트를 불러오면 실제 범위가 표시됩니다.';
             return;
         }
@@ -214,17 +216,17 @@
         const lo = Math.max(0, Math.min(99, Math.min(a, b)));
         const hi = Math.max(0, Math.min(99, Math.max(a, b)));
 
-        vizActual.style.left  = pct(lo);
-        vizActual.style.width = pct(hi - lo);
+        vizActual.style.bottom = pct(lo);
+        vizActual.style.height = pct(hi - lo);
 
-        // 원본 진폭 (비교용)
+        // 원본 진폭 (비교용) — 트랙 옆 별도 열이라 막대와 겹치지 않는다
         if (vizSrc) {
-            vizSrc.style.left  = pct(strokeAxis.lo);
-            vizSrc.style.width = pct(strokeAxis.span);
+            vizSrc.style.bottom = pct(strokeAxis.lo);
+            vizSrc.style.height = pct(strokeAxis.span);
         }
         if (vizSrcLbl) {
-            vizSrcLbl.textContent = `원본 ${strokeAxis.lo}~${strokeAxis.hi}`;
-            vizSrcLbl.style.left  = pct(Math.min(strokeAxis.lo, 70));
+            vizSrcLbl.textContent  = `원본 ${strokeAxis.lo}~${strokeAxis.hi}`;
+            vizSrcLbl.style.bottom = pct(strokeAxis.lo + strokeAxis.span / 2);   // 구간 중앙에
         }
 
         const ratio = strokeAxis.span > 0 ? (hi - lo) / strokeAxis.span : 0;
@@ -273,9 +275,7 @@
         // 스크립트가 실제로 쓰는 폭을 보여준다 — "왜 조금만 움직이는지"가 여기서 드러난다
         const L0 = axes.L0;
         if (L0 && fsSpanLabel) {
-            fsSpanLabel.textContent = L0.span >= 10
-                ? `원본 진폭 ${L0.lo}~${L0.hi} (폭 ${L0.span})`
-                : `원본 진폭 ${L0.lo}~${L0.hi} (폭 ${L0.span}) — 너무 좁아 자동 확장 안 함`;
+            fsSpanLabel.textContent = L0.span >= 10 ? '' : '원본 진폭이 너무 좁아 자동 확장은 적용되지 않습니다.';
         } else if (fsSpanLabel) {
             fsSpanLabel.textContent = 'L0 스트로크 축 없음';
         }
@@ -295,7 +295,7 @@
                 if (!vizMarker) return;
                 for (const t of triggered) {
                     if (t.axis !== 'L0') continue;
-                    vizMarker.style.left = pct(t.pos);
+                    vizMarker.style.bottom  = pct(t.pos);
                     vizMarker.style.opacity = '1';
                 }
             },
