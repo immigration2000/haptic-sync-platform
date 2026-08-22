@@ -61,10 +61,14 @@ const sessionStore = new FileStore({
 });
 // 손상 세션 파일 방어 — 깨진 JSON/cookie 필드 누락 세션이 500을 내지 않고 새 세션으로 대체
 const storeGet = sessionStore.get.bind(sessionStore);
+// 세션을 못 읽으면 어떤 이유든 '세션 없음'으로 처리해 새 세션을 발급받게 한다.
+// (기존에도 손상 파일·cookie 누락은 막고 있었고, 여기에 나머지 오류도 포함시킨 방어다.
+//  ENOENT 자체는 실측상 500을 내지 않는다 — 2026-08-22 수정 전/후 코드로 확인.
+//  세션 디렉터리가 통째로 사라진 상황 등 예외 경로만 추가로 덮는다.)
 sessionStore.get = (sid, cb) => storeGet(sid, (err, sess) => {
-    if (err && err.code !== 'ENOENT') return cb(null, null);
-    if (sess && !sess.cookie) return cb(null, null);
-    cb(err, sess);
+    if (err) return cb(null, null);                 // 파일 없음·손상 모두 새 세션으로
+    if (sess && !sess.cookie) return cb(null, null); // cookie 필드 누락도 무효 처리
+    cb(null, sess);
 });
 
 const sessionMiddleware = session({

@@ -15,35 +15,95 @@
                 <form method="POST" action="/bj-studio/profile">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
-                    <!-- ① 제공 서비스 — 아래 설정들이 이 선택에 따라 켜지고 꺼진다 -->
-                    <div class="form-row">
-                        <label class="form-label">① 제공 서비스</label>
-                        <p class="text-faint" style="font-size:11px;margin:0 0 8px;">
-                            여기서 고른 것만 사용자에게 노출됩니다.
-                            <strong>선택에 따라 아래 설정이 자동으로 켜지고 꺼집니다.</strong>
-                            영상 업로드만 할 계획이면 골라도 되고 안 골라도 됩니다.
-                        </p>
-                        <div class="svc-grid">
-                            <% serviceTypes.forEach(function (sv) { %>
-                            <label class="svc-item">
-                                <input type="checkbox" class="svc-check" name="services" value="<%= sv.code %>"
-                                       data-audience="<%= sv.audience %>" data-code="<%= sv.code %>"
-                                       <%= mySvc.includes(sv.code) ? 'checked' : '' %>>
-                                <div>
+                    <!-- ① 운영 방식 — 업로드 전용이면 아래 라이브 설정이 통째로 사라진다 -->
+                    <div class="sw-row sw-master" id="row-upload-only">
+                        <div class="sw-text">
+                            <strong>📤 영상 업로드 전용</strong>
+                            <span>라이브(통화·방송)를 하지 않고 <strong>영상 업로드·판매만</strong> 합니다.</span>
+                        </div>
+                        <input type="checkbox" class="sw" id="upload-only" <%= mySvc.length ? '' : 'checked' %>>
+                    </div>
+
+                    <!-- ② 라이브 서비스 — 스위치를 켜면 바로 아래에 설정이 펼쳐진다 -->
+                    <div id="live-block">
+                        <div class="form-label" style="margin:18px 0 8px;">라이브 서비스 — 켠 것만 사용자에게 노출됩니다</div>
+
+                        <% serviceTypes.forEach(function (sv) { %>
+                        <div class="sw-item" data-code="<%= sv.code %>" data-audience="<%= sv.audience %>">
+                            <div class="sw-row">
+                                <div class="sw-text">
                                     <strong><%= sv.icon %> <%= sv.label %></strong>
                                     <span><%= sv.desc %></span>
-                                    <span style="color:<%= sv.billing === 'donation' ? 'var(--c-green)' : 'var(--c-yellow)' %>;font-size:10px;">
-                                        <%= sv.billing === 'donation' ? '입장 무료 · 후원' : '분당 과금' %>
-                                    </span>
                                 </div>
-                            </label>
-                            <% }) %>
+                                <input type="checkbox" class="sw svc-check" name="services" value="<%= sv.code %>"
+                                       data-code="<%= sv.code %>" data-audience="<%= sv.audience %>"
+                                       <%= mySvc.includes(sv.code) ? 'checked' : '' %>>
+                            </div>
+
+                            <div class="sw-panel">
+                                <% if (sv.code === 'voice_1on1') { %>
+                                    <div class="form-row" style="margin:0;">
+                                        <label class="form-label">🎤 음성통화 분당 요금 (50~1000 Ruby)</label>
+                                        <input class="form-input" type="number" name="rate_per_minute"
+                                               value="<%= profile.rate_per_minute %>" min="0" max="1000">
+                                    </div>
+                                <% } else if (sv.code === 'video_1on1') { %>
+                                    <div class="form-row" style="margin:0;">
+                                        <label class="form-label">📷 영상통화 분당 요금
+                                            <span class="text-faint" style="font-size:10px;">0 = 음성 요금과 동일</span></label>
+                                        <input class="form-input" type="number" name="rate_cam"
+                                               value="<%= profile.rate_cam %>" min="0" max="2000" step="10">
+                                    </div>
+                                <% } else { %>
+                                    <p class="text-faint" style="font-size:12px;margin:0;">
+                                        방송은 <strong>입장 무료 + 후원</strong>이라 정할 요금이 없습니다.
+                                        시청자 후원이 그대로 수익이 됩니다.
+                                    </p>
+                                <% } %>
+                            </div>
+                        </div>
+                        <% }) %>
+
+                        <!-- 1:1 공통 설정 — 1:1을 하나라도 켜면 펼쳐진다 -->
+                        <div class="sw-item" id="common-1on1">
+                            <div class="sw-panel" style="border-top:none;">
+                                <div class="form-label" style="margin-bottom:8px;">1:1 공통 설정</div>
+                                <div class="grid grid-2 gap-3">
+                                    <div class="form-row" style="margin:0;">
+                                        <label class="form-label">무료 체험 시간 (초) — 0~120</label>
+                                        <input class="form-input" type="number" name="free_preview_sec"
+                                               value="<%= profile.free_preview_sec %>" min="0" max="120" step="10">
+                                    </div>
+                                    <div class="form-row" style="margin:0;">
+                                        <label class="form-label">시간제 결제 단위 (분) — 1~60</label>
+                                        <input class="form-input" type="number" name="session_block_min"
+                                               value="<%= profile.session_block_min %>" min="1" max="60">
+                                    </div>
+                                </div>
+                                <div style="background:rgba(123,45,255,0.08);border-radius:var(--rad-sm);padding:10px 12px;margin-top:12px;">
+                                    <div class="mono text-faint" style="font-size:11px;">미리보기</div>
+                                    <p class="text-dim" style="font-size:13px;margin:4px 0 0;">
+                                        <strong id="pv-free" style="color:var(--c-pink);"><%= profile.free_preview_sec %></strong>초 무료 체험 후,
+                                        <strong id="pv-block" style="color:var(--c-pink);"><%= profile.session_block_min %></strong>분에
+                                        <strong id="pv-cost" style="color:var(--c-yellow);"><%= (profile.rate_per_minute * profile.session_block_min).toLocaleString() %></strong> Ruby 결제
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sw-row" style="margin-top:10px;">
+                            <div class="sw-text">
+                                <strong>🔌 기기 제어 제공</strong>
+                                <span>통화·방송 중 내가 시청자 디바이스를 조작합니다.</span>
+                            </div>
+                            <input type="checkbox" class="sw" name="device_control" value="1" <%= profile.device_control ? 'checked' : '' %>>
                         </div>
                     </div>
 
-                    <!-- ② 기본 정보 -->
+                    <!-- ③ 기본 정보 -->
+                    <div class="form-label" style="margin:22px 0 8px;">기본 정보</div>
                     <div class="form-row">
-                        <label class="form-label">② 활동명 (스테이지명)</label>
+                        <label class="form-label">활동명 (스테이지명)</label>
                         <input class="form-input" type="text" name="stage_name" value="<%= profile.stage_name %>" required maxlength="30">
                     </div>
                     <div class="form-row">
@@ -71,53 +131,11 @@
                         </p>
                     </div>
 
-                    <!-- ③ 1:1 설정 — 1:1 서비스를 고르지 않으면 비활성 -->
-                    <div class="card card-body mb-4 opt-sec" data-needs="1on1" style="border-color:rgba(123,45,255,0.2);">
-                        <div class="panel-title">③ 1:1 통화 설정 <span class="sec-note"></span></div>
-                        <div class="grid grid-2 gap-3">
-                            <div class="form-row" style="margin:0;">
-                                <label class="form-label">🎤 음성통화 분당 요금 (50~1000)</label>
-                                <input class="form-input opt-in" type="number" name="rate_per_minute" value="<%= profile.rate_per_minute %>" min="0" max="1000">
-                            </div>
-                            <div class="form-row opt-sec" data-needs="video_1on1" style="margin:0;">
-                                <label class="form-label">📷 영상통화 분당 요금 <span class="text-faint" style="font-size:10px;">0 = 음성과 동일</span> <span class="sec-note"></span></label>
-                                <input class="form-input opt-in" type="number" name="rate_cam" value="<%= profile.rate_cam %>" min="0" max="2000" step="10">
-                            </div>
-                        </div>
-                        <div class="grid grid-2 gap-3" style="margin-top:12px;">
-                            <div class="form-row" style="margin:0;">
-                                <label class="form-label">무료 체험 시간 (초) — 0~120</label>
-                                <input class="form-input opt-in" type="number" name="free_preview_sec" value="<%= profile.free_preview_sec %>" min="0" max="120" step="10">
-                            </div>
-                            <div class="form-row" style="margin:0;">
-                                <label class="form-label">시간제 결제 단위 (분) — 1~60</label>
-                                <input class="form-input opt-in" type="number" name="session_block_min" value="<%= profile.session_block_min %>" min="1" max="60">
-                            </div>
-                        </div>
-                        <div class="mt-4" style="background:rgba(123,45,255,0.06);border-radius:var(--rad-sm);padding:10px 12px;">
-                            <div class="mono text-faint" style="font-size:11px;">미리보기</div>
-                            <p class="text-dim" style="font-size:13px;margin:4px 0 0;">
-                                <strong id="pv-free" style="color:var(--c-pink);"><%= profile.free_preview_sec %></strong>초 무료 체험 후,
-                                <strong id="pv-block" style="color:var(--c-pink);"><%= profile.session_block_min %></strong>분에
-                                <strong id="pv-cost" style="color:var(--c-yellow);"><%= (profile.rate_per_minute * profile.session_block_min).toLocaleString() %></strong> Ruby 결제
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- ④ 방송 — 요금 설정이 없다는 것을 알려주는 안내 -->
-                    <div class="card card-body mb-4 opt-sec" data-needs="multi" style="border-color:rgba(0,220,130,0.2);">
-                        <div class="panel-title">④ 방송 (1:다수) <span class="sec-note"></span></div>
-                        <p class="text-faint" style="font-size:12px;margin:0;">
-                            방송은 <strong>입장 무료 + 후원</strong>이라 따로 정할 요금이 없습니다.
-                            시청자 후원이 그대로 수익이 됩니다.
-                        </p>
-                    </div>
-
-                    <!-- ⑤ 영상·구독 — 라이브 서비스와 무관하게 항상 사용 -->
+                    <!-- ④ 영상 판매·구독 — 라이브 여부와 무관하게 항상 사용 -->
                     <div class="card card-body mb-4" style="border-color:rgba(0,220,130,0.2);">
-                        <div class="panel-title">⑤ 영상 멤버십 구독</div>
+                        <div class="panel-title">영상 판매 · 멤버십 구독</div>
                         <p class="text-faint" style="font-size:11px;margin:0 0 10px;">
-                            업로드한 영상에 적용됩니다. 1:1·방송을 하지 않아도 <strong>영상만 판매</strong>할 수 있습니다.
+                            업로드한 영상에 적용됩니다. 라이브를 하지 않아도 <strong>영상만 판매</strong>할 수 있습니다.
                         </p>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <div class="form-row" style="margin:0;">
@@ -134,20 +152,12 @@
                             <strong>아무도 볼 수 없습니다.</strong> 구독가를 정하거나
                             <a href="/bj-studio/videos">내 영상</a>에서 개별구매 가격을 매기세요.
                         </p>
-                        <label class="svc-item" style="display:flex;margin-top:12px;">
-                            <input type="checkbox" name="show_sub_videos" value="1" <%= profile.show_sub_videos ? 'checked' : '' %>>
-                            <div><strong>🔓 구독전용 영상 노출</strong><span>전체 영상 목록에 잠금 상태로 표시 (구독 유도)</span></div>
-                        </label>
-                    </div>
-
-                    <!-- ⑥ 기기 제어 -->
-                    <div class="form-row">
-                        <label class="form-label">⑥ 기기 제어</label>
-                        <div class="svc-grid">
-                            <label class="svc-item">
-                                <input type="checkbox" name="device_control" value="1" <%= profile.device_control ? 'checked' : '' %>>
-                                <div><strong>🔌 기기 제어 제공</strong><span>내가 시청자 디바이스를 조작 (1:1·방송 공통)</span></div>
-                            </label>
+                        <div class="sw-row" style="margin-top:12px;">
+                            <div class="sw-text">
+                                <strong>🔓 구독전용 영상 노출</strong>
+                                <span>전체 영상 목록에 잠금 상태로 표시 (구독 유도)</span>
+                            </div>
+                            <input type="checkbox" class="sw" name="show_sub_videos" value="1" <%= profile.show_sub_videos ? 'checked' : '' %>>
                         </div>
                     </div>
 
@@ -169,10 +179,50 @@
 </section>
 
 <style>
-/* 제공하지 않는 서비스의 설정은 흐리게 + 입력 잠금 (값은 그대로 두어 다시 켜면 복원된다) */
-.opt-sec.is-off { opacity: .45; }
-.opt-sec.is-off .form-label { color: var(--tx-3); }
-.opt-sec.is-off .opt-in { pointer-events: none; background: var(--bg-2); }
+/* 좌우로 움직이는 토글 스위치 */
+.sw {
+    appearance: none; -webkit-appearance: none;
+    width: 46px; height: 26px; flex: none;
+    border-radius: var(--rad-pill);
+    background: var(--bg-3);
+    border: 1px solid var(--border-soft);
+    position: relative; cursor: pointer;
+    transition: background .15s ease;
+}
+.sw::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--tx-3);
+    transition: transform .15s ease, background .15s ease;
+}
+.sw:checked { background: var(--c-purple); border-color: var(--c-purple); }
+.sw:checked::after { transform: translateX(20px); background: #fff; }
+
+.sw-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--rad-md);
+}
+.sw-row.sw-master { border-color: rgba(123,45,255,0.35); background: rgba(123,45,255,0.07); }
+.sw-text { flex: 1; min-width: 0; }
+.sw-text strong { display: block; font-size: 14px; }
+.sw-text span { display: block; font-size: 11px; color: var(--tx-3); margin-top: 2px; }
+
+/* 스위치를 켜면 바로 아래로 설정이 펼쳐진다 */
+.sw-item { margin-bottom: 8px; }
+.sw-item .sw-panel {
+    display: none;
+    padding: 14px;
+    border: 1px solid var(--border-soft);
+    border-top: none;
+    border-radius: 0 0 var(--rad-md) var(--rad-md);
+    background: var(--bg-1);
+}
+.sw-item.on .sw-panel { display: block; }
+.sw-item.on > .sw-row { border-radius: var(--rad-md) var(--rad-md) 0 0; border-bottom-color: transparent; }
+#live-block.hidden-block { display: none; }
 </style>
 
 <script>
@@ -188,59 +238,59 @@
         if (cur.indexOf(t) === -1) { cur.push(t); inp.value = cur.join(','); }
     });
 
-    var rateEl = document.querySelector('input[name="rate_per_minute"]');
-    var checks = [].slice.call(document.querySelectorAll('.svc-check'));
-    var secs   = [].slice.call(document.querySelectorAll('.opt-sec'));
-
-    function picked() {
-        var codes = [], audiences = {};
-        checks.forEach(function (c) {
-            if (!c.checked) return;
-            codes.push(c.getAttribute('data-code'));
-            audiences[c.getAttribute('data-audience')] = true;
-        });
-        return { codes: codes, audiences: audiences };
-    }
-
-    /* 섹션이 요구하는 조건이 충족됐는지 — 'audience' 값이거나 특정 서비스 코드 */
-    function needsMet(needs, p) {
-        if (needs === '1on1' || needs === 'multi') return !!p.audiences[needs];
-        return p.codes.indexOf(needs) !== -1;
-    }
+    var uploadOnly = document.getElementById('upload-only');
+    var liveBlock  = document.getElementById('live-block');
+    var common1on1 = document.getElementById('common-1on1');
+    var checks     = [].slice.call(document.querySelectorAll('.svc-check'));
+    var rateEl     = document.querySelector('input[name="rate_per_minute"]');
 
     function sync() {
-        var p = picked();
-        secs.forEach(function (sec) {
-            var off = !needsMet(sec.getAttribute('data-needs'), p);
-            sec.classList.toggle('is-off', off);
-            // readonly는 값을 그대로 전송한다 → 다시 켜면 이전 설정이 살아있다
-            [].slice.call(sec.querySelectorAll('.opt-in')).forEach(function (i) { i.readOnly = off; });
-            // 1:1을 제공할 때만 분당 요금을 브라우저에서도 필수/하한 검사한다
-            if (sec.getAttribute('data-needs') === '1on1' && rateEl) {
-                rateEl.required = !off;
-                rateEl.min = off ? '0' : '50';
-            }
-            var note = sec.querySelector('.sec-note');
-            if (note) note.textContent = off ? '— 제공하지 않아 사용되지 않습니다' : '';
+        var only = uploadOnly && uploadOnly.checked;
+
+        /* 업로드 전용이면 라이브 블록을 통째로 숨기고 서비스를 전부 해제한다.
+           체크된 채 숨기기만 하면 폼이 그대로 전송돼 라이브가 켜진 상태로 저장된다. */
+        if (only) checks.forEach(function (c) { c.checked = false; });
+        if (liveBlock) liveBlock.classList.toggle('hidden-block', only);
+
+        var any1on1 = false;
+        checks.forEach(function (c) {
+            var item = c.closest('.sw-item');
+            if (item) item.classList.toggle('on', c.checked);
+            if (c.checked && c.getAttribute('data-audience') === '1on1') any1on1 = true;
         });
+
+        if (common1on1) common1on1.classList.toggle('on', any1on1 && !only);
+
+        /* 1:1을 켰을 때만 분당 요금을 브라우저에서도 필수/하한 검사 */
+        if (rateEl) {
+            rateEl.required = any1on1 && !only;
+            rateEl.min = (any1on1 && !only) ? '50' : '0';
+        }
         upd();
     }
 
     /* 1:1 미리보기 */
-    var rate  = document.querySelector('input[name="rate_per_minute"]');
     var free  = document.querySelector('input[name="free_preview_sec"]');
     var block = document.querySelector('input[name="session_block_min"]');
     var pvFree = document.getElementById('pv-free');
     var pvBlock = document.getElementById('pv-block');
     var pvCost = document.getElementById('pv-cost');
     function upd() {
-        if (!pvFree || !pvBlock || !pvCost) return;
+        if (!pvFree || !pvBlock || !pvCost || !rateEl) return;
         pvFree.textContent = free.value || 0;
         pvBlock.textContent = block.value || 0;
-        pvCost.textContent = ((parseInt(rate.value || 0, 10) * parseInt(block.value || 0, 10)) || 0).toLocaleString();
+        pvCost.textContent = ((parseInt(rateEl.value || 0, 10) * parseInt(block.value || 0, 10)) || 0).toLocaleString();
     }
-    [rate, free, block].forEach(function (el) { el && el.addEventListener('input', upd); });
+    [rateEl, free, block].forEach(function (el) { el && el.addEventListener('input', upd); });
+
     checks.forEach(function (c) { c.addEventListener('change', sync); });
+    /* 서비스를 하나라도 켜면 업로드 전용은 자동 해제 */
+    checks.forEach(function (c) {
+        c.addEventListener('change', function () {
+            if (c.checked && uploadOnly && uploadOnly.checked) { uploadOnly.checked = false; sync(); }
+        });
+    });
+    uploadOnly && uploadOnly.addEventListener('change', sync);
     sync();
 })();
 </script>
