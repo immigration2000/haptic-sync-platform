@@ -57,10 +57,13 @@
             sentLbl.textContent = status.sentCount.toLocaleString() + ' cmd';
         } else {
             btn.classList.remove('connected');
-            label.textContent = '디바이스';
+            // 쓰기 실패로 차단된 경우 — 왜 멈췄는지 알려야 한다.
+            // 그냥 '디바이스'로 돌아가면 사용자는 끊긴 줄도 모르고 계속 조작한다.
+            label.textContent = status.writeDead ? '⚠ 연결 끊김' : '디바이스';
+            btn.title = status.lastError || '';
             popDisc.classList.remove('pulse-hidden');
             popConn.classList.add('pulse-hidden');
-            portLbl.textContent = '—';
+            portLbl.textContent = status.lastError || '—';
             sentLbl.textContent = '0 cmd';
         }
         if (btnUSB) btnUSB.disabled = !status.serialSupported;
