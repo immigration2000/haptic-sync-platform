@@ -25,8 +25,12 @@ const storage = multer.diskStorage({
         cb(null, dir);
     },
     filename: (req, file, cb) => {
+        // 영상과 스크립트가 같은 base를 갖도록 요청당 스탬프를 한 번만 만든다.
+        // 파일마다 Date.now()를 부르면 ms가 갈려 base가 어긋나고,
+        // 그러면 다축 funscript 자동 탐색(loadMultiAxis)이 짝을 못 찾는다.
+        if (!req._uploadStamp) req._uploadStamp = Date.now();
         const safe = file.originalname.replace(/[^\w.\-]/g, '_');
-        cb(null, Date.now() + '_' + safe);
+        cb(null, req._uploadStamp + '_' + safe);
     },
 });
 const upload = multer({

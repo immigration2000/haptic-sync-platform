@@ -16,17 +16,28 @@
                 <div class="panel-title">영상 업로드</div>
                 <form method="POST" action="/bj-studio/videos/upload" enctype="multipart/form-data">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+                    <div class="form-row">
+                        <label class="form-label">📁 파일 한 번에 선택 (영상 + funscript)</label>
+                        <input class="form-input" type="file" id="pick-all" multiple accept="video/*,.funscript,.json">
+                        <p class="text-faint" style="font-size:11px;margin:6px 0 0;">
+                            영상과 스크립트를 함께 고르면 자동으로 나눠 담고 제목도 채웁니다.
+                            아래 칸에서 언제든 바꿀 수 있습니다.
+                        </p>
+                        <div id="pick-status" class="mono" style="font-size:11px;margin-top:6px;"></div>
+                    </div>
+
                     <div class="form-row">
                         <label class="form-label">제목</label>
-                        <input class="form-input" type="text" name="title" maxlength="80" required>
+                        <input class="form-input" type="text" name="title" id="v-title" maxlength="80" required>
                     </div>
                     <div class="form-row">
                         <label class="form-label">영상 파일 (mp4/webm/mov, 최대 2GB)</label>
-                        <input class="form-input" type="file" name="video" accept="video/*" required>
+                        <input class="form-input" type="file" name="video" id="v-video" accept="video/*" required>
                     </div>
                     <div class="form-row">
                         <label class="form-label">funscript (선택 — 디바이스 자동 연동용)</label>
-                        <input class="form-input" type="file" name="script" accept=".funscript,.json">
+                        <input class="form-input" type="file" name="script" id="v-script" accept=".funscript,.json">
                     </div>
                     <div class="form-row">
                         <label class="form-label">개별구매(PPV) 가격 (Ruby) — 0이면 구독 전용</label>
@@ -110,6 +121,91 @@
             if (cur.indexOf(name) === -1) { cur.push(name); t.value = cur.join(','); }
             t.focus();
         });
+    });
+})();
+</script>
+
+<script>
+/* 업로드 편의 — 파일을 한 번에 고르면 영상/스크립트로 나눠 담고 제목을 채운다.
+ * 브라우저 보안상 파일 입력에 디스크 경로로 값을 넣을 수는 없으므로,
+ * 사용자가 고른 File 객체를 DataTransfer로 각 입력에 옮겨 담는 방식을 쓴다.
+ * (DataTransfer 미지원 브라우저에서는 제목만 채우고 안내한다) */
+(function () {
+    var all    = document.getElementById('pick-all');
+    var video  = document.getElementById('v-video');
+    var script = document.getElementById('v-script');
+    var title  = document.getElementById('v-title');
+    var status = document.getElementById('pick-status');
+    if (!all || !video || !script || !title) return;
+
+    var SCRIPT_RE = /\.(funscript|json)$/i;
+    // 다축 보조 스크립트 — 메인(.funscript)과 구분한다
+    var AXIS_RE   = /\.(roll|twist|pitch|surge|sway)\.(funscript|json)$/i;
+
+    function baseName(name) { return String(name).replace(/\.[^.]+$/, ''); }
+    function titleFrom(name) {
+        return baseName(name).replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+    }
+    function setFile(input, file) {
+        try {
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            return true;
+        } catch (e) { return false; }
+    }
+    function say(html, color) {
+        if (!status) return;
+        status.innerHTML = html;
+        status.style.color = color || 'var(--tx-3)';
+    }
+
+    all.addEventListener('change', function () {
+        var files = Array.prototype.slice.call(all.files || []);
+        if (!files.length) { say(''); return; }
+
+        var vid = null, main = null, axes = [];
+        files.forEach(function (f) {
+            if (SCRIPT_RE.test(f.name)) { AXIS_RE.test(f.name) ? axes.push(f) : (main = main || f); }
+            else if (!vid) { vid = f; }
+        });
+        // 메인 스크립트가 없고 축 스크립트만 있으면 그거라도 쓴다
+        if (!main && axes.length) { main = axes.shift(); }
+
+        var msgs = [], warn = false;
+
+        if (vid) {
+            if (!setFile(video, vid)) { warn = true; msgs.push('영상 자동 담기 실패 — 아래에서 직접 선택'); }
+            else msgs.push('영상: ' + vid.name);
+            if (!title.value.trim()) title.value = titleFrom(vid.name);
+        } else {
+            warn = true; msgs.push('영상 파일이 없습니다');
+        }
+
+        if (main) {
+            if (!setFile(script, main)) { warn = true; msgs.push('스크립트 자동 담기 실패 — 아래에서 직접 선택'); }
+            else {
+                var match = vid && baseName(main.name).toLowerCase().indexOf(baseName(vid.name).toLowerCase()) === 0;
+                msgs.push('스크립트: ' + main.name + (vid ? (match ? ' (이름 일치 ✓)' : ' (이름 다름 — 확인)') : ''));
+                if (vid && !match) warn = true;
+            }
+        } else {
+            msgs.push('스크립트 없음 (선택)');
+        }
+
+        if (axes.length) {
+            warn = true;
+            msgs.push('⚠ 다축 스크립트 ' + axes.length + '개는 아직 함께 올릴 수 없습니다 (' +
+                      axes.map(function (f) { return f.name; }).join(', ') + ')');
+        }
+
+        say(msgs.join('<br>'), warn ? 'var(--c-yellow)' : 'var(--c-green)');
+    });
+
+    // 영상만 따로 고른 경우에도 제목을 채운다
+    video.addEventListener('change', function () {
+        var f = video.files && video.files[0];
+        if (f && !title.value.trim()) title.value = titleFrom(f.name);
     });
 })();
 </script>
