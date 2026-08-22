@@ -6,6 +6,12 @@
             <div class="section-eyebrow">ADMIN · STREAMER ACCOUNTS</div>
             <h1 class="section-title">스트리머 계정 발급</h1>
 
+            <% if (ok) { %>
+                <div class="card card-body" style="border-color:var(--c-green); margin-bottom:16px;">
+                    <strong style="color:var(--c-green);">✅ <%= ok %></strong>
+                </div>
+            <% } %>
+
             <% if (err) { %>
                 <div class="card card-body" style="border-color: var(--c-pink); margin-bottom: 16px;">
                     <strong style="color: var(--c-pink);">발급 실패</strong>
@@ -60,6 +66,21 @@
                         <label class="form-label">비밀번호</label>
                         <input class="form-input" type="text" name="password" maxlength="60" placeholder="비우면 자동 생성 (권장)" autocomplete="off">
                     </div>
+                    <div class="form-row">
+                        <label class="form-label">구독가 (Ruby / 기간)</label>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <input class="form-input" type="number" name="sub_price" value="0" min="0" max="1000000" step="100" style="width:120px;">
+                            <span class="text-faint" style="font-size:12px;">Ruby /</span>
+                            <input class="form-input" type="number" name="sub_days" value="30" min="1" max="3650" style="width:80px;">
+                            <span class="text-faint" style="font-size:12px;">일</span>
+                        </div>
+                        <p class="text-faint" style="font-size:11px;margin:6px 0 0;">
+                            <strong>0으로 두면 구독을 제공하지 않습니다.</strong> 그 상태에서 가격 없이 올린 영상은
+                            구독 전용이 되어 <strong>아무도 볼 수 없습니다.</strong>
+                            영상마다 개별구매 가격을 매길 계획이면 0으로 둬도 됩니다.
+                        </p>
+                    </div>
+
                     <button type="submit" class="btn btn-primary">계정 발급</button>
                 </form>
             </div>
@@ -71,18 +92,40 @@
                 <% } else { %>
                     <div style="overflow-x: auto;">
                         <table class="tx-table">
-                            <thead><tr><th>ID</th><th>로그인</th><th>활동명</th><th>영상</th><th>통화요율</th><th>가입일</th></tr></thead>
+                            <thead><tr><th>ID</th><th>로그인</th><th>활동명</th><th>영상</th><th>구독 설정</th></tr></thead>
                             <tbody>
                                 <% accounts.forEach(a => { %>
                                     <tr>
                                         <td class="mono"><%= a.id %></td>
                                         <td class="mono"><%= a.login_id %></td>
-                                        <td><strong><%= a.stage_name %></strong></td>
-                                        <td class="mono"><%= a.video_count %>편</td>
-                                        <td class="mono <%= a.rate_per_minute === 0 ? 'text-faint' : '' %>">
-                                            <%= a.rate_per_minute === 0 ? '업로드 전용' : a.rate_per_minute.toLocaleString() %>
+                                        <td><strong><%= a.stage_name %></strong><br>
+                                            <span class="mono text-faint" style="font-size:10px;"><%= a.created_at %></span></td>
+                                        <td class="mono">
+                                            <%= a.video_count %>편
+                                            <% if (a.sub_only_count) { %>
+                                                <br><span style="font-size:10px;color:<%= a.sub_price > 0 ? 'var(--tx-3)' : 'var(--c-yellow)' %>;">
+                                                    구독전용 <%= a.sub_only_count %>편<%= a.sub_price > 0 ? '' : ' &#9888;' %>
+                                                </span>
+                                            <% } %>
                                         </td>
-                                        <td class="mono text-faint" style="font-size: 11px;"><%= a.created_at %></td>
+                                        <td>
+                                            <% if (a.sub_only_count && !a.sub_price) { %>
+                                                <div style="color:var(--c-yellow);font-size:11px;margin-bottom:4px;">
+                                                    구독가가 없어 <strong><%= a.sub_only_count %>편</strong>을 아무도 볼 수 없습니다
+                                                </div>
+                                            <% } %>
+                                            <form method="POST" action="/admin/streamers/<%= a.id %>/subscription"
+                                                  style="margin:0;display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                                <input class="form-input" type="number" name="sub_price" value="<%= a.sub_price %>"
+                                                       min="0" max="1000000" step="100" style="width:96px;padding:4px 8px;" title="구독가 (Ruby, 0=구독 미제공)">
+                                                <span class="text-faint" style="font-size:11px;">Ruby /</span>
+                                                <input class="form-input" type="number" name="sub_days" value="<%= a.sub_days %>"
+                                                       min="1" max="3650" style="width:64px;padding:4px 8px;" title="구독 기간(일)">
+                                                <span class="text-faint" style="font-size:11px;">일</span>
+                                                <button class="btn btn-sm btn-secondary">저장</button>
+                                            </form>
+                                        </td>
                                     </tr>
                                 <% }) %>
                             </tbody>

@@ -123,12 +123,36 @@ router.get('/streamers', (req, res) => {
     res.render('admin/streamers', {
         title: '스트리머 계정',
         accounts: stmts.listStreamerAccounts.all(),
+        ok:       req.session.flashOk || null,
         issued:   req.session.flashIssued || null,   // 발급 직후 1회만 표시
         err:      req.session.flashErr || null,
     });
     // 비밀번호는 화면에 한 번만 — 새로고침하면 사라진다
     req.session.flashIssued = null;
     req.session.flashErr = null;
+    req.session.flashOk = null;
+});
+
+// 구독가 설정 — 이게 없으면 '구독 전용' 영상을 아무도 볼 수 없다.
+// (가격 0 = 구독 전용인데 구독가도 0이면 구독할 방법 자체가 없다)
+router.post('/streamers/:id/subscription', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    let price = parseInt(req.body.sub_price || '0', 10);
+    let days  = parseInt(req.body.sub_days  || '30', 10);
+    if (isNaN(price) || price < 0) price = 0;
+    if (price > 1000000) price = 1000000;
+    if (isNaN(days) || days < 1) days = 30;
+    if (days > 3650) days = 3650;
+
+    if (!id || !stmts.findBJ.get(id)) {
+        req.session.flashErr = '스트리머를 찾을 수 없습니다.';
+    } else {
+        stmts.setBJSubscription.run(price, days, id);
+        req.session.flashOk = price > 0
+            ? `구독가를 ${price.toLocaleString()} Ruby / ${days}일로 설정했습니다.`
+            : '구독을 사용하지 않도록 설정했습니다. (구독 전용 영상은 볼 수 없게 됩니다)';
+    }
+    res.redirect('/admin/streamers');
 });
 
 router.post('/streamers/create', (req, res) => {
@@ -136,6 +160,8 @@ router.post('/streamers/create', (req, res) => {
         loginId:   req.body.login_id,
         stageName: req.body.stage_name,
         password:  (req.body.password || '').trim() || undefined,
+        subPrice:  req.body.sub_price,
+        subDays:   req.body.sub_days,
     });
     if (!r.ok) {
         req.session.flashErr = r.error;

@@ -26,7 +26,7 @@ function generatePassword(len = 12) {
  * @returns {{ok:true, id, loginId, stageName, password, generated, created}}
  *          실패 시 {ok:false, error} — error는 사용자에게 그대로 보여줄 수 있는 문구
  */
-function provisionStreamer({ loginId, stageName, password }) {
+function provisionStreamer({ loginId, stageName, password, subPrice, subDays }) {
     const login = String(loginId || '').trim();
     const stage = String(stageName || '').trim().slice(0, 40);
 
@@ -64,12 +64,23 @@ function provisionStreamer({ loginId, stageName, password }) {
 
     // 업로드 전용 — 라이브 요율은 전부 0으로 막고 기기 제어도 끈다.
     // services는 최소 1개가 강제되므로 voice_1on1만 남긴다 (server/service_types.js)
+    //
+    // ⚠ sub_price는 0이 기본이지만, 가격 0(=구독 전용)으로 올린 영상은
+    //   구독가가 없으면 소유자 외에 **아무도 볼 수 없다.** 발급 시 정해줄 수 있게 열어둔다.
+    let price = parseInt(subPrice, 10);
+    if (isNaN(price) || price < 0) price = 0;
+    if (price > 1000000) price = 1000000;
+    let days = parseInt(subDays, 10);
+    if (isNaN(days) || days < 1) days = 30;
+    if (days > 3650) days = 3650;
+
     db.prepare(
         'UPDATE bj_profiles SET services=?, rate_per_minute=0, rate_with_video=0, rate_cam=0, ' +
-        'sub_price=0, device_control=0, is_online=0 WHERE user_id=?'
-    ).run(svc.normalizeServices(['voice_1on1']), id);
+        'sub_price=?, sub_days=?, device_control=0, is_online=0 WHERE user_id=?'
+    ).run(svc.normalizeServices(['voice_1on1']), price, days, id);
 
-    return { ok: true, id, loginId: login, stageName: stage, password: pw, generated, created };
+    return { ok: true, id, loginId: login, stageName: stage, password: pw, generated, created,
+             subPrice: price, subDays: days };
 }
 
 module.exports = { provisionStreamer, generatePassword };
