@@ -6,6 +6,19 @@ const { requireRole } = require('../middleware/auth');
 const tagEngine = require('../tags');
 const { provisionStreamer } = require('../services/account_provision');
 const diskGuard = require('../disk_guard');
+const fs   = require('fs');
+const path = require('path');
+
+/** 같은 base의 축 스크립트가 실제로 있는지 — 다축 배지는 이걸로 판단한다.
+ *  스크립트가 있다는 것만으로 '다축'이라고 표시하면 단축 영상에 잘못된 배지가 붙는다. */
+function hasMultiAxis(scriptPath) {
+    if (!scriptPath) return false;
+    const abs  = path.join(__dirname, '..', '..', 'public', scriptPath.replace(/^\//, ''));
+    const base = abs.replace(/\.(funscript|json)$/i, '');
+    const ext  = (abs.match(/\.(funscript|json)$/i) || ['.funscript'])[0];
+    return ['.roll', '.twist', '.pitch', '.surge', '.sway']
+        .some(a => { try { return fs.existsSync(base + a + ext); } catch (_) { return false; } });
+}
 
 router.use(requireRole('admin'));
 
@@ -185,7 +198,7 @@ router.post('/contents/promote', (req, res) => {
     const r = stmts.insertContent.run(
         type, title, (req.body.description || '').trim(), (req.body.creator || '').trim(),
         v.video_path, v.script_path || null, v.thumb_key || null,
-        0, price, '', v.script_path ? 1 : 0,
+        0, price, '', hasMultiAxis(v.script_path) ? 1 : 0,
     );
     // 태그는 태그 엔진을 거쳐야 운영모드·CORE_BLOCK이 적용된다 (직접 넣지 말 것)
     if ((req.body.tags || '').trim()) {

@@ -60,7 +60,7 @@ function buildCatalog(userId) {
         out.push({
             key: 'b' + v.id, href: '/bj/vid/' + v.id,
             type: 'vod',
-            title: v.title, thumb: null, duration: 0,
+            title: v.title, thumb: v.thumb_key || null, duration: 0,
             multiAxis: false, hasScript: !!v.script_path,
             access: kind, price: v.price,
             tags: own.length ? own : tagsOf(v.streamer_tags),
