@@ -4,6 +4,7 @@ const { stmts, getSettingBool, getSetting, setSetting } = require('../db');
 const vrConfig = require('../vr_config');
 const { requireRole } = require('../middleware/auth');
 const tagEngine = require('../tags');
+const { provisionStreamer } = require('../services/account_provision');
 
 router.use(requireRole('admin'));
 
@@ -93,18 +94,94 @@ router.post('/reports/:id/resolve', (req, res) => {
 });
 
 // 컨텐츠 (메타 추가)
+// ── 스트리머 계정 발급 (콘텐츠 작업자용) ──────────────────────────
+router.get('/streamers', (req, res) => {
+    res.render('admin/streamers', {
+        title: '스트리머 계정',
+        accounts: stmts.listStreamerAccounts.all(),
+        issued:   req.session.flashIssued || null,   // 발급 직후 1회만 표시
+        err:      req.session.flashErr || null,
+    });
+    // 비밀번호는 화면에 한 번만 — 새로고침하면 사라진다
+    req.session.flashIssued = null;
+    req.session.flashErr = null;
+});
+
+router.post('/streamers/create', (req, res) => {
+    const r = provisionStreamer({
+        loginId:   req.body.login_id,
+        stageName: req.body.stage_name,
+        password:  (req.body.password || '').trim() || undefined,
+    });
+    if (!r.ok) {
+        req.session.flashErr = r.error;
+    } else {
+        req.session.flashIssued = {
+            loginId: r.loginId, stageName: r.stageName,
+            password: r.password, generated: r.generated, created: r.created,
+        };
+    }
+    res.redirect('/admin/streamers');
+});
+
 router.get('/contents', (req, res) => {
     const contents = stmts.listAllContents.all().map(c => {
         let t = [];
         try { t = stmts.listVideoTags.all('content', c.id).map(x => x.name); } catch (_) {}
         return Object.assign({}, c, { tagStr: t.join(',') });
     });
+    // 스트리머가 올린 영상 — 카탈로그 승격 대상. 이미 올라간 건 표시해서 중복을 막는다.
+    const bjVideos = stmts.listAllBJVideos.all().map(v => {
+        const promoted = stmts.findContentByPath.get(v.video_path);
+        return Object.assign({}, v, { promoted: promoted || null });
+    });
+
     res.render('admin/contents', {
-        title: '콘텐츠 관리', contents,
+        title: '콘텐츠 관리', contents, bjVideos,
         approvedTags: stmts.listApprovedTags.all().slice(0, 30),
         ok: req.session.flashOk,
+        err: req.session.flashErr || null,
     });
     req.session.flashOk = null;
+    req.session.flashErr = null;
+});
+
+// ── 스트리머 업로드 → 플랫폼 카탈로그 승격 ────────────────────────
+// 파일을 복사하지 않고 같은 경로를 참조한다. 폰 저장공간에서 2GB 영상을
+// 복사하는 건 현실적이지 않고, 어차피 같은 정적 경로로 서빙된다.
+// 대신 원본이 지워지면 카탈로그가 깨지므로 bj_studio 삭제 쪽에 가드를 뒀다.
+router.post('/contents/promote', (req, res) => {
+    const vid = parseInt(req.body.video_id, 10);
+    const v = vid ? stmts.findBJVideoById.get(vid) : null;
+    if (!v) {
+        req.session.flashErr = '대상 영상을 찾을 수 없습니다.';
+        return res.redirect('/admin/contents');
+    }
+    if (stmts.findContentByPath.get(v.video_path)) {
+        req.session.flashErr = '이미 카탈로그에 등재된 영상입니다.';
+        return res.redirect('/admin/contents');
+    }
+
+    const type  = ['vod', 'vr', 'volumetric'].includes(req.body.type) ? req.body.type : 'vod';
+    const title = (req.body.title || v.title || '').trim().slice(0, 120);
+    if (!title) {
+        req.session.flashErr = '제목이 비어 있습니다.';
+        return res.redirect('/admin/contents');
+    }
+    let price = parseInt(req.body.price || '0', 10);
+    if (isNaN(price) || price < 0) price = 0;
+
+    const r = stmts.insertContent.run(
+        type, title, (req.body.description || '').trim(), (req.body.creator || '').trim(),
+        v.video_path, v.script_path || null, v.thumb_key || null,
+        0, price, '', v.script_path ? 1 : 0,
+    );
+    // 태그는 태그 엔진을 거쳐야 운영모드·CORE_BLOCK이 적용된다 (직접 넣지 말 것)
+    if ((req.body.tags || '').trim()) {
+        try { tagEngine.submitForVideo('content', Number(r.lastInsertRowid), req.body.tags, req.user.id); } catch (_) {}
+    }
+    req.session.flashOk = `'${title}' 을(를) 카탈로그에 등재했습니다.`;
+    res.redirect('/admin/contents');
 });
 
 // 사이트 콘텐츠 영상별 태그 — 스트리머 영상과 같은 태그 마스터를 공유

@@ -187,6 +187,12 @@ router.post('/videos/upload',
 router.post('/videos/:id/delete', (req, res) => {
     const id = parseInt(req.params.id, 10);
     const v = stmts.findBJVideo.get(id, req.user.id);
+    // 플랫폼 카탈로그가 같은 파일을 참조하고 있으면 지우지 않는다.
+    // (승격은 파일을 복사하지 않고 경로를 공유한다 — admin/contents/promote 참고)
+    if (v && stmts.findContentByPath.get(v.video_path)) {
+        req.session.flash = '이 영상은 플랫폼 카탈로그에 등재되어 있어 삭제할 수 없습니다. 관리자에게 문의하세요.';
+        return res.redirect('/bj-studio/videos');
+    }
     if (v) {
         // 파일 삭제 (best-effort)
         for (const p of [v.video_path, v.script_path]) {

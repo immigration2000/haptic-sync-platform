@@ -249,6 +249,17 @@ const stmts = {
     listContents:      db.prepare(`SELECT * FROM contents WHERE type = ? ORDER BY created_at DESC`),
     listAllContents:   db.prepare(`SELECT * FROM contents ORDER BY created_at DESC`),
     findContent:       db.prepare(`SELECT * FROM contents WHERE id = ?`),
+    // ── 관리자: 콘텐츠 온보딩 ──
+    listStreamerAccounts: db.prepare(`SELECT u.id, u.email AS login_id, u.nickname, u.created_at,
+                                             b.stage_name, b.services, b.rate_per_minute,
+                                             (SELECT COUNT(*) FROM bj_videos v WHERE v.bj_user_id = u.id) AS video_count
+                                      FROM users u
+                                      JOIN bj_profiles b ON b.user_id = u.id
+                                      WHERE u.role = 'bj'
+                                      ORDER BY u.created_at DESC`),
+    // 카탈로그로 이미 올라간 경로인지 (승격 중복·삭제 사고 방지)
+    findContentByPath: db.prepare('SELECT id, title FROM contents WHERE video_path = ?'),
+
     insertContent:     db.prepare(`INSERT INTO contents (type, title, description, creator, video_path, script_path,
                                                           thumbnail_path, duration_sec, price, tags, multi_axis)
                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),

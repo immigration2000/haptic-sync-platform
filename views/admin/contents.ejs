@@ -11,6 +11,62 @@
 
             <div class="card card-body mb-5">
                 <div class="panel-title">새 콘텐츠 추가</div>
+
+            <!-- 스트리머 업로드 → 카탈로그 승격 -->
+            <div class="card card-body" style="margin-bottom: 20px;">
+                <h3 style="margin: 0 0 4px;">스트리머 업로드 영상 (<%= bjVideos.length %>)</h3>
+                <p class="text-faint" style="font-size:12px; margin: 0 0 12px;">
+                    작업자가 <code>/bj-studio/videos</code>에 올린 영상입니다.
+                    SSH 없이 여기서 바로 플랫폼 카탈로그(VOD/VR)에 등재할 수 있습니다.
+                    <strong>파일은 복사되지 않고 같은 경로를 참조</strong>하므로, 등재 후에는
+                    작업자가 그 영상을 지울 수 없게 막힙니다.
+                </p>
+                <% if (!bjVideos.length) { %>
+                    <p class="text-faint" style="margin:0;">업로드된 영상이 없습니다.</p>
+                <% } else { %>
+                <div style="overflow-x:auto;">
+                <table class="tx-table">
+                    <thead><tr><th>제목</th><th>스트리머</th><th>스크립트</th><th>상태</th><th>카탈로그 등재</th></tr></thead>
+                    <tbody>
+                    <% bjVideos.forEach(v => { %>
+                        <tr>
+                            <td><strong><%= v.title %></strong><br>
+                                <span class="mono text-faint" style="font-size:10px;"><%= v.video_path %></span></td>
+                            <td><%= v.stage_name %></td>
+                            <td><%= v.script_path ? '<span style="color:var(--c-green);">있음</span>' : '<span class="text-faint">없음</span>' %></td>
+                            <td>
+                                <% if (v.promoted) { %>
+                                    <span style="color:var(--c-green); font-size:12px;">등재됨 #<%= v.promoted.id %></span>
+                                <% } else { %>
+                                    <span class="text-faint" style="font-size:12px;">미등재</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <% if (v.promoted) { %>
+                                    <span class="text-faint" style="font-size:11px;">—</span>
+                                <% } else { %>
+                                <form method="POST" action="/admin/contents/promote" class="flex items-center gap-2" style="flex-wrap:wrap;">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <input type="hidden" name="video_id" value="<%= v.id %>">
+                                    <select class="form-select" name="type" style="width:auto;">
+                                        <option value="vod">VOD</option>
+                                        <option value="vr">VR</option>
+                                    </select>
+                                    <input class="form-input" type="text" name="title" value="<%= v.title %>" style="width:150px;" maxlength="120">
+                                    <input class="form-input" type="number" name="price" value="0" style="width:80px;" title="가격(Ruby)">
+                                    <input class="form-input" type="text" name="tags" placeholder="태그" style="width:110px;">
+                                    <button class="btn btn-sm btn-primary">등재</button>
+                                </form>
+                                <% } %>
+                            </td>
+                        </tr>
+                    <% }) %>
+                    </tbody>
+                </table>
+                </div>
+                <% } %>
+            </div>
+
                 <p class="text-faint mb-4" style="font-size:12px;">⚠ 파일은 SSH/FTP로 <code>public/content/{vods|vrs}/</code>에 먼저 업로드 후 경로 입력.</p>
                 <form method="POST" action="/admin/contents/add">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">

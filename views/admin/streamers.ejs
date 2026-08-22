@@ -1,0 +1,126 @@
+<section class="container">
+    <div class="mypage-grid">
+        <%- include('_nav') %>
+
+        <div>
+            <div class="section-eyebrow">ADMIN · STREAMER ACCOUNTS</div>
+            <h1 class="section-title">스트리머 계정 발급</h1>
+
+            <% if (err) { %>
+                <div class="card card-body" style="border-color: var(--c-pink); margin-bottom: 16px;">
+                    <strong style="color: var(--c-pink);">발급 실패</strong>
+                    <p class="text-faint" style="margin: 6px 0 0;"><%= err %></p>
+                </div>
+            <% } %>
+
+            <% if (issued) { %>
+                <div class="card card-body" style="border-color: var(--c-green); margin-bottom: 16px;">
+                    <strong style="color: var(--c-green);">
+                        ✅ <%= issued.created ? '계정을 발급했습니다' : '기존 계정을 스트리머로 갱신했습니다' %>
+                    </strong>
+                    <table class="tx-table" style="margin-top: 10px;">
+                        <tr><td class="text-faint" style="width: 90px;">로그인 ID</td>
+                            <td class="mono"><strong id="iss-id"><%= issued.loginId %></strong></td></tr>
+                        <tr><td class="text-faint">활동명</td><td><%= issued.stageName %></td></tr>
+                        <tr><td class="text-faint">비밀번호</td>
+                            <td class="mono"><strong id="iss-pw"><%= issued.password %></strong></td></tr>
+                        <tr><td class="text-faint">업로드 주소</td><td class="mono">/bj-studio/videos</td></tr>
+                    </table>
+                    <div class="flex items-center gap-2" style="margin-top: 10px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-sm" id="copy-cred">📋 계정 정보 복사</button>
+                        <span id="cred-msg" class="text-faint" style="font-size: 11px;"></span>
+                    </div>
+                    <% if (issued.generated) { %>
+                        <p style="color: var(--c-yellow); font-size: 12px; margin: 10px 0 0;">
+                            ⚠ 비밀번호는 <strong>이 화면에만</strong> 표시됩니다. 새로고침하면 사라지고 다시 볼 수 없습니다.
+                            지금 복사해서 전달하세요. 받는 분께 첫 로그인 후 마이페이지에서 변경하도록 안내해 주세요.
+                        </p>
+                    <% } %>
+                </div>
+            <% } %>
+
+            <div class="card card-body" style="margin-bottom: 20px;">
+                <h3 style="margin: 0 0 4px;">새 계정 발급</h3>
+                <p class="text-faint" style="font-size: 12px; margin: 0 0 14px;">
+                    콘텐츠 작업자에게 <strong>관리자 계정을 주지 마세요.</strong>
+                    관리자는 회원 목록·거래 내역·점검 모드까지 열립니다.
+                    여기서 만든 계정은 영상 업로드만 가능하고 관리자 화면에는 접근할 수 없습니다.
+                </p>
+                <form method="post" action="/admin/streamers/create">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="form-row">
+                        <label class="form-label">로그인 ID</label>
+                        <input class="form-input" type="text" name="login_id" required maxlength="60" placeholder="worker01" autocomplete="off">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">활동명</label>
+                        <input class="form-input" type="text" name="stage_name" required maxlength="40" placeholder="콘텐츠팀" autocomplete="off">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">비밀번호</label>
+                        <input class="form-input" type="text" name="password" maxlength="60" placeholder="비우면 자동 생성 (권장)" autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-primary">계정 발급</button>
+                </form>
+            </div>
+
+            <h3 style="margin-bottom: 10px;">스트리머 계정 (<%= accounts.length %>)</h3>
+            <div class="card card-body">
+                <% if (!accounts.length) { %>
+                    <p class="text-faint" style="margin: 0;">아직 스트리머 계정이 없습니다.</p>
+                <% } else { %>
+                    <div style="overflow-x: auto;">
+                        <table class="tx-table">
+                            <thead><tr><th>ID</th><th>로그인</th><th>활동명</th><th>영상</th><th>통화요율</th><th>가입일</th></tr></thead>
+                            <tbody>
+                                <% accounts.forEach(a => { %>
+                                    <tr>
+                                        <td class="mono"><%= a.id %></td>
+                                        <td class="mono"><%= a.login_id %></td>
+                                        <td><strong><%= a.stage_name %></strong></td>
+                                        <td class="mono"><%= a.video_count %>편</td>
+                                        <td class="mono <%= a.rate_per_minute === 0 ? 'text-faint' : '' %>">
+                                            <%= a.rate_per_minute === 0 ? '업로드 전용' : a.rate_per_minute.toLocaleString() %>
+                                        </td>
+                                        <td class="mono text-faint" style="font-size: 11px;"><%= a.created_at %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+(function () {
+    var btn = document.getElementById('copy-cred');
+    if (!btn) return;
+    var msg = document.getElementById('cred-msg');
+    btn.addEventListener('click', function () {
+        var id = (document.getElementById('iss-id') || {}).textContent || '';
+        var pw = (document.getElementById('iss-pw') || {}).textContent || '';
+        var text = '로그인 ID: ' + id.trim() + '\n비밀번호: ' + pw.trim()
+                 + '\n업로드 주소: /bj-studio/videos';
+        function done(ok) {
+            if (!msg) return;
+            msg.textContent = ok ? '복사됨' : '복사 실패 — 직접 선택해 주세요';
+            msg.style.color = ok ? 'var(--c-green)' : 'var(--c-pink)';
+            setTimeout(function () { msg.textContent = ''; }, 2500);
+        }
+        function fallback() {
+            var ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            var ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            document.body.removeChild(ta); done(ok);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+        } else { fallback(); }
+    });
+})();
+</script>
