@@ -123,6 +123,19 @@ module.exports = (httpServer, sessionMiddleware) => {
             // tier = 1:1 서비스 코드(voice_1on1 | video_1on1). 구 값(call/video/cam)도 자동 변환.
             // 요금은 서버가 이 값으로만 산정하므로 여기서 정규화해 저장한다.
             const tier = require('../service_types').normalizeTier(context && context.tier);
+            // 요청한 tier를 이 스트리머가 실제로 제공하는지 확인한다.
+            // 목록에서 빼는 것만으로는 부족하다 — socketId/userId를 직접 넣어 호출할 수 있다.
+            const svcT = require('../service_types');
+            const prof = stmts.findBJ.get(bj.userId);
+            if (!svcT.has(prof && prof.services, tier)) {
+                socket.emit('call-failed', { reason: 'SERVICE_NOT_OFFERED' });
+                // 위에서 잡아둔 매칭 상태를 되돌린다
+                pairs.delete(socket.id); pairs.delete(bj.socketId);
+                busyBJs.delete(bj.socketId);
+                if (!waitingBJs.some(b => b.socketId === bj.socketId)) waitingBJs.push(bj);
+                broadcastLobby();
+                return;
+            }
             activeSessions.set(socket.userId, { bjUserId: bj.userId, kind: kind || 'call', socketId: socket.id, tier });
             broadcastLobby();
             const ctx = context || {};

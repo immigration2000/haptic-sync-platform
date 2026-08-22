@@ -30,7 +30,7 @@
 
                 <%
                    // 제공 서비스는 서비스 태그가 기준. 요율은 rate_cam이 0이면 기본 요율로 폴백.
-                   var svc = (bj.services || 'voice_1on1').split(',');
+                   var svc = String(bj.services || '').split(',').filter(Boolean);   // 빈 값 = 라이브 미제공
                    var hasVideo1 = svc.indexOf('video_1on1') >= 0;
                    var videoRate = (bj.rate_cam > 0) ? bj.rate_cam : bj.rate_per_minute;
                 %>
@@ -105,4 +105,4 @@ window.__BJ_CALL__ = {
 <script src="/js/core/device.js"></script>
 <script src="/js/core/funscript.js"></script>
 <script src="/js/core/bj_session.js"></script>
-<script src="/js/pages/bj_call.js?v=remoteguard"></script>
+<script src="/js/pages/bj_call.js?v=svcguard"></script>

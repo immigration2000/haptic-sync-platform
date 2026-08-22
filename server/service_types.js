@@ -44,7 +44,15 @@ const LEGACY_MAP = {
     broadcast:    'video_multi',
 };
 
-/** 콤마 문자열/배열 → 유효한 신규 코드 배열 (구 코드 자동 변환, 중복 제거, 최소 1개 보장) */
+/** 콤마 문자열/배열 → 유효한 신규 코드 배열 (구 코드 자동 변환, 중복 제거)
+ *
+ * ⚠ 2026-08-22: 예전에는 **최소 1개를 강제**해서 빈 값이면 voice_1on1을 넣었다.
+ *   그래서 "라이브 서비스를 하나도 안 함"(영상 업로드만 하는 계정)을 표현할 수 없었고,
+ *   업로드 전용 계정이 1:1 통화를 제공하는 것처럼 취급돼 요율 검사에 걸리고
+ *   보이스 목록에도 노출됐다. 이제 **빈 배열을 허용**한다.
+ *   → 빈 서비스 = 라이브 미제공. 목록·매칭에서 제외되고, 영상 업로드/구독은 그대로 된다.
+ *   과금 tier 판정(normalizeTier)은 별개다 — 그쪽은 여전히 기본값으로 떨어진다.
+ */
 function normalizeList(input) {
     let arr = input;
     if (typeof arr === 'string') arr = arr.split(',');
@@ -56,8 +64,7 @@ function normalizeList(input) {
         if (LEGACY_MAP[v]) v = LEGACY_MAP[v];
         if (CODES.includes(v) && !out.includes(v)) out.push(v);
     }
-    if (!out.length) out.push('voice_1on1');          // 최소 1개
-    return out;
+    return out;                                       // 빈 배열 허용 (= 라이브 미제공)
 }
 
 /** DB 저장용 콤마 문자열 */

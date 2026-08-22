@@ -73,7 +73,7 @@
                             <div class="content-tags">
                                 <%
                                    // 제공 서비스 배지 — 서비스 태그가 기준 (요율 필드가 아니라)
-                                   var bsvc = (bj.services || 'voice_1on1').split(',');
+                                   var bsvc = String(bj.services || '').split(',').filter(Boolean);
                                    var LBL = { voice_1on1:'🎤 음성통화', video_1on1:'📷 영상통화',
                                                voice_multi:'📻 음성방송', video_multi:'📺 영상방송' };
                                 %>

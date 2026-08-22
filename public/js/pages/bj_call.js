@@ -81,7 +81,9 @@
         socket.on('peer-hangup', () => endCall(true));
         socket.on('call-failed', ({ reason }) => {
             const msg = reason === 'BJ_BUSY' ? '⚠ 다른 통화 중입니다. 잠시 후 다시.'
-                      : reason === 'BJ_OFFLINE' ? '⚠ 해당 BJ가 오프라인입니다.' : '⚠ 통화 실패';
+                      : reason === 'BJ_OFFLINE' ? '⚠ 해당 스트리머가 오프라인입니다.'
+                      : reason === 'SERVICE_NOT_OFFERED' ? '⚠ 이 스트리머는 해당 통화를 제공하지 않습니다.'
+                      : '⚠ 통화 실패';
             stateEl.innerHTML = `<span style="color: var(--c-pink);">${msg}</span>`;
             actsStart.classList.add('hidden');
         });

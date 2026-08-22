@@ -150,6 +150,9 @@ router.post('/session/charge', requireLogin, express.json(), (req, res) => {
 // BJ 목록 + (옵션) 더미 방 합치기
 router.get('/', requireAgeVerified, (req, res) => {
     let bjs = stmts.listBJs.all();
+    // 1:1 서비스를 하나도 제공하지 않는 계정(영상 업로드 전용 등)은 통화 목록에서 뺀다.
+    // 예전엔 services가 최소 1개로 강제돼 이런 계정도 항상 목록에 떴다.
+    bjs = bjs.filter(b => svcTypes.has(b.services, 'voice_1on1') || svcTypes.has(b.services, 'video_1on1'));
     // 함께보기 진입이면 1:1 영상통화 제공 스트리머만 (함께보기는 영상통화의 기능으로 흡수됨)
     if (req.query.cowatchContent) {
         bjs = bjs.filter(b => svcTypes.has(b.services, 'video_1on1'));

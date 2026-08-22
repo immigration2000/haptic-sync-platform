@@ -62,8 +62,9 @@ function provisionStreamer({ loginId, stageName, password, subPrice, subDays }) 
         stmts.insertBJProfile.run(id, stage, '콘텐츠 업로드 계정', 0, '');
     }
 
-    // 업로드 전용 — 라이브 요율은 전부 0으로 막고 기기 제어도 끈다.
-    // services는 최소 1개가 강제되므로 voice_1on1만 남긴다 (server/service_types.js)
+    // 업로드 전용 — 라이브 서비스를 아예 제공하지 않는다(services 빈 값).
+    // 통화 목록에 뜨지 않고, 프로필 저장 시 분당요금 검사도 걸리지 않는다.
+    // 나중에 스튜디오에서 서비스를 체크하면 그때부터 라이브도 가능해진다.
     //
     // ⚠ sub_price는 0이 기본이지만, 가격 0(=구독 전용)으로 올린 영상은
     //   구독가가 없으면 소유자 외에 **아무도 볼 수 없다.** 발급 시 정해줄 수 있게 열어둔다.
@@ -77,7 +78,7 @@ function provisionStreamer({ loginId, stageName, password, subPrice, subDays }) 
     db.prepare(
         'UPDATE bj_profiles SET services=?, rate_per_minute=0, rate_with_video=0, rate_cam=0, ' +
         'sub_price=?, sub_days=?, device_control=0, is_online=0 WHERE user_id=?'
-    ).run(svc.normalizeServices(['voice_1on1']), price, days, id);
+    ).run(svc.normalizeServices([]), price, days, id);
 
     return { ok: true, id, loginId: login, stageName: stage, password: pw, generated, created,
              subPrice: price, subDays: days };

@@ -8,7 +8,7 @@
             <p class="text-dim mb-5"><%= profile.description || '자기소개를 입력해주세요.' %></p>
 
             <!-- 빠른 액션 -->
-            <% const svc = (profile.services || 'voice_1on1').split(',');
+            <% const svc = String(profile.services || '').split(',').filter(Boolean);
                const labels = { voice_1on1:'🎤 1:1 음성통화', video_1on1:'📷 1:1 영상통화',
                                 voice_multi:'📻 음성방송', video_multi:'📺 영상방송' };
                const oneToOne = ['voice_1on1','video_1on1'].filter(s => svc.includes(s));
