@@ -90,9 +90,22 @@ router.post('/profile', (req, res) => {
     if (!stage_name || stage_name.length < 2 || stage_name.length > 30) {
         req.session.flash = '활동명 2~30자.'; return res.redirect('/bj-studio/profile');
     }
-    const rate = parseInt(rate_per_minute || '0', 10);
-    if (rate < 50 || rate > 1000) {
-        req.session.flash = '분당 요금 50~1000 Ruby.'; return res.redirect('/bj-studio/profile');
+    // 1:1 서비스를 제공할 때만 분당 요금이 의미가 있다.
+    // 예전엔 무조건 50~1000을 요구해서, 업로드 전용 계정(요율 0)은
+    // **프로필을 아예 저장할 수 없었다.** 구독가조차 못 바꾸는 상태였다.
+    const svcTypes0 = require('../service_types');
+    const picked    = svcTypes0.normalizeList(req.body.services);
+    const offers1on1 = picked.some(c => svcTypes0.BY_CODE[c] && svcTypes0.BY_CODE[c].audience === '1on1');
+
+    let rate = parseInt(rate_per_minute || '0', 10);
+    if (isNaN(rate) || rate < 0) rate = 0;
+    if (offers1on1) {
+        if (rate < 50 || rate > 1000) {
+            req.session.flash = '1:1 서비스를 제공하려면 분당 요금이 50~1000 Ruby여야 합니다.';
+            return res.redirect('/bj-studio/profile');
+        }
+    } else if (rate > 1000) {
+        rate = 1000;
     }
     let free  = parseInt(free_preview_sec || '60', 10);
     let block = parseInt(session_block_min || '5', 10);
