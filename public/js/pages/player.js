@@ -8,6 +8,13 @@
     const devStatusEl = document.getElementById('player-dev-status');
     const intensitySlider = document.getElementById('intensity-slider');
     const intensityValue  = document.getElementById('intensity-value');
+    const outMinSlider    = document.getElementById('out-min-slider');
+    const outMinValue     = document.getElementById('out-min-value');
+    const outMaxSlider    = document.getElementById('out-max-slider');
+    const outMaxValue     = document.getElementById('out-max-value');
+    const expandToggle    = document.getElementById('expand-toggle');
+    const fsSpanLabel     = document.getElementById('fs-span-label');
+    const strokeReset     = document.getElementById('stroke-reset');
 
     // 관리자 기본값(서버 설정) + 사용자 개별 조정(localStorage)
     const VR_ADMIN = Object.assign({ hFovDeg: 100, fisheyeFovDeg: 100, pitchDeg: 30, yawDeg: 0, eye: 'left' }, CFG.vrDefaults || {});
@@ -135,9 +142,67 @@
     renderDev(Dev.getStatus());
     Dev.onChange(renderDev);
 
-    intensitySlider.addEventListener('input', () => {
-        intensity = parseInt(intensitySlider.value, 10) / 100;
-        intensityValue.textContent = intensitySlider.value + '%';
+    // ─── 스트로크 제어 (최소·최대·강도·자동확장) ───────────────
+    // 설정은 기기·취향에 묶이므로 브라우저에 저장한다 (VR 재투영 설정과 같은 방식)
+    const STROKE_KEY = 'pulse_stroke_cfg';
+    const STROKE_DEFAULT = { outMin: 0, outMax: 100, gain: 1.0, expand: true };
+    let stroke = Object.assign({}, STROKE_DEFAULT);
+    try {
+        const saved = JSON.parse(localStorage.getItem(STROKE_KEY) || 'null');
+        if (saved) stroke = Object.assign(stroke, saved);
+    } catch (_) {}
+
+    function saveStroke() {
+        try { localStorage.setItem(STROKE_KEY, JSON.stringify(stroke)); } catch (_) {}
+    }
+
+    // 슬라이더 → 상태. 최소가 최대를 넘지 않도록 서로 밀어낸다.
+    function pullFromUI(changed) {
+        let lo = parseInt(outMinSlider.value, 10);
+        let hi = parseInt(outMaxSlider.value, 10);
+        if (lo >= hi) {
+            if (changed === 'min') { lo = Math.max(0, hi - 5); outMinSlider.value = lo; }
+            else                   { hi = Math.min(100, lo + 5); outMaxSlider.value = hi; }
+        }
+        stroke.outMin = lo;
+        stroke.outMax = hi;
+        stroke.gain   = parseInt(intensitySlider.value, 10) / 100;
+        stroke.expand = !!expandToggle.checked;
+        intensity = stroke.gain;           // 하위호환 경로에서도 같은 값을 쓰도록
+        renderStroke();
+        saveStroke();
+    }
+
+    function renderStroke() {
+        if (!strokeUIReady) return;
+        outMinValue.textContent   = stroke.outMin;
+        outMaxValue.textContent   = stroke.outMax;
+        intensityValue.textContent = Math.round(stroke.gain * 100) + '%';
+    }
+
+    const strokeUIReady = !!(outMinSlider && outMaxSlider && intensitySlider && expandToggle);
+
+    function pushToUI() {
+        if (!strokeUIReady) return;
+        outMinSlider.value    = stroke.outMin;
+        outMaxSlider.value    = stroke.outMax;
+        intensitySlider.value = Math.round(stroke.gain * 100);
+        expandToggle.checked  = stroke.expand;
+        intensity = stroke.gain;
+        renderStroke();
+    }
+    pushToUI();
+
+    if (strokeUIReady) {
+        outMinSlider.addEventListener('input', () => pullFromUI('min'));
+        outMaxSlider.addEventListener('input', () => pullFromUI('max'));
+        intensitySlider.addEventListener('input', () => pullFromUI('gain'));
+        expandToggle.addEventListener('change', () => pullFromUI('expand'));
+    }
+    strokeReset && strokeReset.addEventListener('click', () => {
+        stroke = Object.assign({}, STROKE_DEFAULT);
+        pushToUI();
+        saveStroke();
     });
 
     if (!CFG.fsPath) {
@@ -149,10 +214,22 @@
         const present = Object.keys(axes);
         if (!present.length) { fsAxesLbl.textContent = '로드 실패'; return; }
         fsAxesLbl.textContent = present.join(' · ');
+
+        // 스크립트가 실제로 쓰는 폭을 보여준다 — "왜 조금만 움직이는지"가 여기서 드러난다
+        const L0 = axes.L0;
+        if (L0 && fsSpanLabel) {
+            fsSpanLabel.textContent = L0.span >= 10
+                ? `원본 진폭 ${L0.lo}~${L0.hi} (폭 ${L0.span})`
+                : `원본 진폭 ${L0.lo}~${L0.hi} (폭 ${L0.span}) — 너무 좁아 자동 확장 안 함`;
+        } else if (fsSpanLabel) {
+            fsSpanLabel.textContent = 'L0 스트로크 축 없음';
+        }
+
         engine = new FS.MultiAxisEngine({
             video,
             axes,
             intensityGetter: () => intensity,
+            shapeGetter: () => stroke,
             sendOnce: true,
             onCommand: (cmd) => Dev.send(cmd),
         });

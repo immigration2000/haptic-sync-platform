@@ -44,9 +44,45 @@
         await Promise.all(AXIS_DEFS.map(async (def) => {
             const url = base + def.ext + ext;
             const acts = await tryFetch(url);
-            if (acts) axes[def.tcode] = { actions: acts, index: 0, url };
+            if (!acts) return;
+            // 스크립트가 실제로 쓰는 진폭을 재둔다. 이걸 알아야 "원본이 좁아서 안 움직이는 것"과
+            // "사용자가 강도를 줄인 것"을 구분할 수 있고, 좁은 스크립트를 넓게 펴줄 수 있다.
+            let lo = 100, hi = 0;
+            for (const a of acts) {
+                const v = Math.max(0, Math.min(100, Number(a.pos) || 0));
+                if (v < lo) lo = v;
+                if (v > hi) hi = v;
+            }
+            axes[def.tcode] = { actions: acts, index: 0, url, lo, hi, span: hi - lo };
         }));
         return axes;
+    }
+
+    // 진폭이 이보다 좁으면 '펴기'를 하지 않는다.
+    // 거의 정지된 스크립트를 억지로 늘리면 미세한 흔들림이 풀스트로크로 증폭돼 위험하다.
+    const MIN_EXPAND_SPAN = 10;
+
+    /**
+     * 스크립트 위치(0~100) → 실제 출력 위치
+     *   shape 없으면 기존 동작 그대로: 50 + (pos-50) * intensity
+     */
+    function shapeStroke(pos, ax, shape, intensity) {
+        if (!shape) return Math.round(50 + (pos - 50) * intensity);
+
+        const outMin = Math.max(0, Math.min(100, shape.outMin));
+        const outMax = Math.max(outMin, Math.min(100, shape.outMax));
+        const gain   = shape.gain == null ? 1 : shape.gain;
+
+        // 1) 0~1 정규화. 펴기가 켜져 있고 스크립트 진폭이 충분하면 그 진폭 기준으로,
+        //    아니면 원본 스케일(0~100) 그대로.
+        const canExpand = shape.expand && ax && ax.span >= MIN_EXPAND_SPAN;
+        const norm = canExpand ? (pos - ax.lo) / ax.span : pos / 100;
+
+        // 2) 사용자 출력 범위로 매핑 + 강도 배율
+        const center = (outMin + outMax) / 2;
+        const out = center + (norm - 0.5) * (outMax - outMin) * gain;
+
+        return Math.round(Math.max(outMin, Math.min(outMax, out)));
     }
 
     /**
@@ -56,11 +92,16 @@
      *   - sendOnce(true): 한 tick에 여러 축이 동시 트리거되면 단일 TCode 라인으로 합쳐 송신
      */
     class MultiAxisEngine {
-        constructor({ video, axes, onCommand, intensityGetter, sendOnce = true }) {
+        constructor({ video, axes, onCommand, intensityGetter, shapeGetter, sendOnce = true }) {
             this.video = video;
             this.axes  = axes;             // { L0: {actions, index}, R0: {...}, ... }
             this.onCommand = onCommand;    // (tcodeStr, perAxisDetails[]) => void
             this.getIntensity = intensityGetter || (() => 1);
+            // 출력 성형 설정. 없으면 기존 동작과 완전히 동일하게 둔다.
+            //   outMin/outMax : 장치가 실제로 오갈 범위 (0~100)
+            //   gain          : 그 범위 안에서의 진폭 배율 (강도)
+            //   expand        : 스크립트 자체 진폭을 outMin~outMax로 펴줄지
+            this.getShape = shapeGetter || null;
             this.sendOnce = sendOnce;
             this._running = false;
             this._lastMs = -1;
@@ -101,6 +142,7 @@
             this._lastMs = ms;
 
             const intensity = this.getIntensity();
+            const shape = this.getShape ? this.getShape() : null;
             const triggered = [];   // 이번 tick에서 트리거된 축
 
             for (const k of Object.keys(this.axes)) {
@@ -109,10 +151,10 @@
                     const cur  = ax.actions[ax.index];
                     const next = ax.actions[ax.index + 1];
                     const interp = Math.max(1, next.at - cur.at);
-                    // 강도 보정 (L0만 — 회전축은 그대로)
+                    // 출력 성형 (L0만 — 회전축은 그대로)
                     const isStroke = (k === 'L0');
                     const scaled = isStroke
-                        ? Math.round(50 + (next.pos - 50) * intensity)
+                        ? shapeStroke(next.pos, ax, shape, intensity)
                         : next.pos;
                     const pos = Math.max(0, Math.min(99, scaled));
                     triggered.push({ axis: k, pos, interp, atMs: next.at });

@@ -51,12 +51,36 @@
                 </div>
             </div>
             <div class="panel">
-                <div class="panel-title">강도 (STROKE RANGE)</div>
-                <div class="flex items-center gap-3">
-                    <input type="range" id="intensity-slider" min="20" max="100" value="100" step="5" style="flex:1;">
-                    <span id="intensity-value" class="mono" style="min-width: 48px; text-align: right;">100%</span>
+                <div class="panel-title">스트로크 제어 (L0)</div>
+
+                <div class="flex items-center gap-3" style="margin-bottom:6px;">
+                    <span class="text-faint" style="font-size:11px; min-width:52px;">최소</span>
+                    <input type="range" id="out-min-slider" min="0" max="100" value="0" step="5" style="flex:1;">
+                    <span id="out-min-value" class="mono" style="min-width:40px; text-align:right;">0</span>
                 </div>
-                <p class="text-faint" style="font-size: 11px; margin-top: 8px;">L0 스트로크 폭 조절. 회전축(R0/R2)는 그대로.</p>
+                <div class="flex items-center gap-3" style="margin-bottom:6px;">
+                    <span class="text-faint" style="font-size:11px; min-width:52px;">최대</span>
+                    <input type="range" id="out-max-slider" min="0" max="100" value="100" step="5" style="flex:1;">
+                    <span id="out-max-value" class="mono" style="min-width:40px; text-align:right;">100</span>
+                </div>
+                <div class="flex items-center gap-3" style="margin-bottom:8px;">
+                    <span class="text-faint" style="font-size:11px; min-width:52px;">강도</span>
+                    <input type="range" id="intensity-slider" min="20" max="100" value="100" step="5" style="flex:1;">
+                    <span id="intensity-value" class="mono" style="min-width:40px; text-align:right;">100%</span>
+                </div>
+
+                <label class="flex items-center gap-2" style="font-size:12px; cursor:pointer;">
+                    <input type="checkbox" id="expand-toggle" checked style="accent-color:#7B2DFF;">
+                    <span>스크립트 진폭 자동 확장</span>
+                </label>
+
+                <p class="text-faint" style="font-size: 11px; margin-top: 8px;">
+                    <span id="fs-span-label">—</span><br>
+                    자동 확장은 스크립트가 쓰는 폭을 위 최소~최대로 펴준다.
+                    원본 진폭이 좁아 기기가 조금만 움직일 때 켠다. 회전축(R0/R2)은 그대로.
+                    <button type="button" id="stroke-reset" class="text-faint"
+                            style="background:none;border:none;padding:0;margin-top:4px;text-decoration:underline;cursor:pointer;font-size:11px;">기본값으로</button>
+                </p>
             </div>
             <div class="panel">
                 <div class="panel-title">FUNSCRIPT</div>
@@ -102,4 +126,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=7"></script>
+<script src="/js/pages/player.js?v=stroke1"></script>
