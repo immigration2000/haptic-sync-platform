@@ -7,18 +7,27 @@
             <h1 class="section-title">회원 목록 (최근 20명)</h1>
 
             <div class="card card-body">
+                <div class="flex items-center gap-2" style="margin-bottom: 12px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-sm" id="copy-tsv">📋 표 복사</button>
+                    <button type="button" class="btn btn-sm btn-ghost" id="copy-csv">CSV 복사</button>
+                    <button type="button" class="btn btn-sm btn-ghost" id="copy-emails">이메일만 복사</button>
+                    <span id="copy-msg" class="text-faint" style="font-size: 11px;"></span>
+                </div>
+
                 <div style="overflow-x: auto;">
-                    <table class="tx-table">
+                    <table class="tx-table" id="users-table">
                         <thead><tr><th>ID</th><th>이메일</th><th>닉네임</th><th>역할</th><th>크레딧</th><th>연령</th><th>가입일</th></tr></thead>
                         <tbody>
                             <% users.forEach(u => { %>
                                 <tr>
                                     <td class="mono"><%= u.id %></td>
-                                    <td><%= u.email %></td>
+                                    <td data-col="email"><%= u.email %></td>
                                     <td><strong><%= u.nickname %></strong></td>
                                     <td><span class="badge"><%= u.role.toUpperCase() %></span></td>
-                                    <td class="mono"><%= (u.credits || 0).toLocaleString() %></td>
-                                    <td><%= u.age_verified ? '<span style="color: var(--c-green);">✓</span>' : '<span style="color: var(--c-pink);">✗</span>' %></td>
+                                    <td class="mono" data-copy="<%= u.credits || 0 %>"><%= (u.credits || 0).toLocaleString() %></td>
+                                    <td data-copy="<%= u.age_verified ? 'Y' : 'N' %>">
+                                        <%- u.age_verified ? '<span style="color: var(--c-green);">✓</span>' : '<span style="color: var(--c-pink);">✗</span>' %>
+                                    </td>
                                     <td class="mono text-faint" style="font-size: 11px;"><%= u.created_at %></td>
                                 </tr>
                             <% }) %>
@@ -29,3 +38,85 @@
         </div>
     </div>
 </section>
+
+<script>
+(function () {
+    var table = document.getElementById('users-table');
+    var msgEl = document.getElementById('copy-msg');
+    if (!table) return;
+
+    // 셀 값 — data-copy가 있으면 그걸 쓴다(크레딧 원본 숫자, 연령 Y/N 등 표시용 서식 제거)
+    function cellText(td) {
+        var v = td.getAttribute('data-copy');
+        return (v !== null ? v : td.textContent).trim().replace(/\s+/g, ' ');
+    }
+    function headers() {
+        return Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+            return th.textContent.trim();
+        });
+    }
+    function rows() {
+        return Array.prototype.map.call(table.querySelectorAll('tbody tr'), function (tr) {
+            return Array.prototype.map.call(tr.querySelectorAll('td'), cellText);
+        });
+    }
+    function csvCell(s) {
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }
+
+    function build(kind) {
+        if (kind === 'emails') {
+            return Array.prototype.map.call(table.querySelectorAll('tbody td[data-col="email"]'), function (td) {
+                return cellText(td);
+            }).join('\n');
+        }
+        var all = [headers()].concat(rows());
+        if (kind === 'csv') {
+            return all.map(function (r) { return r.map(csvCell).join(','); }).join('\n');
+        }
+        return all.map(function (r) { return r.join('\t'); }).join('\n');   // TSV — 엑셀에 그대로 붙는다
+    }
+
+    function say(text, bad) {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.color = bad ? 'var(--c-pink)' : 'var(--c-green)';
+        setTimeout(function () { msgEl.textContent = ''; }, 2500);
+    }
+
+    function copy(text, n) {
+        // clipboard API는 보안 컨텍스트(https/localhost)에서만 동작 → 실패 시 구식 방법으로 폴백
+        function fallback() {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            var okFb = false;
+            try { okFb = document.execCommand('copy'); } catch (e) { okFb = false; }
+            document.body.removeChild(ta);
+            okFb ? say('복사됨 · ' + n + '행') : say('복사 실패 — 표를 직접 선택해 주세요', true);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () { say('복사됨 · ' + n + '행'); }, fallback);
+        } else {
+            fallback();
+        }
+    }
+
+    function bind(id, kind) {
+        var b = document.getElementById(id);
+        if (!b) return;
+        b.addEventListener('click', function () {
+            var text = build(kind);
+            if (!text) { say('복사할 내용이 없습니다', true); return; }
+            copy(text, text.split('\n').length);
+        });
+    }
+    bind('copy-tsv', 'tsv');
+    bind('copy-csv', 'csv');
+    bind('copy-emails', 'emails');
+})();
+</script>
