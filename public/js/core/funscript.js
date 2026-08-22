@@ -182,6 +182,10 @@
     window.PulseFunscript = {
         loadMultiAxis,
         MultiAxisEngine,
+        // UI 미리보기가 엔진과 **같은 계산**을 쓰도록 노출한다.
+        // 따로 구현하면 공식이 바뀔 때 미리보기만 조용히 어긋난다.
+        shapeStroke,
+        MIN_EXPAND_SPAN,
         splitFunscriptPath,
         AXIS_DEFS,
     };

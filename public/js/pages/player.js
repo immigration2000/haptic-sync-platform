@@ -15,6 +15,12 @@
     const expandToggle    = document.getElementById('expand-toggle');
     const fsSpanLabel     = document.getElementById('fs-span-label');
     const strokeReset     = document.getElementById('stroke-reset');
+    const vizLimit        = document.getElementById('viz-limit');
+    const vizActual       = document.getElementById('viz-actual');
+    const vizMarker       = document.getElementById('viz-marker');
+    const vizSrc          = document.getElementById('viz-src');
+    const vizSrcLbl       = document.getElementById('viz-src-lbl');
+    const vizText         = document.getElementById('viz-text');
 
     // 관리자 기본값(서버 설정) + 사용자 개별 조정(localStorage)
     const VR_ADMIN = Object.assign({ hFovDeg: 100, fisheyeFovDeg: 100, pitchDeg: 30, yawDeg: 0, eye: 'left' }, CFG.vrDefaults || {});
@@ -178,6 +184,55 @@
         outMinValue.textContent   = stroke.outMin;
         outMaxValue.textContent   = stroke.outMax;
         intensityValue.textContent = Math.round(stroke.gain * 100) + '%';
+        renderViz();
+    }
+
+    // 실제 움직임 범위 미리보기.
+    // ⚠ 여기서 공식을 다시 구현하지 않는다. 엔진이 쓰는 shapeStroke를 그대로 호출해야
+    //    공식이 바뀌어도 미리보기가 어긋나지 않는다.
+    let strokeAxis = null;              // 로드된 L0 축 (진폭 lo/hi/span 보유)
+    const pct = (v) => Math.max(0, Math.min(100, v)) + '%';
+
+    function renderViz() {
+        if (!vizLimit || !window.PulseFunscript) return;
+        const FSx = window.PulseFunscript;
+
+        // 허용 구간
+        vizLimit.style.left  = pct(stroke.outMin);
+        vizLimit.style.width = pct(stroke.outMax - stroke.outMin);
+
+        if (!strokeAxis) {                       // 스크립트 로드 전
+            vizActual.style.left = vizActual.style.width = '0%';
+            if (vizText) vizText.textContent = '스크립트를 불러오면 실제 범위가 표시됩니다.';
+            return;
+        }
+
+        // 원본의 최저·최고를 통과시키면 그게 곧 도달 가능한 양 끝이다.
+        // (확장 ON/OFF, 안전 임계 미달까지 shapeStroke가 알아서 반영)
+        const a = FSx.shapeStroke(strokeAxis.lo, strokeAxis, stroke, stroke.gain);
+        const b = FSx.shapeStroke(strokeAxis.hi, strokeAxis, stroke, stroke.gain);
+        const lo = Math.max(0, Math.min(99, Math.min(a, b)));
+        const hi = Math.max(0, Math.min(99, Math.max(a, b)));
+
+        vizActual.style.left  = pct(lo);
+        vizActual.style.width = pct(hi - lo);
+
+        // 원본 진폭 (비교용)
+        if (vizSrc) {
+            vizSrc.style.left  = pct(strokeAxis.lo);
+            vizSrc.style.width = pct(strokeAxis.span);
+        }
+        if (vizSrcLbl) {
+            vizSrcLbl.textContent = `원본 ${strokeAxis.lo}~${strokeAxis.hi}`;
+            vizSrcLbl.style.left  = pct(Math.min(strokeAxis.lo, 70));
+        }
+
+        const ratio = strokeAxis.span > 0 ? (hi - lo) / strokeAxis.span : 0;
+        const blocked = stroke.expand && strokeAxis.span < FSx.MIN_EXPAND_SPAN;
+        if (vizText) {
+            vizText.textContent = `실제 ${lo}~${hi} (폭 ${hi - lo}) · 원본 대비 ${ratio.toFixed(2)}배`
+                + (blocked ? ' · ⚠ 원본 진폭이 좁아 확장 안 함' : '');
+        }
     }
 
     const strokeUIReady = !!(outMinSlider && outMaxSlider && intensitySlider && expandToggle);
@@ -225,20 +280,32 @@
             fsSpanLabel.textContent = 'L0 스트로크 축 없음';
         }
 
+        strokeAxis = L0 || null;
+        renderViz();
+
         engine = new FS.MultiAxisEngine({
             video,
             axes,
             intensityGetter: () => intensity,
             shapeGetter: () => stroke,
             sendOnce: true,
-            onCommand: (cmd) => Dev.send(cmd),
+            onCommand: (cmd, triggered) => {
+                Dev.send(cmd);
+                // 재생 중 현재 위치 표시 — L0만
+                if (!vizMarker) return;
+                for (const t of triggered) {
+                    if (t.axis !== 'L0') continue;
+                    vizMarker.style.left = pct(t.pos);
+                    vizMarker.style.opacity = '1';
+                }
+            },
         });
         engine.start();
     });
 
     video.addEventListener('seeking', () => { engine && engine.resync(); });
-    video.addEventListener('pause',   () => Dev.send('L050I300'));
-    video.addEventListener('ended',   () => Dev.send('L050I500'));
+    video.addEventListener('pause',   () => { Dev.send('L050I300'); if (vizMarker) vizMarker.style.opacity = '0.3'; });
+    video.addEventListener('ended',   () => { Dev.send('L050I500'); if (vizMarker) vizMarker.style.opacity = '0'; });
 
     // 시청 위치 트래킹 (5초마다, 그리고 종료/이탈 시)
     let saveTimer = setInterval(saveProgress, 5000);
