@@ -40,6 +40,16 @@
                         <input class="form-input" type="file" name="script" id="v-script" accept=".funscript,.json">
                     </div>
                     <div class="form-row">
+                        <label class="form-label">썸네일</label>
+                        <input class="form-input" type="file" name="thumb" id="v-thumb" accept=".jpg,.jpeg,.png">
+                        <p class="text-faint" style="font-size:11px;margin:6px 0 0;">
+                            영상을 고르면 <strong>자동으로 한 장 뽑아 채웁니다.</strong>
+                            마음에 안 들면 직접 골라 바꾸세요.
+                        </p>
+                        <div id="thumb-preview" style="margin-top:8px;"></div>
+                    </div>
+
+                    <div class="form-row">
                         <label class="form-label">개별구매(PPV) 가격 (Ruby) — 0이면 구독 전용</label>
                         <input class="form-input" type="number" name="price" value="0" min="0" max="100000" step="100">
                         <p class="text-faint mt-2" style="font-size:11px;">구독자는 무료 시청. 비구독자는 이 가격으로 개별 구매(영구 시청).</p>
@@ -59,7 +69,17 @@
                         <tbody>
                             <% videos.forEach(v => { %>
                                 <tr>
-                                    <td><a href="/bj/vid/<%= v.id %>" target="_blank"><%= v.title %></a></td>
+                                    <td>
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <% if (v.thumb_key) { %>
+                                                <img src="<%= v.thumb_key %>" alt="" onerror="this.style.display='none'"
+                                                     style="width:64px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;flex:none;">
+                                            <% } else { %>
+                                                <span style="width:64px;aspect-ratio:16/9;background:var(--bg-3);border-radius:4px;flex:none;"></span>
+                                            <% } %>
+                                            <a href="/bj/vid/<%= v.id %>" target="_blank"><%= v.title %></a>
+                                        </div>
+                                    </td>
                                     <td><%= v.script_path ? '✓ 연동' : '—' %></td>
                                     <td>
                                         <form method="POST" action="/bj-studio/videos/<%= v.id %>/price" style="margin:0;display:flex;gap:4px;align-items:center;">
@@ -176,7 +196,7 @@
 
         if (vid) {
             if (!setFile(video, vid)) { warn = true; msgs.push('영상 자동 담기 실패 — 아래에서 직접 선택'); }
-            else msgs.push('영상: ' + vid.name);
+            else { msgs.push('영상: ' + vid.name); makeThumb(vid); }   // .files 대입은 change를 안 띄운다
             if (!title.value.trim()) title.value = titleFrom(vid.name);
         } else {
             warn = true; msgs.push('영상 파일이 없습니다');
@@ -206,6 +226,78 @@
     video.addEventListener('change', function () {
         var f = video.files && video.files[0];
         if (f && !title.value.trim()) title.value = titleFrom(f.name);
+        makeThumb(f);
     });
+
+    /* 썸네일 자동 생성 — 브라우저에서 영상 한 프레임을 캔버스로 떠서 JPEG로 만든다.
+     * 서버(폰)에는 ffmpeg이 없고, 있어도 트랜스코딩은 CPU·발열 때문에 부담이다.
+     * 사용자가 직접 고른 썸네일이 있으면 덮어쓰지 않는다. */
+    var thumbInput = document.getElementById('v-thumb');
+    var thumbPrev  = document.getElementById('thumb-preview');
+    var autoThumb  = false;      // 자동 생성분인지 (사용자가 고른 건 건드리지 않는다)
+
+    if (thumbInput) {
+        thumbInput.addEventListener('change', function () {
+            if (thumbInput.files && thumbInput.files.length) {
+                autoThumb = false;
+                showPrev(URL.createObjectURL(thumbInput.files[0]), '직접 선택함');
+            }
+        });
+    }
+    function showPrev(url, note) {
+        if (!thumbPrev) return;
+        thumbPrev.innerHTML = '<img src="' + url + '" style="width:160px;aspect-ratio:16/9;object-fit:cover;'
+            + 'border-radius:var(--rad-sm);border:1px solid var(--border-soft);">'
+            + '<div class="text-faint" style="font-size:11px;margin-top:4px;">' + note + '</div>';
+    }
+    function note(msg) { if (thumbPrev) thumbPrev.innerHTML = '<div class="text-faint" style="font-size:11px;">' + msg + '</div>'; }
+
+    function makeThumb(file) {
+        if (!file || !thumbInput) return;
+        if (thumbInput.files && thumbInput.files.length && !autoThumb) return;   // 사용자가 고른 것 보존
+        if (!window.URL || !document.createElement('canvas').getContext) return;
+
+        note('썸네일 만드는 중…');
+        var url = URL.createObjectURL(file);
+        var vid = document.createElement('video');
+        vid.preload = 'metadata'; vid.muted = true; vid.playsInline = true;
+
+        var done = false;
+        function fail(msg) {
+            if (done) return; done = true;
+            URL.revokeObjectURL(url);
+            note(msg || '썸네일 자동 생성 실패 — 직접 골라주세요 (없어도 업로드는 됩니다)');
+        }
+        setTimeout(function () { fail(); }, 15000);   // 코덱 미지원 등으로 영영 안 끝나는 경우
+
+        vid.onerror = function () { fail('이 브라우저가 영상 형식을 못 읽습니다 — 썸네일을 직접 골라주세요'); };
+        vid.onloadedmetadata = function () {
+            // 앞부분은 검은 화면인 경우가 많다 → 10% 지점(최대 30초)
+            var t = Math.min(30, Math.max(1, (vid.duration || 10) * 0.1));
+            vid.currentTime = isFinite(t) ? t : 1;
+        };
+        vid.onseeked = function () {
+            if (done) return;
+            try {
+                var w = 480, h = Math.round(w * (vid.videoHeight / vid.videoWidth)) || 270;
+                var c = document.createElement('canvas'); c.width = w; c.height = h;
+                c.getContext('2d').drawImage(vid, 0, 0, w, h);
+                c.toBlob(function (blob) {
+                    if (done) return;
+                    if (!blob) return fail();
+                    var f = new File([blob], 'thumb.jpg', { type: 'image/jpeg' });
+                    try {
+                        var dt = new DataTransfer(); dt.items.add(f);
+                        thumbInput.files = dt.files;
+                        autoThumb = true;
+                        done = true;
+                        URL.revokeObjectURL(url);
+                        showPrev(c.toDataURL('image/jpeg', 0.8), '자동 생성됨 (' + w + '×' + h + ')');
+                    } catch (e) { fail(); }
+                }, 'image/jpeg', 0.8);
+            } catch (e) { fail(); }
+        };
+        vid.src = url;
+    }
 })();
 </script>

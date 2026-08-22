@@ -40,16 +40,23 @@ const upload = multer({
     // 가드(disk_guard)가 Content-Length로 먼저 거르지만, 스트리밍 중 초과를 막는 이중 방어.
     // 설정(upload_max_file_mb)보다 여유를 둬서 가드 쪽 문구가 먼저 뜨게 한다.
     limits: { fileSize: () => (diskGuard.limits().maxFileMB + 64) * 1024 * 1024 },
+    // 필드마다 허용 확장자가 다르다. 하나로 묶으면 영상 칸에 스크립트를 넣는 것도 통과한다.
     fileFilter: (req, file, cb) => {
-        const ok = /\.(mp4|webm|mov|m4v|funscript|json)$/i.test(file.originalname);
-        cb(ok ? null : new Error('지원하지 않는 파일'), ok);
+        const RULES = {
+            video:  /\.(mp4|webm|mov|m4v)$/i,
+            script: /\.(funscript|json)$/i,
+            thumb:  /\.(jpg|jpeg|png)$/i,
+        };
+        const re = RULES[file.fieldname];
+        const ok = !!re && re.test(file.originalname);
+        cb(ok ? null : new Error(`지원하지 않는 파일: ${file.originalname}`), ok);
     },
 });
 
 /** 이번 요청으로 올라간 파일을 지운다 (검증 실패·거부 시) */
 function dropUploads(req) {
     if (!req.files || !req.user) return;
-    for (const field of ['video', 'script']) {
+    for (const field of ['video', 'script', 'thumb']) {
         const f = req.files[field] && req.files[field][0];
         if (f) fileStore.remove(`bj/${req.user.id}/${f.filename}`);
     }
@@ -184,7 +191,11 @@ router.post('/videos/:id/tags', (req, res) => {
 router.post('/videos/upload',
     diskGuard.guardUpload,  // 디스크가 써지기 전에 용량·할당량으로 먼저 거른다
     (req, res, next) => {
-        upload.fields([{ name: 'video', maxCount: 1 }, { name: 'script', maxCount: 1 }])(req, res, (err) => {
+        upload.fields([
+            { name: 'video',  maxCount: 1 },
+            { name: 'script', maxCount: 1 },
+            { name: 'thumb',  maxCount: 1 },   // 브라우저가 영상에서 뽑아 보낸 썸네일
+        ])(req, res, (err) => {
             if (err) {
                 req.session.flash = err.code === 'LIMIT_FILE_SIZE'
                     ? `파일이 너무 큽니다. 상한은 ${diskGuard.limits().maxFileMB}MB입니다.`
@@ -208,6 +219,7 @@ router.post('/videos/upload',
         const title = (req.body.title || '').trim().slice(0, 80);
         const vf = req.files && req.files.video && req.files.video[0];
         const sf = req.files && req.files.script && req.files.script[0];
+        const tf = req.files && req.files.thumb && req.files.thumb[0];
         if (!title || !vf) {
             dropUploads(req);   // 검증 실패 — 올라간 파일을 남기지 않는다
             req.session.flash = '제목과 영상 파일은 필수입니다.';
@@ -217,7 +229,7 @@ router.post('/videos/upload',
         let price = parseInt(req.body.price || '0', 10);
         if (isNaN(price) || price < 0) price = 0;
         if (price > 100000) price = 100000;
-        stmts.insertBJVideo.run(req.user.id, title, rel(vf), sf ? rel(sf) : null, price);
+        stmts.insertBJVideo.run(req.user.id, title, rel(vf), sf ? rel(sf) : null, price, tf ? rel(tf) : null);
         req.session.flashOk = '영상 업로드 완료.';
         res.redirect('/bj-studio/videos');
     });
@@ -233,7 +245,7 @@ router.post('/videos/:id/delete', (req, res) => {
     }
     if (v) {
         // 파일 삭제 (best-effort)
-        for (const p of [v.video_path, v.script_path]) {
+        for (const p of [v.video_path, v.script_path, v.thumb_key]) {
             if (!p) continue;
             const abs = path.join(__dirname, '..', '..', 'public', p.replace(/^\//, ''));
             try { fs.unlinkSync(abs); } catch (_) {}

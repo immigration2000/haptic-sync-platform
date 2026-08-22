@@ -189,7 +189,8 @@ const stmts = {
 
     // BJ 개인 영상
     listBJVideos:      db.prepare('SELECT * FROM bj_videos WHERE bj_user_id = ? ORDER BY created_at DESC'),
-    insertBJVideo:     db.prepare('INSERT INTO bj_videos (bj_user_id, title, video_path, script_path, price) VALUES (?, ?, ?, ?, ?)'),
+    insertBJVideo:     db.prepare('INSERT INTO bj_videos (bj_user_id, title, video_path, script_path, price, thumb_key) VALUES (?, ?, ?, ?, ?, ?)'),
+    updateBJVideoThumb:db.prepare('UPDATE bj_videos SET thumb_key = ? WHERE id = ? AND bj_user_id = ?'),
     findBJVideo:       db.prepare('SELECT * FROM bj_videos WHERE id = ? AND bj_user_id = ?'),
     findBJVideoById:   db.prepare('SELECT * FROM bj_videos WHERE id = ?'),
     deleteBJVideo:     db.prepare('DELETE FROM bj_videos WHERE id = ? AND bj_user_id = ?'),
