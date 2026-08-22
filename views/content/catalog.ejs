@@ -94,7 +94,7 @@
                         <% if (it.streamer) { %>
                             <div class="text-faint" style="font-size:11px;margin-top:2px;"><%= it.streamer.name %></div>
                         <% } %>
-                        <div class="content-tags" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+                        <div class="content-tags" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
                             <% if (it.locked) { %>
                                 <span class="btn btn-sm btn-primary" style="pointer-events:none;">
                                     <%= it.access === 'sub' ? '구독하고 보기' : (it.price ? it.price.toLocaleString() + ' Ruby' : '구매하고 보기') %>

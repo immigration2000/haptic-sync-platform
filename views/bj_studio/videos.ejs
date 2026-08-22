@@ -14,6 +14,24 @@
 
             <div class="card card-body mb-5">
                 <div class="panel-title">영상 업로드</div>
+                <%
+                   // 가격 0 = 구독 전용인데 구독가가 없으면 그 영상은 아무도 볼 수 없다.
+                   var subOnly = videos.filter(function (v) { return !v.price; }).length;
+                   var noSub   = !profile || !profile.sub_price;
+                %>
+                <% if (subOnly && noSub) { %>
+                    <div class="card card-body" style="border-color:var(--c-yellow);margin-bottom:16px;">
+                        <strong style="color:var(--c-yellow);">⚠ 아무도 볼 수 없는 영상이 <%= subOnly %>편 있습니다</strong>
+                        <p class="text-faint" style="font-size:12px;margin:6px 0 0;">
+                            가격이 <strong>0</strong>인 영상은 <strong>구독 전용</strong>인데,
+                            지금 구독가가 설정돼 있지 않아 시청자가 구독할 방법이 없습니다.
+                            아래 중 하나를 하세요 —
+                            <a href="/bj-studio/profile" style="color:var(--c-pink);">스튜디오 프로필에서 구독가 설정</a>
+                            또는 각 영상에 개별구매 가격 지정.
+                        </p>
+                    </div>
+                <% } %>
+
                 <form method="POST" action="/bj-studio/videos/upload" enctype="multipart/form-data">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 

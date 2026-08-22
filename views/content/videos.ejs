@@ -30,7 +30,7 @@
                         <div class="content-meta">
                             <a href="/bj/<%= v.bj_user_id %>/library" style="color:var(--c-pink); text-decoration:none;"><%= v.stage_name %></a>
                         </div>
-                        <div class="content-tags" style="margin-top:8px;">
+                        <div class="content-tags">
                             <% if (!v.locked) { %>
                                 <a href="/bj/vid/<%= v.id %>" class="btn btn-sm btn-primary">▶ 시청</a>
                                 <% if (v.accessReason === 'OWNER') { %><span class="tag">내 영상</span>

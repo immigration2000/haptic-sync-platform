@@ -326,7 +326,7 @@
 .grid-list .content-card .content-info { padding: 10px 12px; }
 .grid-list .content-card .content-title { font-size: 13px; line-height: 1.3; margin-bottom: 4px; }
 .grid-list .content-card .content-meta { font-size: 10px; }
-.grid-list .content-card .content-tags { margin-top: 6px; }
+.grid-list .content-card .content-tags { margin-top: auto; padding-top: 6px; }   /* 액션 줄을 카드 하단에 고정 — 제목 줄 수가 달라도 버튼 높이가 같게 */
 .grid-list .content-card .duration { font-size: 10px; padding: 1px 5px; }
 
 @media (max-width: 900px) {

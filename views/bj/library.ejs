@@ -60,20 +60,42 @@
                     </div>
                     <div class="content-info">
                         <div class="content-title"><%= v.title %></div>
-                        <div class="content-tags" style="margin-top:8px;">
+                        <div class="content-tags">
                             <% if (!v.locked) { %>
                                 <a href="/bj/vid/<%= v.id %>" class="btn btn-sm btn-primary">▶ 시청</a>
                                 <% if (v.accessReason === 'OWNER') { %><span class="tag">내 영상</span>
                                 <% } else if (v.accessReason === 'SUBSCRIBED') { %><span class="badge badge-multi">구독</span>
                                 <% } else if (v.accessReason === 'PURCHASED') { %><span class="badge badge-multi">구매함</span><% } %>
                             <% } else if (v.price > 0) { %>
-                                <form method="POST" action="/bj/vid/<%= v.id %>/purchase" style="margin:0;display:inline;">
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                                    <form method="POST" action="/bj/vid/<%= v.id %>/purchase" style="margin:0;">
+                                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                        <button class="btn btn-sm btn-secondary">구매 · <%= v.price.toLocaleString() %> Ruby</button>
+                                    </form>
+                                    <% if (!isOwner && !sub && bj.sub_price > 0) { %>
+                                        <form method="POST" action="/bj/<%= bj.id %>/subscribe" style="margin:0;">
+                                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                            <button class="btn btn-sm btn-primary">구독하고 보기</button>
+                                        </form>
+                                    <% } %>
+                                </div>
+                                <% if (bj.sub_price > 0) { %>
+                                    <span class="text-faint" style="font-size:11px;display:block;margin-top:4px;">또는 구독 시 무료</span>
+                                <% } %>
+                            <% } else if (!isOwner && !sub && bj.sub_price > 0) { %>
+                                <form method="POST" action="/bj/<%= bj.id %>/subscribe" style="margin:0;">
                                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                                    <button class="btn btn-sm btn-secondary">구매 · <%= v.price.toLocaleString() %> Ruby</button>
+                                    <button class="btn btn-sm btn-primary">
+                                        구독하고 보기 · <%= bj.sub_price.toLocaleString() %> Ruby
+                                    </button>
                                 </form>
-                                <span class="text-faint" style="font-size:11px;display:block;margin-top:4px;">또는 구독 시 무료</span>
                             <% } else { %>
                                 <span class="tag">🔒 구독 전용</span>
+                                <% if (!isOwner && bj.sub_price <= 0) { %>
+                                    <span class="text-faint" style="font-size:11px;display:block;margin-top:4px;">
+                                        이 스트리머가 구독을 제공하지 않아 지금은 볼 수 없습니다.
+                                    </span>
+                                <% } %>
                             <% } %>
                         </div>
                     </div>
