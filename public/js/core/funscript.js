@@ -58,6 +58,11 @@
         return axes;
     }
 
+    // 타이머 루프 주기(ms). 화면이 가려져 rAF가 멈춘 동안의 예비 경로다.
+    // ⚠ 브라우저는 숨겨진 탭의 타이머를 1초 이상으로 늦춘다(오디오 재생 중이면 완화).
+    //   즉 백그라운드에서는 정밀도가 떨어진다 — 완전히 멈추는 것보다 낫다는 수준이다.
+    const TIMER_MS = 40;
+
     // 진폭이 이보다 좁으면 '펴기'를 하지 않는다.
     // 거의 정지된 스크립트를 억지로 늘리면 미세한 흔들림이 풀스트로크로 증폭돼 위험하다.
     const MIN_EXPAND_SPAN = 10;
@@ -110,15 +115,29 @@
         start() {
             if (this._running) return;
             this._running = true;
+
+            // rAF는 화면이 보일 때만 부드럽지만, **페이지가 렌더링되지 않으면 아예 멈춘다**
+            // (다른 탭·최소화·화면 꺼짐 등). 그동안 영상은 계속 재생되므로
+            // 엔진만 멈춰 기기가 죽은 것처럼 보인다. 그래서 타이머 루프를 함께 돌린다.
+            // 두 경로가 같은 _tick()을 불러도 안전하다 — 인덱스가 이미 지나가면 아무것도 안 보낸다.
             const tick = () => {
                 if (!this._running) return;
                 this._tick();
                 requestAnimationFrame(tick);
             };
             requestAnimationFrame(tick);
+            this._timer = setInterval(() => { if (this._running) this._tick(); }, TIMER_MS);
+
+            // 화면으로 돌아오면 인덱스를 현재 재생시간에 맞춰 다시 잡는다 (밀린 것 몰아보내기 방지)
+            this._onVis = () => { if (!document.hidden) this.resync(); };
+            document.addEventListener('visibilitychange', this._onVis);
         }
 
-        stop() { this._running = false; }
+        stop() {
+            this._running = false;
+            if (this._timer) { clearInterval(this._timer); this._timer = null; }
+            if (this._onVis) { document.removeEventListener('visibilitychange', this._onVis); this._onVis = null; }
+        }
 
         resync() {
             const ms = this.video.currentTime * 1000;
@@ -147,6 +166,13 @@
 
             for (const k of Object.keys(this.axes)) {
                 const ax = this.axes[k];
+                // ⚠ 한 tick에서 같은 축의 키프레임이 여러 개 지나갈 수 있다.
+                //   (탭이 가려져 rAF가 멈췄다가 돌아온 경우 수십 개가 한꺼번에 밀린다)
+                //   예전에는 그걸 전부 triggered에 넣어 한 줄로 합쳐 보냈다 →
+                //   'L090I250 L010I250 …' 처럼 같은 축이 반복되는 수백 자 명령이 나가고,
+                //   릴레이 64자 제한에 잘리거나 원격 검증기(토큰 6개)에서 통째로 거부됐다.
+                //   위치 기반 프로토콜이라 **지나간 목표는 의미가 없다** → 축마다 마지막 것만 보낸다.
+                let latest = null, skipped = 0;
                 while (ax.index < ax.actions.length - 1 && ms > ax.actions[ax.index].at) {
                     const cur  = ax.actions[ax.index];
                     const next = ax.actions[ax.index + 1];
@@ -157,8 +183,15 @@
                         ? shapeStroke(next.pos, ax, shape, intensity)
                         : next.pos;
                     const pos = Math.max(0, Math.min(99, scaled));
-                    triggered.push({ axis: k, pos, interp, atMs: next.at });
+                    if (latest) skipped++;
+                    latest = { axis: k, pos, interp, atMs: next.at, skipped: 0 };
                     ax.index++;
+                }
+                if (latest) {
+                    // 많이 밀렸으면 원래 보간시간(수십 ms)으로 튀지 않게 최소 이동시간을 준다
+                    if (skipped > 0) latest.interp = Math.max(latest.interp, 120);
+                    latest.skipped = skipped;
+                    triggered.push(latest);
                 }
             }
 
