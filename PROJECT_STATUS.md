@@ -62,7 +62,10 @@
 - **업로드** — multer (순수 JS, 폰에서 동작)
 
 ### 디바이스 / 스크립트
-- **TCode V3 프로토콜** — `L0`(stroke) · `R0`(roll) · `R2`(pitch), 포맷 `L0xxIyyy`
+- **TCode V3 프로토콜** — `L0`(stroke) · `R0`(roll) · `R1`(twist) · `R2`(pitch) · `L1`(surge) · `L2`(sway)
+  - 와이어 포맷은 `L050I100` → **`L0500I0100`**. 위치는 "0.xx" 소수라 **우측패딩 3자리**(`50`→`500`=50%),
+    보간 `I`는 ms 정수라 **좌측패딩 4자리 + 1~9999 클램프**. 구현 `public/js/core/device_drivers.js` → `normTok()`
+  - ⚠ `padStart`를 쓰면 `50`→`050`이 돼 **50%가 5%로 나간다.** 시리얼 **baud 115200**(2026-07-28 실기기 검증)
 - 지원 기기: OSR2 / SR6 / TempestMAX (TempestMAX/XTPlayer 계열)
 - **funscript** — `{actions:[{at, pos}]}`
 - **연결** — Web Serial API (USB) + Web Bluetooth API (Nordic UART Service)
@@ -326,6 +329,70 @@ setsid env PORT=5501 BEHIND_PROXY=1 node server/app.js > data/logs/run.log 2>&1 
 - **스트리머 채널**(`/content/streamers`) — 라이브러리 보유 스트리머 채널 카드. content/streamers.ejs.
 - 헤더 '영상' → /content/vod(첫 탭), `path.startsWith('/content')`로 활성. 검증: 4탭 200·탭바·접근상태 렌더, 스모크 46/46, 외부 확인.
 
+## 6-11. 콘텐츠 온보딩 파이프라인 + 용량 가드 (2026-08-26, 폰 배포 완료)
+
+콘텐츠를 가진 외부 작업자에게 **관리자 계정을 주지 않고** 업로드만 맡기기 위해 만들었다.
+
+- **계정 발급** — `server/services/account_provision.js` 하나를 CLI(`scripts/make_streamer.js`)와
+  관리자 UI(`/admin/streamers`)가 **공유**한다. 양쪽에 따로 구현하면 정책이 조용히 갈라진다.
+  `role='bj'` 고정 — admin을 주면 `requireRole`이 모든 역할 검사를 통과시켜
+  회원목록·거래내역·점검모드까지 열린다. 기존 admin 계정은 강등 거부.
+  비밀번호는 발급 화면에만 1회 표시 + 복사 버튼.
+- **업로드 편의** — 다중 선택, 영상과 **같은 이름의 스크립트 자동 매칭**, 제목 자동채움,
+  브라우저 canvas 썸네일 추출(폰에 ffmpeg이 없다).
+- **용량 가드** — `server/disk_guard.js`. multer는 받으면서 디스크에 쓰므로
+  **다 받은 뒤 거부하면 이미 늦다** → `Content-Length`로 사전 차단하는 미들웨어를 multer 앞에 세운다.
+  설정 `upload_max_file_mb`(800) / `upload_quota_user_gb`(10) / `upload_min_free_gb`(5).
+  폰이 차면 업로드만 실패하는 게 아니라 **SQLite 쓰기가 깨져 세션·결제·시청기록이 무너지고**
+  같은 폰의 다른 프로젝트(릴레이·터널)까지 영향을 받는다.
+- **카탈로그 승격** — `/admin/contents/promote`로 업로드분을 공개 카탈로그로 올린다.
+- **구독 진입로** — 영상 상세에 구독하기 버튼 추가. 관리자가 구독가·기간을 직접 정한다.
+  ⚠ 가격 0으로 올린 영상은 **구독가가 없으면 소유자 외에 아무도 볼 수 없다** — 목록에 경고 표시.
+
+검증: 계정발급→업로드→승격→시청 e2e 14항목. 스모크 통과.
+⚠ 남은 것: **기존 업로드분은 `thumb_key`가 없어 썸네일이 비어 있다.**
+
+## 6-12. 스트리머 프로필 재편 — 라이브 미제공 허용 (2026-08-26, 폰 배포 완료)
+
+**SSOT 변경** — `server/service_types.js`의 `normalizeList`가 **빈 배열을 허용**한다.
+전에는 서비스 최소 1개를 강제해서, 업로드만 하는 계정도 통화 목록에 뜨고 분당요금 검사에 걸렸다.
+소비쪽 6곳을 함께 고쳤다. **이 규칙을 되돌리면 업로드 전용 계정이 전부 깨진다.**
+
+UI: 업로드 전용 마스터 스위치를 맨 위에 두고, 서비스별 옵션은 토글 + 펼침 설정으로 정리.
+
+## 6-13. 스트로크 제어 시스템 + mosa식 전송 (2026-08-26, 폰 배포 완료)
+
+스크립트 진폭이 좋은 기기에 비해 짧은 문제 → 사용자가 **이동 한계와 증폭률**을 직접 정한다.
+
+**공식 (`public/js/core/funscript.js` → `shapeStroke`)** — 단일 진실원.
+
+```
+out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
+      center    = (outMin + outMax) / 2          ← 최소·최대가 중심을 정한다
+      srcCenter = 스크립트 자체 중앙                ← 고정값 50이 아니다
+      gain      = -0.8 ~ +0.8 (기본 0 = ×1)
+```
+
+- ⚠ **시간(`interp`)은 절대 건드리지 않는다.** T-Code는 위치 기반이라 증폭 = 좌표 변환이다.
+  이동시간을 늘리는 순간 기능의 정의가 훼손된다. 빨라지는 건 증폭의 **결과지 부작용이 아니다.**
+- `srcCenter`를 고정값 `50`으로 두면 치우친 스크립트(30~50)에서 증폭이 **한쪽으로만** 늘어난다.
+- 관리자가 강도 범위를 정한다 — 설정 `stroke_gain_min` / `stroke_gain_max`,
+  `layout.ejs`가 `window.PULSE_TUNING`으로 내려준다.
+- 미리보기 UI는 공식을 **재구현하지 않고** `FSx.shapeStroke`를 그대로 부른다(두 번 구현하면 갈라진다).
+- UI는 커스텀 세로 이중손잡이 슬라이더(`.v-range` / `.v-thumb`, `pages.css`).
+  손잡이가 `margin -9px`로 트랙 끝에서 삐져나오므로 위아래 글자와 **14px** 이상 띄워야 겹치지 않는다.
+
+**전송 계층 (`public/js/core/device.js`)** — 참고 구현 `tnxa/mosa` 방식으로 바꿨다.
+
+- `writer.write()`에 **`await`을 걸지 않는다.** 쓰기 한 번이 지연되면 Web Streams 백압으로
+  큐 전체가 멈추고, 그걸 연결 실패로 오판해 끊어버렸던 것이 리모컨 문제의 유력 원인이다.
+- 타임아웃/fail-closed를 쓰기 경로에서 제거. `bounded()`는 **종료 경로에서만** 쓴다.
+- 축별 **최신 키프레임만** 보낸다 — 화면이 가려졌다 돌아오면 rAF가 재개되면서
+  밀렸던 토큰이 한꺼번에 터져 나가던 문제(40개 폭주)를 막는다.
+- rAF는 페이지가 그려지지 않으면 멈춘다 → `setInterval(40ms)` 병행 + `visibilitychange`에 `resync()`.
+
+⚠ **전송 계층 변경은 실기기 검증 전이다.** 끊김이 실제로 사라졌는지 확인되지 않았다.
+
 ## 7. 주요 트러블슈팅 기록
 
 | 문제 | 해결 |
@@ -357,6 +424,9 @@ setsid env PORT=5501 BEHIND_PROXY=1 node server/app.js > data/logs/run.log 2>&1 
       config `provider` 플래그만 바꾸면 붙는 구조. **별도 모듈로 구현 후 연결** 방침
 - [ ] (확장) AWS 이전 — S3/CloudFront. `storage.js` 추상화 완료로 DB 수정 없이 전환 가능(§9-10).
       영상은 **서명 URL** 필요(구독전용 보호), 업로드는 presigned 직업로드 권장
+- [ ] **스트로크/전송 실기기 검증** — mosa식 전송(§6-13)으로 끊김이 사라지는지. **최우선**
+- [ ] 축 매핑 `R0`/`R1` 확정 — 코드는 `.roll`→R0 / `.twist`→R1, AI_NOTES `TCODE_GUIDE.md`는 반대로 적혀 있다. 실기기 필요
+- [ ] 기존 업로드분 `thumb_key` 백필 — 썸네일이 빈 상태(§6-11)
 - [ ] (옛 데모) 수익 시뮬레이터·합법성·로드맵·CTA / 데모 폰 재배포 — task #11·#12
 
 > 3축(영상·라이브·피드) 구조 개편 완료. 핵심 워크플로우 전부 동작하며 실서비스 가능 수준.
