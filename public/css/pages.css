@@ -636,10 +636,10 @@
 
 /* 중심 슬라이더 — 박스 안 글자 배치: 위 "중심" / 슬라이더 / 아래 범위 수치.
    수치 칸은 3ch 고정 폭이라 0→100 으로 자릿수가 변해도 묶음 폭이 흔들리지 않는다. */
-.v-cap { font-size: 10px; color: var(--tx-3); margin-bottom: 4px; line-height: 1.2;
+.v-cap { font-size: 10px; color: var(--tx-3); margin-bottom: 14px; line-height: 1.2;
          white-space: nowrap; position: relative; z-index: 1;
          width: 100%; text-align: center; }
-.v-val { font-size: 10px; color: var(--tx-2); margin-top: 4px; line-height: 1.2;
+.v-val { font-size: 10px; color: var(--tx-2); margin-top: 14px; line-height: 1.2;
          white-space: nowrap; position: relative; z-index: 1;
          font-variant-numeric: tabular-nums;
          width: 100%; text-align: center; }
