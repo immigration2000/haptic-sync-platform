@@ -554,6 +554,18 @@
 /* 기기 이동 한계 — 세로 이중 손잡이 (미리보기 막대 옆)
    강도 바와 같은 보라 계열. 손잡이가 겹쳐도 잡기 쉽도록 트랙을 두껍게 둔다. */
 .v-range { position: relative; width: 18px; min-height: 0; }   /* 높이는 부모 flex 가 정한다 */
+
+/* 중심 슬라이더를 감싸는 라운드 박스 — 강도 바(.stroke-ctl)와 같은 모양.
+   ⚠ 절대 배치라 레이아웃에 영향이 없다. padding/border 로 감싸면 슬라이더가 밀려
+   왼쪽 눈금(100/50/0)과 어긋나므로 배경 레이어로만 그린다. */
+.ctl-box {
+    position: absolute; inset: -8px -10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--rad-md);
+    z-index: 0;
+    pointer-events: none;
+}
 .v-range .v-track,
 .v-range .v-fill {
     position: absolute; left: 50%; transform: translateX(-50%);
