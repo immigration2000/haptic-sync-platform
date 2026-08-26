@@ -22,7 +22,10 @@
     const vizSrcLbl       = document.getElementById('viz-src-lbl');
     const vizText         = document.getElementById('viz-text');
     const gainRow         = document.getElementById('gain-row');
-    const drFill          = document.getElementById('dr-fill');
+    const vRange          = document.getElementById('vlimit');
+    const vFill           = document.getElementById('v-fill');
+    const vThumbMin       = document.getElementById('v-thumb-min');
+    const vThumbMax       = document.getElementById('v-thumb-max');
 
     // 관리자 기본값(서버 설정) + 사용자 개별 조정(localStorage)
     const VR_ADMIN = Object.assign({ hFovDeg: 100, fisheyeFovDeg: 100, pitchDeg: 30, yawDeg: 0, eye: 'left' }, CFG.vrDefaults || {});
@@ -185,10 +188,12 @@
         if (!strokeUIReady) return;
         outMinValue.textContent   = stroke.outMin;
         outMaxValue.textContent   = stroke.outMax;
-        if (drFill) {                        // 두 손잡이 사이를 채운다
-            drFill.style.left  = stroke.outMin + '%';
-            drFill.style.width = (stroke.outMax - stroke.outMin) + '%';
+        if (vFill) {                         // 두 손잡이 사이를 채운다 (아래가 0)
+            vFill.style.bottom = stroke.outMin + '%';
+            vFill.style.height = (stroke.outMax - stroke.outMin) + '%';
         }
+        if (vThumbMin) vThumbMin.style.bottom = stroke.outMin + '%';
+        if (vThumbMax) vThumbMax.style.bottom = stroke.outMax + '%';
         const gpct = Math.round(stroke.gain * 100);
         intensityValue.textContent = (gpct > 0 ? '+' : '') + gpct + '%';
 
@@ -198,6 +203,39 @@
         intensitySlider.disabled = !on;
 
         renderViz();
+    }
+
+    /* 세로 이중 손잡이 — 값은 숨겨둔 range 입력에 넣어 기존 pullFromUI 흐름을 그대로 쓴다. */
+    if (vRange && vThumbMin && vThumbMax) {
+        let dragging = null;
+        const valueAt = (clientY) => {
+            const r = vRange.getBoundingClientRect();
+            return Math.max(0, Math.min(100, Math.round(((r.bottom - clientY) / r.height) * 100)));
+        };
+        const apply = (which, v) => {
+            if (which === 'min') { outMinSlider.value = Math.min(v, stroke.outMax); pullFromUI('min'); }
+            else                 { outMaxSlider.value = Math.max(v, stroke.outMin); pullFromUI('max'); }
+        };
+        const onMove = (e) => {
+            if (!dragging) return;
+            e.preventDefault();
+            apply(dragging, valueAt(e.touches ? e.touches[0].clientY : e.clientY));
+        };
+        [vThumbMin, vThumbMax].forEach(function (el) {
+            const start = (e) => { dragging = el.getAttribute('data-which'); e.preventDefault(); };
+            el.addEventListener('mousedown', start);
+            el.addEventListener('touchstart', start, { passive: false });
+        });
+        vRange.addEventListener('mousedown', (e) => {          // 트랙 클릭 → 가까운 손잡이 이동
+            if (e.target === vThumbMin || e.target === vThumbMax) return;
+            const v = valueAt(e.clientY);
+            dragging = Math.abs(v - stroke.outMin) <= Math.abs(v - stroke.outMax) ? 'min' : 'max';
+            apply(dragging, v);
+        });
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('mouseup', () => { dragging = null; });
+        document.addEventListener('touchend', () => { dragging = null; });
     }
 
     // 실제 움직임 범위 미리보기.
@@ -247,8 +285,8 @@
 
 
         if (vizText) {
-            vizText.textContent = `실제 ${lo}~${hi} (폭 ${hi - lo}) · 원본 대비 ${ratio.toFixed(2)}배`
-                + (blocked ? ' · ⚠ 원본 진폭이 좁아 확장 안 함' : '');
+            vizText.textContent = `· 원본 대비 ${ratio.toFixed(2)}배`
+                + (blocked ? '  ⚠ 원본 진폭이 좁아 확장 안 함' : '');
         }
     }
 
