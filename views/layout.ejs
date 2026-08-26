@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/components.css?v=cardalign">
     <link rel="stylesheet" href="/css/pulse_device.css">
-    <link rel="stylesheet" href="/css/pages.css?v=stroke2">
+    <link rel="stylesheet" href="/css/pages.css?v=gain0">
     <link rel="stylesheet" href="/css/bj_session.css">
     <%- typeof style !== 'undefined' ? style : '' %>
 </head>
@@ -23,11 +23,14 @@
     <%- include('components/footer') %>
 </div>
 
-<script>window.PULSE_TUNING = { maxSpeed: <%= typeof strokeMaxSpeed !== 'undefined' ? strokeMaxSpeed : 0.4 %> };</script>
+<script>window.PULSE_TUNING = {
+    gainMin: <%= typeof strokeGainMin !== 'undefined' ? strokeGainMin : -80 %>,
+    gainMax: <%= typeof strokeGainMax !== 'undefined' ? strokeGainMax :  80 %>
+};</script>
 <script src="/js/core/device_drivers.js?v=baud115200"></script>
-<script src="/js/core/device.js?v=remoteguard"></script>
-<script src="/js/core/funscript.js?v=slew"></script>
-<script src="/js/core/header.js?v=wtimeout500"></script>
+<script src="/js/core/device.js?v=nowait"></script>
+<script src="/js/core/funscript.js?v=gain0"></script>
+<script src="/js/core/header.js?v=nowait"></script>
 <%- typeof script !== 'undefined' ? script : '' %>
 </body>
 </html>

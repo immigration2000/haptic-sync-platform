@@ -53,78 +53,56 @@
             <div class="panel">
                 <div class="panel-title">스트로크 제어 (L0)</div>
 
-                <!-- 미리보기 막대 + 최소/최대 이중 슬라이더 -->
-                <div style="display:flex; gap:14px; align-items:stretch;">
-
-                    <!-- 왼쪽: 실제 움직임 범위 -->
-                    <div style="flex:1; min-width:0;">
-                        <div style="font-size:10px;color:var(--tx-3);margin-bottom:4px;">실제 움직임 범위</div>
-                        <div style="display:flex;gap:6px;height:170px;">
-                            <div style="display:flex;flex-direction:column;justify-content:space-between;
-                                        width:34px;text-align:right;font-size:9px;color:var(--tx-3);">
-                                <span>100<br><span style="font-size:8px;">깊음</span></span>
-                                <span>50</span>
-                                <span><span style="font-size:8px;">얕음</span><br>0</span>
-                            </div>
-                            <div style="position:relative;width:38px;background:var(--bg-3);
-                                        border-radius:var(--rad-sm);overflow:hidden;">
-                                <div id="viz-limit" style="position:absolute;left:0;right:0;
-                                        background:rgba(123,45,255,0.18);
-                                        border-top:1px solid var(--c-purple);border-bottom:1px solid var(--c-purple);"></div>
-                                <div id="viz-actual" style="position:absolute;left:7px;right:7px;min-height:2px;
-                                        background:var(--gradient-main);border-radius:var(--rad-pill);"></div>
-                                <div id="viz-marker" style="position:absolute;left:0;right:0;height:2px;
-                                        background:var(--c-green);opacity:0;transition:bottom .08s linear;"></div>
-                            </div>
-                            <div style="position:relative;flex:1;min-width:64px;">
-                                <div id="viz-src" style="position:absolute;left:0;width:3px;min-height:2px;
-                                        background:var(--tx-3);border-radius:2px;"></div>
-                                <div id="viz-src-lbl" style="position:absolute;left:8px;font-size:9px;
-                                        color:var(--tx-3);white-space:nowrap;transform:translateY(50%);"></div>
-                            </div>
-                        </div>
+                <!-- 실제 움직임 범위 미리보기 -->
+                <div style="display:flex;gap:6px;height:150px;justify-content:center;">
+                    <div style="display:flex;flex-direction:column;justify-content:space-between;
+                                width:72px;text-align:right;font-size:9px;color:var(--tx-3);">
+                        <span>100<br><span style="font-size:8px;">깊음</span></span>
+                        <span>50</span>
+                        <span><span style="font-size:8px;">얕음</span><br>0</span>
                     </div>
-
-                    <!-- 오른쪽: 최소·최대 세로 이중 슬라이더 -->
-                    <div style="width:96px;flex:none;text-align:center;">
-                        <div style="font-size:11px;color:var(--tx-2);margin-bottom:6px;">
-                            최대 : <strong id="out-max-value" class="mono">100</strong>
-                        </div>
-                        <div id="range-track" style="position:relative;height:140px;width:100%;
-                                    display:flex;justify-content:center;cursor:pointer;">
-                            <div style="width:8px;height:100%;background:var(--bg-3);border-radius:var(--rad-pill);"></div>
-                            <div id="range-fill" style="position:absolute;width:8px;left:50%;transform:translateX(-50%);
-                                    background:var(--c-blue);border-radius:var(--rad-pill);"></div>
-                            <div id="thumb-max" class="vr-thumb" data-which="max"></div>
-                            <div id="thumb-min" class="vr-thumb" data-which="min"></div>
-                        </div>
-                        <div style="font-size:11px;color:var(--tx-2);margin-top:6px;">
-                            최소 : <strong id="out-min-value" class="mono">0</strong>
-                        </div>
+                    <div style="position:relative;width:36px;background:var(--bg-3);
+                                border-radius:var(--rad-sm);overflow:hidden;">
+                        <div id="viz-limit" style="position:absolute;left:0;right:0;
+                                background:rgba(123,45,255,0.18);
+                                border-top:1px solid var(--c-purple);border-bottom:1px solid var(--c-purple);"></div>
+                        <div id="viz-actual" style="position:absolute;left:7px;right:7px;min-height:2px;
+                                background:var(--gradient-main);border-radius:var(--rad-pill);"></div>
+                        <div id="viz-marker" style="position:absolute;left:0;right:0;height:2px;
+                                background:var(--c-green);opacity:0;transition:bottom .08s linear;"></div>
+                    </div>
+                    <div style="position:relative;width:72px;">
+                        <div id="viz-src" style="position:absolute;left:0;width:3px;min-height:2px;
+                                background:var(--tx-3);border-radius:2px;"></div>
+                        <div id="viz-src-lbl" style="position:absolute;left:8px;font-size:9px;
+                                color:var(--tx-3);white-space:nowrap;transform:translateY(50%);"></div>
                     </div>
                 </div>
 
-                <div id="viz-text" class="mono" style="font-size:11px;color:var(--tx-2);margin-top:10px;"></div>
-                <div id="viz-warn" style="font-size:11px;color:var(--c-yellow);margin-top:6px;display:none;line-height:1.5;"></div>
+                <div id="viz-text" class="mono" style="font-size:11px;color:var(--tx-2);margin-top:10px;text-align:center;"></div>
 
-                <!-- 자동 확장 -->
-                <label class="sw-row" style="margin-top:12px;cursor:pointer;">
-                    <div class="sw-text" style="flex:1;">
-                        <strong>스크립트 진폭 자동 확장</strong>
-                        <span>원본이 쓰는 폭을 위 최소~최대로 펴줍니다. 끄면 강도도 함께 꺼집니다.</span>
-                    </div>
+                <!-- 최소 · 최대 · 강도 — 같은 형태의 가로 슬라이더 -->
+                <div class="stroke-ctl">
+                    <span class="stroke-ctl-lbl">최소</span>
+                    <input type="range" id="out-min-slider" min="0" max="100" step="1" value="0">
+                    <span id="out-min-value" class="mono stroke-ctl-val">0</span>
+                </div>
+                <div class="stroke-ctl">
+                    <span class="stroke-ctl-lbl">최대</span>
+                    <input type="range" id="out-max-slider" min="0" max="100" step="1" value="100">
+                    <span id="out-max-value" class="mono stroke-ctl-val">100</span>
+                </div>
+
+                <label class="sw-row" style="margin-top:10px;cursor:pointer;">
+                    <div class="sw-text" style="flex:1;"><strong>스크립트 진폭 자동 확장</strong></div>
                     <input type="checkbox" class="sw" id="expand-toggle" checked>
                 </label>
 
-                <!-- 강도 (자동확장이 켜져 있을 때만 활성) -->
-                <div id="gain-row" style="display:flex;align-items:center;gap:10px;margin-top:10px;
-                            padding:10px 12px;background:var(--bg-2);border:1px solid var(--border-soft);
-                            border-radius:var(--rad-md);">
-                    <span class="text-faint" style="font-size:11px;min-width:28px;">강도</span>
-                    <input type="range" id="intensity-slider" min="20" max="100" value="100" step="5" style="flex:1;">
-                    <span id="intensity-value" class="mono" style="min-width:44px;text-align:right;">100%</span>
+                <div class="stroke-ctl" id="gain-row">
+                    <span class="stroke-ctl-lbl">강도</span>
+                    <input type="range" id="intensity-slider" min="-80" max="80" step="5" value="0">
+                    <span id="intensity-value" class="mono stroke-ctl-val">0%</span>
                 </div>
-                <div id="gain-cap-note" style="font-size:11px;color:var(--c-yellow);margin-top:6px;display:none;"></div>
 
                 <p class="text-faint" style="font-size:11px;margin-top:8px;">
                     <span id="fs-span-label"></span>
@@ -132,10 +110,6 @@
                             style="background:none;border:none;padding:0;margin-top:4px;text-decoration:underline;
                                    cursor:pointer;font-size:11px;display:block;">기본값으로</button>
                 </p>
-
-                <!-- 값 보관용 (실제 조작은 위 이중 슬라이더가 한다) -->
-                <input type="range" id="out-min-slider" min="0" max="100" value="0" step="1" style="display:none;">
-                <input type="range" id="out-max-slider" min="0" max="100" value="100" step="1" style="display:none;">
             </div>
             <div class="panel">
                 <div class="panel-title">FUNSCRIPT</div>
@@ -181,4 +155,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=stroke3"></script>
+<script src="/js/pages/player.js?v=gain0"></script>

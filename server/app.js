@@ -142,7 +142,11 @@ const { stmts, getSettingBool, getSetting } = require('./db');
 // 기기 튜닝값을 모든 뷰에 넘긴다 (layout이 window.PULSE_TUNING 으로 심는다).
 // funscript 엔진이 이 값을 속도 상한으로 쓴다 — 하드웨어 스펙이 오르면 관리자가 올린다.
 app.use((req, res, next) => {
-    res.locals.strokeMaxSpeed = parseFloat(getSetting('stroke_max_speed', '0.4')) || 0.4;
+    // 강도 슬라이더 범위(%) — 0%가 원본 그대로. 기기 성능에 맞춰 관리자가 조정한다.
+    res.locals.strokeGainMin = parseFloat(getSetting('stroke_gain_min', '-80'));
+    res.locals.strokeGainMax = parseFloat(getSetting('stroke_gain_max', '80'));
+    if (isNaN(res.locals.strokeGainMin)) res.locals.strokeGainMin = -80;
+    if (isNaN(res.locals.strokeGainMax)) res.locals.strokeGainMax = 80;
     next();
 });
 

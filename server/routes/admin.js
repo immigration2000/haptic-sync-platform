@@ -37,7 +37,8 @@ router.get('/', (req, res) => {
     res.render('admin/dashboard', {
         title: '관리자', stats,
         disk: diskGuard.status(),
-        strokeMaxSpeed: parseFloat(getSetting('stroke_max_speed', '0.4')) || 0.4,
+        strokeGainMin: parseFloat(getSetting('stroke_gain_min', '-80')),
+        strokeGainMax: parseFloat(getSetting('stroke_gain_max', '80')),
         dummyEnabled: getSettingBool('dummy_bj_enabled', true),
         siteMessage:  getSetting('site_message', ''),
         maintMode:    getSettingBool('maintenance_mode', false),
@@ -76,9 +77,9 @@ router.post('/settings', (req, res) => {
     numSet('upload_max_file_mb',   upload_max_file_mb,   50, 4000);
     numSet('upload_quota_user_gb', upload_quota_user_gb,  1,  500);
     numSet('upload_min_free_gb',   upload_min_free_gb,    1,  200);
-    // 기기 스트로크 속도 상한 (%/ms). 하드웨어 스펙이 오르면 올린다.
-    // 너무 높이면 기기가 못 따라가 시리얼이 밀리고 연결이 끊긴다 → 실기기로 확인할 것.
-    numSet('stroke_max_speed', req.body.stroke_max_speed, 0.05, 5);
+    // 강도 슬라이더 범위(%). 0%가 원본 그대로이므로 음수~양수로 잡는다.
+    numSet('stroke_gain_min', req.body.stroke_gain_min, -100, 0);
+    numSet('stroke_gain_max', req.body.stroke_gain_max, 0, 500);
     setSetting('dummy_bj_enabled',  dummy_bj_enabled === 'on'  ? '1' : '0');
     setSetting('maintenance_mode',  maintenance_mode === 'on' ? '1' : '0');
     setSetting('site_message',      (site_message || '').slice(0, 200));

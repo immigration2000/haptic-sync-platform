@@ -76,21 +76,23 @@
                     </div>
 
                     <div class="form-row mt-4">
-                        <div class="form-label" style="margin-bottom:8px;">기기 스트로크 속도 상한
-                            <span class="text-faint" style="font-size:11px;">(하드웨어 스펙에 맞춰 조정)</span></div>
+                        <div class="form-label" style="margin-bottom:8px;">스트로크 강도 범위
+                            <span class="text-faint" style="font-size:11px;">(플레이어 강도 슬라이더의 최소·최대)</span></div>
                         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                            <input class="form-input" type="number" name="stroke_max_speed"
-                                   min="0.05" max="5" step="0.05" value="<%= strokeMaxSpeed %>" style="width:110px;">
-                            <span class="text-faint" style="font-size:12px;">%/ms</span>
-                            <span class="text-faint mono" style="font-size:11px;">
-                                = 전구간(0~100%) 이동에 <%= Math.round(100 / strokeMaxSpeed) %>ms
-                            </span>
+                            <input class="form-input" type="number" name="stroke_gain_min"
+                                   min="-100" max="0" step="5" value="<%= strokeGainMin %>" style="width:100px;">
+                            <span class="text-faint" style="font-size:12px;">% ~</span>
+                            <input class="form-input" type="number" name="stroke_gain_max"
+                                   min="0" max="500" step="5" value="<%= strokeGainMax %>" style="width:100px;">
+                            <span class="text-faint" style="font-size:12px;">%</span>
                         </div>
                         <p class="text-faint" style="font-size:11px;margin:6px 0 0;">
-                            진폭 자동확장은 같은 시간에 더 멀리 움직이라는 명령이 되므로, 이 상한을 넘으면
-                            엔진이 이동시간을 늘려 맞춥니다. <strong>너무 높이면 기기가 못 따라가
-                            시리얼이 밀리고 연결이 끊깁니다.</strong> 기본값 0.4는 기존 VR 스크립트가
-                            요구하는 최대 속도와 같은 값입니다. 실기기로 확인 후 조정하세요.
+                            <strong>0% = 스크립트 원본 그대로</strong>입니다. 음수는 진폭 축소, 양수는 확대.
+                            기기가 더 큰 진폭을 감당하면 최대값을 올리세요.
+                            <span class="mono">+<%= strokeGainMax %>%</span> = 원본의
+                            <span class="mono"><%= (1 + strokeGainMax / 100).toFixed(2) %>배</span>,
+                            <span class="mono"><%= strokeGainMin %>%</span> =
+                            <span class="mono"><%= (1 + strokeGainMin / 100).toFixed(2) %>배</span>.
                         </p>
                     </div>
 

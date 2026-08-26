@@ -53,33 +53,21 @@
                 if (v < lo) lo = v;
                 if (v > hi) hi = v;
             }
-            // 원본이 요구하는 최대 속도(%/ms). 확장 배율을 곱하면 실제 요구 속도가 나온다.
-            let maxSpeed = 0;
-            for (let i = 1; i < acts.length; i++) {
-                const d = Math.abs((acts[i].pos || 0) - (acts[i - 1].pos || 0));
-                const g = Math.max(1, acts[i].at - acts[i - 1].at);
-                if (d / g > maxSpeed) maxSpeed = d / g;
-            }
-            axes[def.tcode] = { actions: acts, index: 0, url, lo, hi, span: hi - lo, maxSpeed, lastOut: null };
+            axes[def.tcode] = { actions: acts, index: 0, url, lo, hi, span: hi - lo };
         }));
         return axes;
     }
 
-    // 최대 이동 속도 (위치% / ms). 기기가 물리적으로 낼 수 있는 속도의 상한이다.
-    // 0.4 %/ms = 전구간(0~100%)을 250ms에 이동 — 스트로커 기준 이미 빠른 편.
-    //
-    // ⚠ 왜 필요한가: 진폭을 늘리면 **같은 시간에 더 멀리** 가야 하므로 속도가 배율만큼 빨라진다.
-    //   예) vr_technician_01 은 원본 진폭 30~50(폭 20)에 최소 간격 50ms.
-    //       자동확장으로 0~100(폭 100)이 되면 배율 5배 → 전구간을 50ms에 이동하라는 명령이 된다.
-    //       기기가 못 따라가면 시리얼이 밀려 쓰기가 지연되고, 결국 연결이 끊긴다.
-    //   → 거리에 맞춰 이동시간(interp)을 늘려준다. 빠른 구간은 살짝 늦어지지만 끊기지 않는다.
-    const MAX_SPEED_DEFAULT = 0.4;
-    // 관리자 설정으로 덮어쓸 수 있다 (기기 스펙이 올라가면 조정).
-    // layout에서 window.PULSE_TUNING 을 심어주며, 이 파일이 먼저 로드되므로 매번 읽는다.
-    function maxSpeed() {
-        const t = window.PULSE_TUNING;
-        const v = t && parseFloat(t.maxSpeed);
-        return (v && v > 0) ? v : MAX_SPEED_DEFAULT;
+    // 강도 슬라이더 범위(%). 관리자가 설정으로 조정한다 (layout이 window.PULSE_TUNING 으로 심는다).
+    // 0% = 원본 그대로. 음수는 진폭 축소, 양수는 확대.
+    const GAIN_MIN_DEFAULT = -80, GAIN_MAX_DEFAULT = 80;
+    function gainRange() {
+        const t = window.PULSE_TUNING || {};
+        let lo = parseFloat(t.gainMin), hi = parseFloat(t.gainMax);
+        if (isNaN(lo)) lo = GAIN_MIN_DEFAULT;
+        if (isNaN(hi)) hi = GAIN_MAX_DEFAULT;
+        if (hi < lo) { const x = lo; lo = hi; hi = x; }
+        return { min: lo, max: hi };
     }
 
     // 타이머 루프 주기(ms). 화면이 가려져 rAF가 멈춘 동안의 예비 경로다.
@@ -93,24 +81,38 @@
 
     /**
      * 스크립트 위치(0~100) → 실제 출력 위치
-     *   shape 없으면 기존 동작 그대로: 50 + (pos-50) * intensity
+     *
+     * 참고 구현(tnxa/mosa `tcode.js` scaleAxes)과 같은 선형 매핑을 쓰되,
+     * 강도(gain)를 **중앙 기준 배율**로 얹는다. `interp`(이동시간)는 건드리지 않는다.
+     *
+     *   1) 정규화  norm = 확장 ON ? (pos - lo)/span : pos/100
+     *   2) 매핑    base = outMin + norm * (outMax - outMin)
+     *   3) 강도    out  = center + (base - center) * (1 + gain)
+     *              gain 0 = 원본 그대로, +0.8 = 1.8배, -0.8 = 0.2배
+     *   4) 클램프  [outMin, outMax] → [0, 99]
+     *
+     * center(중앙)는 "강도를 바꿔도 움직이지 않는 기준점"이다.
+     *   확장 ON  → 출력 범위의 중앙 (원본을 이미 그 범위로 폈으므로)
+     *   확장 OFF → 원본 진폭의 중앙을 매핑한 값 (강도 0%가 원본 그대로가 되도록)
      */
     function shapeStroke(pos, ax, shape, intensity) {
-        if (!shape) return Math.round(50 + (pos - 50) * intensity);
+        if (!shape) return Math.round(50 + (pos - 50) * intensity);   // 구버전 호출부 호환
 
         const outMin = Math.max(0, Math.min(100, shape.outMin));
         const outMax = Math.max(outMin, Math.min(100, shape.outMax));
-        const gain   = shape.gain == null ? 1 : shape.gain;
+        const gain   = shape.gain == null ? 0 : shape.gain;           // -0.8 ~ +0.8
 
-        // 1) 0~1 정규화. 펴기가 켜져 있고 스크립트 진폭이 충분하면 그 진폭 기준으로,
-        //    아니면 원본 스케일(0~100) 그대로.
         const canExpand = shape.expand && ax && ax.span >= MIN_EXPAND_SPAN;
         const norm = canExpand ? (pos - ax.lo) / ax.span : pos / 100;
 
-        // 2) 사용자 출력 범위로 매핑 + 강도 배율
-        const center = (outMin + outMax) / 2;
-        const out = center + (norm - 0.5) * (outMax - outMin) * gain;
+        const span = outMax - outMin;
+        const base = outMin + norm * span;
 
+        const centerNorm = canExpand ? 0.5
+            : (ax && ax.span ? ((ax.lo + ax.hi) / 2) / 100 : 0.5);
+        const center = outMin + centerNorm * span;
+
+        const out = center + (base - center) * (1 + gain);
         return Math.round(Math.max(outMin, Math.min(outMax, out)));
     }
 
@@ -167,7 +169,6 @@
             const ms = this.video.currentTime * 1000;
             for (const k of Object.keys(this.axes)) {
                 const ax = this.axes[k];
-                ax.lastOut = null;      // 되감기 후 이전 위치 기준 속도계산이 어긋나지 않게
                 ax.index = 0;
                 for (let i = 0; i < ax.actions.length - 1; i++) {
                     if (ms > ax.actions[i].at) ax.index++;
@@ -216,13 +217,6 @@
                     // 많이 밀렸으면 원래 보간시간(수십 ms)으로 튀지 않게 최소 이동시간을 준다
                     if (skipped > 0) latest.interp = Math.max(latest.interp, 120);
 
-                    // 속도 제한 — 실제로 움직여야 하는 거리 기준으로 이동시간을 확보한다.
-                    // (성형 후 위치로 계산해야 한다. 원본 거리로 재면 확장 배율이 반영되지 않는다)
-                    const prev = (ax.lastOut == null) ? latest.pos : ax.lastOut;
-                    const need = Math.abs(latest.pos - prev) / maxSpeed();
-                    if (latest.interp < need) latest.interp = Math.round(need);
-                    ax.lastOut = latest.pos;
-
                     latest.skipped = skipped;
                     triggered.push(latest);
                 }
@@ -252,8 +246,7 @@
         // 따로 구현하면 공식이 바뀔 때 미리보기만 조용히 어긋난다.
         shapeStroke,
         MIN_EXPAND_SPAN,
-        maxSpeed,                 // 현재 적용 중인 속도 상한 (관리자 설정 반영)
-        MAX_SPEED_DEFAULT,
+        gainRange,                // 관리자가 정한 강도 범위 (%)
         splitFunscriptPath,
         AXIS_DEFS,
     };

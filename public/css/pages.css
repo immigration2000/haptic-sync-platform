@@ -537,18 +537,16 @@
 .bj-real-card .bj-go { cursor: pointer; }
 
 
-/* === 세로 이중 슬라이더 (플레이어 스트로크 범위) === */
-.vr-thumb {
-    position: absolute;
-    left: 50%;
-    width: 18px; height: 18px;
-    margin-left: -9px; margin-bottom: -9px;
-    border-radius: 50%;
-    background: var(--c-blue);
-    border: 2px solid var(--bg-0);
-    box-shadow: 0 1px 4px rgba(0,0,0,.5);
-    cursor: grab;
-    touch-action: none;
+/* === 스트로크 제어 슬라이더 (최소·최대·강도 동일 형태) === */
+.stroke-ctl {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 8px; padding: 8px 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--rad-md);
 }
-.vr-thumb:active { cursor: grabbing; transform: scale(1.12); }
-#gain-row input[type=range]:disabled { cursor: not-allowed; }
+.stroke-ctl input[type=range] { flex: 1; accent-color: var(--c-purple); }
+.stroke-ctl input[type=range]:disabled { cursor: not-allowed; }
+.stroke-ctl-lbl { font-size: 11px; color: var(--tx-3); min-width: 30px; }
+.stroke-ctl-val { min-width: 46px; text-align: right; font-size: 12px; }
+#gain-row.is-off { opacity: .45; }

@@ -36,7 +36,6 @@
         sentCount: 0,
         portLabel: '',
         deviceInfo: '',       // 기기가 보내온 마지막 응답 (통신 검증용)
-        writeDead: false,     // 쓰기 실패로 차단된 상태 (재연결 전까지 출력 거부)
         lastError: '',        // 사용자에게 보여줄 마지막 실패 사유
         // serial
         port: null,
@@ -64,59 +63,24 @@
             sentCount:          state.sentCount,
             portLabel:          state.portLabel,
             deviceInfo:         state.deviceInfo,   // 기기 응답 (있으면 통신 정상 = baud 맞음)
-            writeDead:          state.writeDead,
             lastError:          state.lastError,
         };
     }
 
-    // ─── 쓰기 타임아웃 · fail-closed ─────────────────────────
-    // 기기가 응답을 멈추면 write promise가 영영 안 끝난다. 그런데 Web Streams는
-    // write를 큐에 쌓으므로 **하나가 멈추면 뒤따르는 write가 전부 그 뒤에 갇힌다.**
-    // → 긴급정지(DSTOP)조차 기기에 도달하지 못한다. 그래서 시간 제한이 필수다.
-    // 멈춘 writer는 재사용해도 복구되지 않으므로(큐가 그대로) 포트째 버리고
-    // 사용자가 명시적으로 재연결할 때까지 출력을 거부한다. (fail-closed)
-    const WRITE_TIMEOUT_MS = 500;
+    // ─── 전송 ────────────────────────────────────────────────
+    // 참고 구현(tnxa/mosa `useSerialHook`)과 같은 방식 — **write를 기다리지 않는다.**
+    // 스트림에 넣고 바로 다음으로 넘어가며, 배압은 스트림 내부 큐가 처리한다.
+    //
+    // ⚠ 예전에는 write를 await하고 500ms를 넘기면 포트를 버리는 fail-closed였다.
+    //   기기가 잠깐 느려지기만 해도 연결이 통째로 끊겨 복구가 안 됐다.
+    //   실사용에서 "스트로크 제어를 건드리면 연결이 끊긴다"로 나타났다. 그래서 걷어냈다.
+    //   실패는 로그로만 남기고 연결은 유지한다. 물리적 단절은 아래 disconnect 이벤트가 잡는다.
 
-    function withTimeout(promise, ms) {
-        let timer;
-        return Promise.race([
-            promise,
-            new Promise((_, reject) => {
-                timer = setTimeout(() => reject(new Error('write-timeout')), ms);
-            }),
-        ]).finally(() => clearTimeout(timer));
-    }
-
-    function failClosed(reason) {
-        if (state.writeDead) return;          // 이미 차단됨 — 중복 실행 방지
-        state.writeDead = true;
-        state.connected = false;
-        state.lastError = reason;
-        console.error('[PulseDevice] 출력 차단 — ' + reason);
-
-        // 참조를 먼저 끊어 이후 send()가 죽은 포트를 못 잡게 한다
-        const w = state.writer, r = state.reader, rd = state.readDone, p = state.port;
-        state.writer = null; state.reader = null; state.readDone = null; state.port = null;
-        state.btChar = null;
-
-        // 정리는 best-effort — 여기서 await로 막히면 차단 자체가 무의미하다
-        (async () => {
-            try { if (w)  await withTimeout(w.abort(), WRITE_TIMEOUT_MS); } catch (_) {}
-            try { if (r)  await r.cancel(); } catch (_) {}
-            try { if (rd) await rd; } catch (_) {}
-            try { if (p)  await p.close(); } catch (_) {}
-        })();
-
-        // 자동 재연결로 조용히 되살아나면 안 된다 — 사용자가 직접 다시 연결해야 한다
-        sessionStorage.removeItem(KEY_INTENT);
-        notify();
-    }
-
-    /** 드라이버 인코딩 후 실제 쓰기 1회 (시간 제한 포함). 성공 여부만 반환. */
-    async function writeOnce(cmd) {
+    /** 드라이버 인코딩 후 쓰기 1회. 큐에 넣기만 하고 결과를 기다리지 않는다. */
+    function writeOnce(cmd) {
         const data = drv().encode(cmd);                 // 캐노니컬 → 기기 바이트 (드라이버가 변환)
         if (state.kind === 'serial' && state.writer) {
-            await withTimeout(state.writer.write(data), WRITE_TIMEOUT_MS);
+            state.writer.write(data).catch(noteWriteError);
             return true;
         }
         if (state.kind === 'bluetooth' && state.btChar) {
@@ -124,10 +88,21 @@
             const op = (wantNoResp && state.btChar.writeValueWithoutResponse)
                 ? state.btChar.writeValueWithoutResponse(data)
                 : state.btChar.writeValue(data);
-            await withTimeout(op, WRITE_TIMEOUT_MS);
+            if (op && op.catch) op.catch(noteWriteError);
             return true;
         }
         return false;
+    }
+
+    // 쓰기 실패는 진단용으로만 남긴다 (연결을 끊지 않는다).
+    // 같은 오류가 쏟아질 수 있으므로 처음 1회와 100회마다만 콘솔에 찍는다.
+    let writeErrCount = 0;
+    function noteWriteError(e) {
+        writeErrCount++;
+        state.lastError = (e && e.message) ? e.message : '전송 오류';
+        if (writeErrCount === 1 || writeErrCount % 100 === 0) {
+            console.warn(`[PulseDevice] 전송 실패 (${writeErrCount}건째):`, state.lastError);
+        }
     }
 
     // ─── 기기 응답 읽기 ───────────────────────────────────────
@@ -168,7 +143,6 @@
         state.writer    = writer;
         state.kind      = 'serial';
         state.connected = true;
-        state.writeDead = false;
         state.lastError = '';
         const info = port.getInfo();
         state.portLabel = (info && info.usbVendorId)
@@ -221,12 +195,21 @@
         state.btChar    = txChar;
         state.kind      = 'bluetooth';
         state.connected = true;
-        state.writeDead = false;
         state.lastError = '';
         state.portLabel = `BLE · ${device.name || 'Unknown'}`;
         sessionStorage.setItem(KEY_INTENT, 'bluetooth');
         notify();
         for (const c of drv().init) { await send(c); }
+    }
+
+    // 해제 경로 전용 시간 제한.
+    // 전송에는 시간 제한을 두지 않지만(느린 기기를 끊지 않기 위해),
+    // **정리는 반드시 끝나야 한다.** 멈춘 쓰기가 있으면 close()가 영영 안 끝나기 때문이다.
+    function bounded(promise, ms) {
+        return Promise.race([
+            Promise.resolve(promise).catch(() => {}),
+            new Promise((resolve) => setTimeout(resolve, ms)),
+        ]);
     }
 
     // ─── 공통 disconnect ─────────────────────────────────────
@@ -235,24 +218,19 @@
         try {
             if (state.kind === 'serial') {
                 if (state.writer) {
-                    // 정지 명령이 막혀도 정리를 멈추면 안 된다 → 시간 제한
-                    let stopped = false;
-                    try { stopped = await writeOnce(drv().stop); } catch (_) {}
-                    // 쓰기가 걸려 있으면 releaseLock()이 예외를 던진다 → abort로 스트림을 버린다
-                    if (stopped) {
-                        try { state.writer.releaseLock(); } catch (_) {}
-                    } else {
-                        try { await withTimeout(state.writer.abort(), WRITE_TIMEOUT_MS); } catch (_) {}
-                    }
+                    try { writeOnce(drv().stop); } catch (_) {}
+                    // write를 기다리지 않으므로 큐에 남은 게 있을 수 있다.
+                    // abort()는 대기 중 쓰기를 실패시키며 스트림을 버린다 — 그래야 포트가 풀린다.
+                    await bounded(state.writer.abort(), 300);
                 }
                 // 읽기 스트림 먼저 정리해야 port.close()가 걸리지 않음
                 if (state.reader) {
                     try { await state.reader.cancel(); } catch (_) {}
                     try { state.reader.releaseLock(); } catch (_) {}
                 }
-                if (state.readDone) { try { await state.readDone; } catch (_) {} }
+                if (state.readDone) { await bounded(state.readDone, 300); }
                 if (state.port) {
-                    try { await state.port.close(); } catch (_) {}
+                    await bounded(state.port.close(), 500);
                 }
             } else if (state.kind === 'bluetooth') {
                 try { await writeOnce(drv().stop); } catch (_) {}
@@ -270,7 +248,6 @@
             state.btChar = null;
             state.kind = null;
             state.connected = false;
-            state.writeDead = false;      // 명시적 해제 — 다시 연결할 수 있다
             state.lastError = '';
             state.sentCount = 0;
             state.portLabel = '';
@@ -280,22 +257,12 @@
     }
 
     // ─── 공통 send ───────────────────────────────────────────
-    async function send(cmd) {
-        if (state.writeDead) return false;              // 차단 상태 — 재연결 전까지 거부
+    function send(cmd) {
         if (!state.connected) return false;
-        try {
-            if (!(await writeOnce(cmd))) return false;
-            state.sentCount++;
-            if (state.sentCount % 5 === 0) notify();
-            return true;
-        } catch (e) {
-            // 타임아웃이든 포트 오류든 스트림은 이미 못 쓴다 → 즉시 차단
-            const timedOut = e && e.message === 'write-timeout';
-            failClosed(timedOut
-                ? '기기 무응답 (' + WRITE_TIMEOUT_MS + 'ms 초과) — 다시 연결하세요'
-                : '전송 실패 — 다시 연결하세요');
-            return false;
-        }
+        if (!writeOnce(cmd)) return false;
+        state.sentCount++;
+        if (state.sentCount % 5 === 0) notify();
+        return true;
     }
 
     // ─── 원격 수신 명령 전용 송신 ─────────────────────────────
@@ -348,7 +315,7 @@
     // 페이지 떠날 때 — 안전 위치로 부드럽게 이동 (의도는 유지)
     window.addEventListener('beforeunload', () => {
         try {
-            if (!state.writeDead && state.kind === 'serial' && state.writer) {
+            if (state.kind === 'serial' && state.writer) {
                 state.writer.write(drv().encode(drv().idle));   // 안전 위치 (드라이버별)
             }
             // BLE는 어차피 페이지 unload 시 끊김
