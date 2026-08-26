@@ -285,7 +285,8 @@
 
 
         if (vizText) {
-            vizText.textContent = `· 원본 대비 ${ratio.toFixed(2)}배`
+            const mid = ((lo + hi) / 2).toFixed(0);
+            vizText.textContent = `실제 ${lo}~${hi} · 중심 ${mid} · 원본 대비 ${ratio.toFixed(2)}배`
                 + (blocked ? '  ⚠ 원본 진폭이 좁아 확장 안 함' : '');
         }
     }

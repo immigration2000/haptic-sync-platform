@@ -84,7 +84,7 @@
                     <!-- 기기 이동 한계 — 세로 이중 손잡이 -->
                     <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
                         <span class="stroke-ctl-lbl" style="min-width:0;"
-                              title="기기가 움직일 수 있는 최소·최대 위치. 이 밖으로 나가는 값은 잘립니다.">한계</span>
+                              title="움직임의 중심과 허용 범위. 두 손잡이의 가운데가 중심이 됩니다.">중심</span>
                         <div id="vlimit" class="v-range">
                             <div class="v-track"></div>
                             <div class="v-fill" id="v-fill"></div>
@@ -166,4 +166,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=vlimit2"></script>
+<script src="/js/pages/player.js?v=center3"></script>
