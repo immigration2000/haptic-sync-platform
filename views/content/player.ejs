@@ -81,9 +81,9 @@
 
                 <div id="viz-text" class="mono" style="font-size:11px;color:var(--tx-2);margin-top:10px;text-align:center;"></div>
 
-                <!-- 중심 범위 — 한 트랙에 손잡이 두 개 (강도 바와 같은 스타일) -->
+                <!-- 기기 이동 한계 — 한 트랙에 손잡이 두 개 (강도 바와 같은 스타일) -->
                 <div class="stroke-ctl">
-                    <span class="stroke-ctl-lbl">범위</span>
+                    <span class="stroke-ctl-lbl" title="기기가 움직일 수 있는 최소·최대 위치. 이 밖으로 나가는 값은 잘립니다.">한계</span>
                     <div class="dual-range">
                         <div class="dr-track"></div>
                         <div class="dr-fill" id="dr-fill"></div>
@@ -157,4 +157,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=center1"></script>
+<script src="/js/pages/player.js?v=abs1"></script>
