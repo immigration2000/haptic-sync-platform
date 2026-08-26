@@ -550,3 +550,34 @@
 .stroke-ctl-lbl { font-size: 11px; color: var(--tx-3); min-width: 30px; }
 .stroke-ctl-val { min-width: 46px; text-align: right; font-size: 12px; }
 #gain-row.is-off { opacity: .45; }
+
+/* 한 트랙에 손잡이 두 개 — 네이티브 range 두 개를 겹쳐 손잡이만 살린다.
+   (트랙은 아래 div가 그리고, input은 배경 없이 손잡이만 보이게 한다) */
+.dual-range { position: relative; flex: 1; height: 20px; }
+.dual-range .dr-track,
+.dual-range .dr-fill {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    height: 4px; border-radius: var(--rad-pill);
+}
+.dual-range .dr-track { left: 0; right: 0; background: var(--bg-3); }
+.dual-range .dr-fill  { background: var(--c-purple); }
+.dual-range input[type=range] {
+    position: absolute; left: 0; top: 0;
+    width: 100%; height: 20px; margin: 0;
+    background: none; appearance: none; -webkit-appearance: none;
+    pointer-events: none;                 /* 트랙은 통과, 손잡이만 잡힌다 */
+}
+.dual-range input[type=range]::-webkit-slider-runnable-track { background: none; height: 20px; }
+.dual-range input[type=range]::-moz-range-track { background: none; height: 20px; }
+.dual-range input[type=range]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none;
+    pointer-events: auto;
+    width: 16px; height: 16px; margin-top: 2px;
+    border-radius: 50%; background: var(--c-purple);
+    border: 2px solid var(--bg-0); cursor: grab;
+}
+.dual-range input[type=range]::-moz-range-thumb {
+    pointer-events: auto;
+    width: 16px; height: 16px; border: 2px solid var(--bg-0);
+    border-radius: 50%; background: var(--c-purple); cursor: grab;
+}

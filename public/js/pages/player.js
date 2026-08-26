@@ -22,6 +22,7 @@
     const vizSrcLbl       = document.getElementById('viz-src-lbl');
     const vizText         = document.getElementById('viz-text');
     const gainRow         = document.getElementById('gain-row');
+    const drFill          = document.getElementById('dr-fill');
 
     // 관리자 기본값(서버 설정) + 사용자 개별 조정(localStorage)
     const VR_ADMIN = Object.assign({ hFovDeg: 100, fisheyeFovDeg: 100, pitchDeg: 30, yawDeg: 0, eye: 'left' }, CFG.vrDefaults || {});
@@ -167,9 +168,9 @@
     function pullFromUI(changed) {
         let lo = parseInt(outMinSlider.value, 10);
         let hi = parseInt(outMaxSlider.value, 10);
-        if (lo >= hi) {
-            if (changed === 'min') { lo = Math.max(0, hi - 5); outMinSlider.value = lo; }
-            else                   { hi = Math.min(100, lo + 5); outMaxSlider.value = hi; }
+        if (lo > hi) {                       // 손잡이가 교차하면 민 쪽을 상대에 맞춘다
+            if (changed === 'min') { lo = hi; outMinSlider.value = lo; }
+            else                   { hi = lo; outMaxSlider.value = hi; }
         }
         stroke.outMin = lo;
         stroke.outMax = hi;
@@ -184,6 +185,10 @@
         if (!strokeUIReady) return;
         outMinValue.textContent   = stroke.outMin;
         outMaxValue.textContent   = stroke.outMax;
+        if (drFill) {                        // 두 손잡이 사이를 채운다
+            drFill.style.left  = stroke.outMin + '%';
+            drFill.style.width = (stroke.outMax - stroke.outMin) + '%';
+        }
         const gpct = Math.round(stroke.gain * 100);
         intensityValue.textContent = (gpct > 0 ? '+' : '') + gpct + '%';
 

@@ -82,37 +82,25 @@
     /**
      * 스크립트 위치(0~100) → 실제 출력 위치
      *
-     * 참고 구현(tnxa/mosa `tcode.js` scaleAxes)과 같은 선형 매핑을 쓰되,
-     * 강도(gain)를 **중앙 기준 배율**로 얹는다. `interp`(이동시간)는 건드리지 않는다.
+     *   center = (최소 + 최대) / 2        ← 최소·최대는 '움직임의 중심'을 정한다
+     *   out    = center + (pos - 50) * (1 + gain)
+     *   → [최소, 최대] 클램프 → [0, 99]
      *
-     *   1) 정규화  norm = 확장 ON ? (pos - lo)/span : pos/100
-     *   2) 매핑    base = outMin + norm * (outMax - outMin)
-     *   3) 강도    out  = center + (base - center) * (1 + gain)
-     *              gain 0 = 원본 그대로, +0.8 = 1.8배, -0.8 = 0.2배
-     *   4) 클램프  [outMin, outMax] → [0, 99]
-     *
-     * center(중앙)는 "강도를 바꿔도 움직이지 않는 기준점"이다.
-     *   확장 ON  → 출력 범위의 중앙 (원본을 이미 그 범위로 폈으므로)
-     *   확장 OFF → 원본 진폭의 중앙을 매핑한 값 (강도 0%가 원본 그대로가 되도록)
+     * - `pos`는 50을 중립으로 보는 편차로 해석한다. 기본값(0~100 · 강도 0%)이면
+     *   center = 50, 배율 1 → **out = pos** 즉 스크립트 원본 그대로다.
+     * - 강도는 그 중심을 기준으로 편차를 키우거나(+) 줄인다(−). 0% = 1배.
+     * - 자동 확장이 꺼져 있으면 강도를 쓰지 않는다(배율 1). 중심 이동만 적용된다.
+     * - `interp`(이동시간)는 절대 건드리지 않는다.
      */
     function shapeStroke(pos, ax, shape, intensity) {
         if (!shape) return Math.round(50 + (pos - 50) * intensity);   // 구버전 호출부 호환
 
         const outMin = Math.max(0, Math.min(100, shape.outMin));
         const outMax = Math.max(outMin, Math.min(100, shape.outMax));
-        const gain   = shape.gain == null ? 0 : shape.gain;           // -0.8 ~ +0.8
+        const center = (outMin + outMax) / 2;
+        const gain   = shape.expand ? (shape.gain == null ? 0 : shape.gain) : 0;
 
-        const canExpand = shape.expand && ax && ax.span >= MIN_EXPAND_SPAN;
-        const norm = canExpand ? (pos - ax.lo) / ax.span : pos / 100;
-
-        const span = outMax - outMin;
-        const base = outMin + norm * span;
-
-        const centerNorm = canExpand ? 0.5
-            : (ax && ax.span ? ((ax.lo + ax.hi) / 2) / 100 : 0.5);
-        const center = outMin + centerNorm * span;
-
-        const out = center + (base - center) * (1 + gain);
+        const out = center + (pos - 50) * (1 + gain);
         return Math.round(Math.max(outMin, Math.min(outMax, out)));
     }
 

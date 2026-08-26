@@ -81,16 +81,18 @@
 
                 <div id="viz-text" class="mono" style="font-size:11px;color:var(--tx-2);margin-top:10px;text-align:center;"></div>
 
-                <!-- 최소 · 최대 · 강도 — 같은 형태의 가로 슬라이더 -->
+                <!-- 중심 범위 — 한 트랙에 손잡이 두 개 (강도 바와 같은 스타일) -->
                 <div class="stroke-ctl">
-                    <span class="stroke-ctl-lbl">최소</span>
-                    <input type="range" id="out-min-slider" min="0" max="100" step="1" value="0">
-                    <span id="out-min-value" class="mono stroke-ctl-val">0</span>
-                </div>
-                <div class="stroke-ctl">
-                    <span class="stroke-ctl-lbl">최대</span>
-                    <input type="range" id="out-max-slider" min="0" max="100" step="1" value="100">
-                    <span id="out-max-value" class="mono stroke-ctl-val">100</span>
+                    <span class="stroke-ctl-lbl">범위</span>
+                    <div class="dual-range">
+                        <div class="dr-track"></div>
+                        <div class="dr-fill" id="dr-fill"></div>
+                        <input type="range" id="out-min-slider" min="0" max="100" step="1" value="0">
+                        <input type="range" id="out-max-slider" min="0" max="100" step="1" value="100">
+                    </div>
+                    <span class="mono stroke-ctl-val">
+                        <span id="out-min-value">0</span>~<span id="out-max-value">100</span>
+                    </span>
                 </div>
 
                 <label class="sw-row" style="margin-top:10px;cursor:pointer;">
@@ -155,4 +157,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=gain0"></script>
+<script src="/js/pages/player.js?v=center1"></script>
