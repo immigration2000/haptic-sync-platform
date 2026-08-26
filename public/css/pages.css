@@ -553,18 +553,18 @@
 
 /* 기기 이동 한계 — 세로 이중 손잡이 (미리보기 막대 옆)
    강도 바와 같은 보라 계열. 손잡이가 겹쳐도 잡기 쉽도록 트랙을 두껍게 둔다. */
-.v-range { position: relative; width: 22px; height: 200px; }
+.v-range { position: relative; width: 18px; height: 200px; }   /* 높이는 미리보기 트랙과 같게 */
 .v-range .v-track,
 .v-range .v-fill {
     position: absolute; left: 50%; transform: translateX(-50%);
-    width: 14px; border-radius: var(--rad-pill);
+    width: 10px; border-radius: var(--rad-pill);
 }
 .v-range .v-track { top: 0; bottom: 0; background: var(--bg-3); }
 .v-range .v-fill  { background: var(--c-purple); }
 .v-thumb {
     position: absolute; left: 50%;
-    width: 22px; height: 22px;
-    margin-left: -11px; margin-bottom: -11px;
+    width: 18px; height: 18px;
+    margin-left: -9px; margin-bottom: -9px;
     border-radius: 50%;
     background: var(--c-purple);
     border: 2px solid var(--bg-0);
