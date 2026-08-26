@@ -535,3 +535,20 @@
 .bj-card.bj-offline { opacity: 0.55; }
 .bj-card.bj-offline:hover { transform: none; border-color: var(--border-soft); }
 .bj-real-card .bj-go { cursor: pointer; }
+
+
+/* === 세로 이중 슬라이더 (플레이어 스트로크 범위) === */
+.vr-thumb {
+    position: absolute;
+    left: 50%;
+    width: 18px; height: 18px;
+    margin-left: -9px; margin-bottom: -9px;
+    border-radius: 50%;
+    background: var(--c-blue);
+    border: 2px solid var(--bg-0);
+    box-shadow: 0 1px 4px rgba(0,0,0,.5);
+    cursor: grab;
+    touch-action: none;
+}
+.vr-thumb:active { cursor: grabbing; transform: scale(1.12); }
+#gain-row input[type=range]:disabled { cursor: not-allowed; }

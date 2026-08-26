@@ -88,6 +88,7 @@ app.use(sessionMiddleware);
 app.use(flash());
 app.use(attachUser);
 
+
 // ─── Rate limiting ──────────────────────────────────────
 // 일반 — 분당 200 요청
 const generalLimit = rateLimit({
@@ -138,6 +139,13 @@ app.get('/sitemap.xml', (req, res) => {
 
 // ─── Routes ─────────────────────────────────────────────
 const { stmts, getSettingBool, getSetting } = require('./db');
+// 기기 튜닝값을 모든 뷰에 넘긴다 (layout이 window.PULSE_TUNING 으로 심는다).
+// funscript 엔진이 이 값을 속도 상한으로 쓴다 — 하드웨어 스펙이 오르면 관리자가 올린다.
+app.use((req, res, next) => {
+    res.locals.strokeMaxSpeed = parseFloat(getSetting('stroke_max_speed', '0.4')) || 0.4;
+    next();
+});
+
 
 // 점검 모드 — admin 외 차단
 app.use((req, res, next) => {

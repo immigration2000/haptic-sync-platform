@@ -76,6 +76,25 @@
                     </div>
 
                     <div class="form-row mt-4">
+                        <div class="form-label" style="margin-bottom:8px;">기기 스트로크 속도 상한
+                            <span class="text-faint" style="font-size:11px;">(하드웨어 스펙에 맞춰 조정)</span></div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <input class="form-input" type="number" name="stroke_max_speed"
+                                   min="0.05" max="5" step="0.05" value="<%= strokeMaxSpeed %>" style="width:110px;">
+                            <span class="text-faint" style="font-size:12px;">%/ms</span>
+                            <span class="text-faint mono" style="font-size:11px;">
+                                = 전구간(0~100%) 이동에 <%= Math.round(100 / strokeMaxSpeed) %>ms
+                            </span>
+                        </div>
+                        <p class="text-faint" style="font-size:11px;margin:6px 0 0;">
+                            진폭 자동확장은 같은 시간에 더 멀리 움직이라는 명령이 되므로, 이 상한을 넘으면
+                            엔진이 이동시간을 늘려 맞춥니다. <strong>너무 높이면 기기가 못 따라가
+                            시리얼이 밀리고 연결이 끊깁니다.</strong> 기본값 0.4는 기존 VR 스크립트가
+                            요구하는 최대 속도와 같은 값입니다. 실기기로 확인 후 조정하세요.
+                        </p>
+                    </div>
+
+                    <div class="form-row mt-4">
                         <div class="form-label" style="margin-bottom:8px;">업로드 용량 가드
                             <span class="text-faint" style="font-size:11px;">(폰 저장공간 보호)</span></div>
                         <div class="grid grid-3 gap-3">

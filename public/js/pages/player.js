@@ -22,6 +22,12 @@
     const vizSrcLbl       = document.getElementById('viz-src-lbl');
     const vizText         = document.getElementById('viz-text');
     const vizWarn         = document.getElementById('viz-warn');
+    const rangeTrack      = document.getElementById('range-track');
+    const rangeFill       = document.getElementById('range-fill');
+    const thumbMin        = document.getElementById('thumb-min');
+    const thumbMax        = document.getElementById('thumb-max');
+    const gainRow         = document.getElementById('gain-row');
+    const gainCapNote     = document.getElementById('gain-cap-note');
 
     // 관리자 기본값(서버 설정) + 사용자 개별 조정(localStorage)
     const VR_ADMIN = Object.assign({ hFovDeg: 100, fisheyeFovDeg: 100, pitchDeg: 30, yawDeg: 0, eye: 'left' }, CFG.vrDefaults || {});
@@ -185,7 +191,62 @@
         outMinValue.textContent   = stroke.outMin;
         outMaxValue.textContent   = stroke.outMax;
         intensityValue.textContent = Math.round(stroke.gain * 100) + '%';
+
+        // 세로 이중 슬라이더 위치 (아래가 0)
+        if (rangeFill) {
+            rangeFill.style.bottom = stroke.outMin + '%';
+            rangeFill.style.height = (stroke.outMax - stroke.outMin) + '%';
+        }
+        if (thumbMin) thumbMin.style.bottom = stroke.outMin + '%';
+        if (thumbMax) thumbMax.style.bottom = stroke.outMax + '%';
+
+        // 자동확장이 꺼지면 강도는 의미가 없다 → 함께 비활성
+        const on = !!stroke.expand;
+        if (gainRow) { gainRow.style.opacity = on ? '1' : '.45'; }
+        intensitySlider.disabled = !on;
+
+        applyGainCap();
         renderViz();
+    }
+
+    /* 강도 상한 — 속도 제한에 걸리면 아무리 올려도 그 이상 안 올라간다.
+       필요속도 = 원본최대속도 × (출력폭 × 강도) / 기준폭
+       이 값이 상한을 넘지 않는 최대 강도를 구해 슬라이더 max 로 건다. */
+    function applyGainCap() {
+        if (!strokeUIReady || !window.PulseFunscript) return;
+        const FSx = window.PulseFunscript;
+        const cap = FSx.maxSpeed ? FSx.maxSpeed() : 0.4;
+        const outSpan = Math.max(1, stroke.outMax - stroke.outMin);
+
+        // 원본 진폭 정보가 없으면(스크립트 로드 전) 제한하지 않는다
+        if (!strokeAxis || !strokeAxis.maxSpeed) {
+            intensitySlider.max = 100;
+            if (gainCapNote) gainCapNote.style.display = 'none';
+            return;
+        }
+        const base = (stroke.expand && strokeAxis.span >= FSx.MIN_EXPAND_SPAN) ? strokeAxis.span : 100;
+        const perGain = strokeAxis.maxSpeed * (outSpan / base);      // 강도 1.0 일 때 필요속도
+        let maxGain = perGain > 0 ? cap / perGain : 1;
+        let maxPct = Math.floor(Math.min(1, maxGain) * 100 / 5) * 5; // 슬라이더 step(5)에 맞춤
+        if (maxPct < 20) maxPct = 20;                                // 슬라이더 최소값 아래로는 못 내린다
+
+        intensitySlider.max = String(maxPct);
+        if (stroke.gain * 100 > maxPct) {                            // 이미 넘어 있으면 끌어내린다
+            stroke.gain = maxPct / 100;
+            intensity = stroke.gain;
+            intensitySlider.value = String(maxPct);
+            intensityValue.textContent = maxPct + '%';
+        }
+
+        if (gainCapNote) {
+            const limited = maxPct < 100;
+            const stillOver = (perGain * (maxPct / 100)) > cap + 1e-9;
+            gainCapNote.style.display = limited ? 'block' : 'none';
+            gainCapNote.textContent = !limited ? ''
+                : stillOver
+                    ? `⚠ 최소 강도에서도 기기 속도 한계(${cap} %/ms)를 넘습니다 — 최소~최대 범위를 좁혀주세요.`
+                    : `⚠ 기기 속도 한계로 강도는 ${maxPct}%까지만 올라갑니다. 범위를 좁히면 더 올릴 수 있습니다.`;
+        }
     }
 
     // 실제 움직임 범위 미리보기.
@@ -271,6 +332,54 @@
         intensitySlider.addEventListener('input', () => pullFromUI('gain'));
         expandToggle.addEventListener('change', () => pullFromUI('expand'));
     }
+
+    /* 세로 이중 슬라이더 — 최소·최대 손잡이를 끌어 범위를 정한다.
+       네이티브 range를 세로로 겹쳐 쓰는 건 브라우저별로 동작이 갈려서 직접 만들었다.
+       실제 값은 숨겨둔 range 입력에 넣어 기존 pullFromUI 흐름을 그대로 쓴다. */
+    if (rangeTrack && thumbMin && thumbMax) {
+        let dragging = null;
+
+        const valueAt = (clientY) => {
+            const r = rangeTrack.getBoundingClientRect();
+            const ratio = (r.bottom - clientY) / r.height;          // 아래가 0
+            return Math.max(0, Math.min(100, Math.round(ratio * 100)));
+        };
+        const nearest = (v) => (Math.abs(v - stroke.outMin) <= Math.abs(v - stroke.outMax) ? 'min' : 'max');
+
+        function applyDrag(which, v) {
+            if (which === 'min') {
+                outMinSlider.value = Math.min(v, stroke.outMax - 5);
+                pullFromUI('min');
+            } else {
+                outMaxSlider.value = Math.max(v, stroke.outMin + 5);
+                pullFromUI('max');
+            }
+        }
+
+        const onMove = (e) => {
+            if (!dragging) return;
+            e.preventDefault();
+            applyDrag(dragging, valueAt(e.touches ? e.touches[0].clientY : e.clientY));
+        };
+        const onUp = () => { dragging = null; };
+
+        [thumbMin, thumbMax].forEach(function (el) {
+            const start = (e) => { dragging = el.getAttribute('data-which'); e.preventDefault(); };
+            el.addEventListener('mousedown', start);
+            el.addEventListener('touchstart', start, { passive: false });
+        });
+        // 트랙을 직접 누르면 가까운 손잡이가 그쪽으로 온다
+        rangeTrack.addEventListener('mousedown', (e) => {
+            if (e.target === thumbMin || e.target === thumbMax) return;
+            const v = valueAt(e.clientY);
+            dragging = nearest(v);
+            applyDrag(dragging, v);
+        });
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('mouseup', onUp);
+        document.addEventListener('touchend', onUp);
+    }
     strokeReset && strokeReset.addEventListener('click', () => {
         stroke = Object.assign({}, STROKE_DEFAULT);
         pushToUI();
@@ -296,7 +405,8 @@
         }
 
         strokeAxis = L0 || null;
-        renderViz();
+        // 원본 진폭·속도를 알게 된 시점이라 강도 상한을 여기서 다시 계산해야 한다
+        renderStroke();
 
         engine = new FS.MultiAxisEngine({
             video,

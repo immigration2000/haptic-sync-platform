@@ -73,7 +73,14 @@
     //       자동확장으로 0~100(폭 100)이 되면 배율 5배 → 전구간을 50ms에 이동하라는 명령이 된다.
     //       기기가 못 따라가면 시리얼이 밀려 쓰기가 지연되고, 결국 연결이 끊긴다.
     //   → 거리에 맞춰 이동시간(interp)을 늘려준다. 빠른 구간은 살짝 늦어지지만 끊기지 않는다.
-    const MAX_SPEED = 0.4;
+    const MAX_SPEED_DEFAULT = 0.4;
+    // 관리자 설정으로 덮어쓸 수 있다 (기기 스펙이 올라가면 조정).
+    // layout에서 window.PULSE_TUNING 을 심어주며, 이 파일이 먼저 로드되므로 매번 읽는다.
+    function maxSpeed() {
+        const t = window.PULSE_TUNING;
+        const v = t && parseFloat(t.maxSpeed);
+        return (v && v > 0) ? v : MAX_SPEED_DEFAULT;
+    }
 
     // 타이머 루프 주기(ms). 화면이 가려져 rAF가 멈춘 동안의 예비 경로다.
     // ⚠ 브라우저는 숨겨진 탭의 타이머를 1초 이상으로 늦춘다(오디오 재생 중이면 완화).
@@ -212,7 +219,7 @@
                     // 속도 제한 — 실제로 움직여야 하는 거리 기준으로 이동시간을 확보한다.
                     // (성형 후 위치로 계산해야 한다. 원본 거리로 재면 확장 배율이 반영되지 않는다)
                     const prev = (ax.lastOut == null) ? latest.pos : ax.lastOut;
-                    const need = Math.abs(latest.pos - prev) / MAX_SPEED;
+                    const need = Math.abs(latest.pos - prev) / maxSpeed();
                     if (latest.interp < need) latest.interp = Math.round(need);
                     ax.lastOut = latest.pos;
 
@@ -245,7 +252,8 @@
         // 따로 구현하면 공식이 바뀔 때 미리보기만 조용히 어긋난다.
         shapeStroke,
         MIN_EXPAND_SPAN,
-        MAX_SPEED,
+        maxSpeed,                 // 현재 적용 중인 속도 상한 (관리자 설정 반영)
+        MAX_SPEED_DEFAULT,
         splitFunscriptPath,
         AXIS_DEFS,
     };
