@@ -91,16 +91,17 @@
                         <!-- 강도 바와 같은 라운드 박스. 배경 레이어로 깔아 레이아웃에 영향을 주지 않는다
                              (padding/border 를 주면 슬라이더가 밀려 눈금과 어긋난다) -->
                         <div class="ctl-box" aria-hidden="true"></div>
+                        <span class="v-cap" title="움직임의 중심과 허용 범위. 두 손잡이의 가운데가 중심이 됩니다.">중심</span>
                         <div id="vlimit" class="v-range" style="flex:1;position:relative;z-index:1;">
                             <div class="v-track"></div>
                             <div class="v-fill" id="v-fill"></div>
                             <div class="v-thumb" id="v-thumb-max" data-which="max"></div>
                             <div class="v-thumb" id="v-thumb-min" data-which="min"></div>
                         </div>
-                        <span style="font-size:10px;color:var(--tx-3);margin-top:4px;white-space:nowrap;
-                                     position:relative;z-index:1;"
-                              title="움직임의 중심과 허용 범위. 두 손잡이의 가운데가 중심이 됩니다.">
-                            중심 <span class="mono" style="color:var(--tx-2);"><span id="out-min-value">0</span>~<span id="out-max-value">100</span></span>
+                        <!-- 숫자 칸을 3ch 고정 폭으로 두어 0→1→100 으로 자릿수가 변해도
+                             묶음이 옆으로 늘어나지 않게 한다 -->
+                        <span class="v-val mono">
+                            <span class="v-num" id="out-min-value">0</span><span class="v-sep">~</span><span class="v-num v-num-r" id="out-max-value">100</span>
                         </span>
                     </div>
                 </div>
