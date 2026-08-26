@@ -572,3 +572,52 @@
     cursor: grab; touch-action: none;
 }
 .v-thumb:active { cursor: grabbing; transform: scale(1.1); }
+
+
+/* === 토글 스위치 · 펼침 설정 (스튜디오 프로필 + 플레이어 공용)
+   원래 profile.ejs 의 인라인 <style> 에만 있어서 플레이어에서는 적용되지 않았다.
+   그 결과 .sw-row 가 display:inline 으로 남아 체크박스가 글씨와 겹쳤다. === */
+/* 좌우로 움직이는 토글 스위치 */
+.sw {
+    appearance: none; -webkit-appearance: none;
+    width: 46px; height: 26px; flex: none;
+    border-radius: var(--rad-pill);
+    background: var(--bg-3);
+    border: 1px solid var(--border-soft);
+    position: relative; cursor: pointer;
+    transition: background .15s ease;
+}
+.sw::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--tx-3);
+    transition: transform .15s ease, background .15s ease;
+}
+.sw:checked { background: var(--c-purple); border-color: var(--c-purple); }
+.sw:checked::after { transform: translateX(20px); background: #fff; }
+
+.sw-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--rad-md);
+}
+.sw-row.sw-master { border-color: rgba(123,45,255,0.35); background: rgba(123,45,255,0.07); }
+.sw-text { flex: 1; min-width: 0; }
+.sw-text strong { display: block; font-size: 14px; }
+.sw-text span { display: block; font-size: 11px; color: var(--tx-3); margin-top: 2px; }
+
+/* 스위치를 켜면 바로 아래로 설정이 펼쳐진다 */
+.sw-item { margin-bottom: 8px; }
+.sw-item .sw-panel {
+    display: none;
+    padding: 14px;
+    border: 1px solid var(--border-soft);
+    border-top: none;
+    border-radius: 0 0 var(--rad-md) var(--rad-md);
+    background: var(--bg-1);
+}
+.sw-item.on .sw-panel { display: block; }
+.sw-item.on > .sw-row { border-radius: var(--rad-md) var(--rad-md) 0 0; border-bottom-color: transparent; }
+#live-block.hidden-block { display: none; }
