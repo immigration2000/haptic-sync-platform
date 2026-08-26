@@ -21,6 +21,7 @@
     const vizSrc          = document.getElementById('viz-src');
     const vizSrcLbl       = document.getElementById('viz-src-lbl');
     const vizText         = document.getElementById('viz-text');
+    const vizWarn         = document.getElementById('viz-warn');
 
     // 관리자 기본값(서버 설정) + 사용자 개별 조정(localStorage)
     const VR_ADMIN = Object.assign({ hFovDeg: 100, fisheyeFovDeg: 100, pitchDeg: 30, yawDeg: 0, eye: 'left' }, CFG.vrDefaults || {});
@@ -231,9 +232,23 @@
 
         const ratio = strokeAxis.span > 0 ? (hi - lo) / strokeAxis.span : 0;
         const blocked = stroke.expand && strokeAxis.span < FSx.MIN_EXPAND_SPAN;
+
+        // 진폭을 늘리면 같은 시간에 더 멀리 가야 하므로 요구 속도가 배율만큼 커진다.
+        // 상한을 넘으면 엔진이 이동시간을 늘려 맞추므로, 실제로는 목표 진폭에 다 못 갈 수 있다.
+        const needSpeed = (strokeAxis.maxSpeed || 0) * ratio;
+        const over = FSx.MAX_SPEED && needSpeed > FSx.MAX_SPEED;
+
         if (vizText) {
             vizText.textContent = `실제 ${lo}~${hi} (폭 ${hi - lo}) · 원본 대비 ${ratio.toFixed(2)}배`
                 + (blocked ? ' · ⚠ 원본 진폭이 좁아 확장 안 함' : '');
+        }
+        if (vizWarn) {
+            vizWarn.textContent = over
+                ? `⚠ 기기 속도 한계 초과 (필요 ${needSpeed.toFixed(2)} / 상한 ${FSx.MAX_SPEED} %/ms)`
+                  + ` — 빠른 구간에서 이동시간이 늘어나 진폭이 목표보다 작아집니다.`
+                  + ` 범위를 좁히거나 강도를 낮추면 원래 리듬에 가까워집니다.`
+                : '';
+            vizWarn.style.display = over ? 'block' : 'none';
         }
     }
 

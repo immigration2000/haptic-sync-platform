@@ -53,10 +53,27 @@
                 if (v < lo) lo = v;
                 if (v > hi) hi = v;
             }
-            axes[def.tcode] = { actions: acts, index: 0, url, lo, hi, span: hi - lo };
+            // 원본이 요구하는 최대 속도(%/ms). 확장 배율을 곱하면 실제 요구 속도가 나온다.
+            let maxSpeed = 0;
+            for (let i = 1; i < acts.length; i++) {
+                const d = Math.abs((acts[i].pos || 0) - (acts[i - 1].pos || 0));
+                const g = Math.max(1, acts[i].at - acts[i - 1].at);
+                if (d / g > maxSpeed) maxSpeed = d / g;
+            }
+            axes[def.tcode] = { actions: acts, index: 0, url, lo, hi, span: hi - lo, maxSpeed, lastOut: null };
         }));
         return axes;
     }
+
+    // 최대 이동 속도 (위치% / ms). 기기가 물리적으로 낼 수 있는 속도의 상한이다.
+    // 0.4 %/ms = 전구간(0~100%)을 250ms에 이동 — 스트로커 기준 이미 빠른 편.
+    //
+    // ⚠ 왜 필요한가: 진폭을 늘리면 **같은 시간에 더 멀리** 가야 하므로 속도가 배율만큼 빨라진다.
+    //   예) vr_technician_01 은 원본 진폭 30~50(폭 20)에 최소 간격 50ms.
+    //       자동확장으로 0~100(폭 100)이 되면 배율 5배 → 전구간을 50ms에 이동하라는 명령이 된다.
+    //       기기가 못 따라가면 시리얼이 밀려 쓰기가 지연되고, 결국 연결이 끊긴다.
+    //   → 거리에 맞춰 이동시간(interp)을 늘려준다. 빠른 구간은 살짝 늦어지지만 끊기지 않는다.
+    const MAX_SPEED = 0.4;
 
     // 타이머 루프 주기(ms). 화면이 가려져 rAF가 멈춘 동안의 예비 경로다.
     // ⚠ 브라우저는 숨겨진 탭의 타이머를 1초 이상으로 늦춘다(오디오 재생 중이면 완화).
@@ -143,6 +160,7 @@
             const ms = this.video.currentTime * 1000;
             for (const k of Object.keys(this.axes)) {
                 const ax = this.axes[k];
+                ax.lastOut = null;      // 되감기 후 이전 위치 기준 속도계산이 어긋나지 않게
                 ax.index = 0;
                 for (let i = 0; i < ax.actions.length - 1; i++) {
                     if (ms > ax.actions[i].at) ax.index++;
@@ -190,6 +208,14 @@
                 if (latest) {
                     // 많이 밀렸으면 원래 보간시간(수십 ms)으로 튀지 않게 최소 이동시간을 준다
                     if (skipped > 0) latest.interp = Math.max(latest.interp, 120);
+
+                    // 속도 제한 — 실제로 움직여야 하는 거리 기준으로 이동시간을 확보한다.
+                    // (성형 후 위치로 계산해야 한다. 원본 거리로 재면 확장 배율이 반영되지 않는다)
+                    const prev = (ax.lastOut == null) ? latest.pos : ax.lastOut;
+                    const need = Math.abs(latest.pos - prev) / MAX_SPEED;
+                    if (latest.interp < need) latest.interp = Math.round(need);
+                    ax.lastOut = latest.pos;
+
                     latest.skipped = skipped;
                     triggered.push(latest);
                 }
@@ -219,6 +245,7 @@
         // 따로 구현하면 공식이 바뀔 때 미리보기만 조용히 어긋난다.
         shapeStroke,
         MIN_EXPAND_SPAN,
+        MAX_SPEED,
         splitFunscriptPath,
         AXIS_DEFS,
     };
