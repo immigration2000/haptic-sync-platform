@@ -84,7 +84,10 @@
                     <!-- 기기 이동 한계 — 세로 이중 손잡이 -->
                     <!-- 슬라이더 + 아래 글씨를 합쳐 미리보기 막대와 같은 높이(200px)로 맞춘다.
                          슬라이더는 flex:1 로 남는 높이를 채우므로 글꼴이 바뀌어도 총 높이가 유지된다. -->
-                    <div style="position:relative;display:flex;flex-direction:column;align-items:center;height:200px;">
+                    <!-- 바깥 높이(200px)는 그대로 두고 위아래 여백만 줘서 슬라이더만 짧아지게 한다.
+                         (박스는 절대 배치라 이 여백에 영향받지 않는다) -->
+                    <div style="position:relative;display:flex;flex-direction:column;align-items:center;
+                                height:200px;padding:8px 0;box-sizing:border-box;">
                         <!-- 강도 바와 같은 라운드 박스. 배경 레이어로 깔아 레이아웃에 영향을 주지 않는다
                              (padding/border 를 주면 슬라이더가 밀려 눈금과 어긋난다) -->
                         <div class="ctl-box" aria-hidden="true"></div>
@@ -172,4 +175,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=box"></script>
+<script src="/js/pages/player.js?v=box2"></script>
