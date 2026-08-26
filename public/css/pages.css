@@ -553,7 +553,7 @@
 
 /* 기기 이동 한계 — 세로 이중 손잡이 (미리보기 막대 옆)
    강도 바와 같은 보라 계열. 손잡이가 겹쳐도 잡기 쉽도록 트랙을 두껍게 둔다. */
-.v-range { position: relative; width: 18px; height: 200px; }   /* 높이는 미리보기 트랙과 같게 */
+.v-range { position: relative; width: 18px; min-height: 0; }   /* 높이는 부모 flex 가 정한다 */
 .v-range .v-track,
 .v-range .v-fill {
     position: absolute; left: 50%; transform: translateX(-50%);

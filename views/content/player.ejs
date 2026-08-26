@@ -82,20 +82,18 @@
                     </div>
 
                     <!-- 기기 이동 한계 — 세로 이중 손잡이 -->
-                    <div style="display:flex;flex-direction:column;align-items:center;">
-                        <div id="vlimit" class="v-range">
+                    <!-- 슬라이더 + 아래 글씨를 합쳐 미리보기 막대와 같은 높이(200px)로 맞춘다.
+                         슬라이더는 flex:1 로 남는 높이를 채우므로 글꼴이 바뀌어도 총 높이가 유지된다. -->
+                    <div style="display:flex;flex-direction:column;align-items:center;height:200px;">
+                        <div id="vlimit" class="v-range" style="flex:1;">
                             <div class="v-track"></div>
                             <div class="v-fill" id="v-fill"></div>
                             <div class="v-thumb" id="v-thumb-max" data-which="max"></div>
                             <div class="v-thumb" id="v-thumb-min" data-which="min"></div>
                         </div>
-                        <span class="stroke-ctl-val" style="min-width:0;font-size:10px;margin-top:6px;
-                                     color:var(--tx-3);text-align:center;"
+                        <span style="font-size:10px;color:var(--tx-3);margin-top:4px;white-space:nowrap;"
                               title="움직임의 중심과 허용 범위. 두 손잡이의 가운데가 중심이 됩니다.">
-                            중심<br>
-                            <span class="mono" style="color:var(--tx-2);">
-                                <span id="out-min-value">0</span>~<span id="out-max-value">100</span>
-                            </span>
+                            중심 <span class="mono" style="color:var(--tx-2);"><span id="out-min-value">0</span>~<span id="out-max-value">100</span></span>
                         </span>
                     </div>
                 </div>
@@ -169,4 +167,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=vfit"></script>
+<script src="/js/pages/player.js?v=vfit2"></script>
