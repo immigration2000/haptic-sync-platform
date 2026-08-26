@@ -82,14 +82,17 @@
     /**
      * 스크립트 위치(0~100) → 실제 출력 위치
      *
-     *   center = (최소 + 최대) / 2        ← 최소·최대는 '움직임의 중심'을 정한다
-     *   out    = center + (pos - 50) * (1 + gain)
+     *   center = (최소 + 최대) / 2                 ← 최소·최대는 '움직임의 중심'을 정한다
+     *   dev    = pos - 스크립트 자체 중앙((lo+hi)/2)
+     *   out    = center + dev * (1 + gain)        ← 확장 OFF면 gain = 0
      *   → [최소, 최대] 클램프 → [0, 99]
      *
-     * - `pos`는 50을 중립으로 보는 편차로 해석한다. 기본값(0~100 · 강도 0%)이면
-     *   center = 50, 배율 1 → **out = pos** 즉 스크립트 원본 그대로다.
-     * - 강도는 그 중심을 기준으로 편차를 키우거나(+) 줄인다(−). 0% = 1배.
-     * - 자동 확장이 꺼져 있으면 강도를 쓰지 않는다(배율 1). 중심 이동만 적용된다.
+     * ⚠ 편차 기준은 **스크립트 자체 중앙**이어야 한다. 50 같은 고정값을 기준으로 잡으면
+     *   원본이 한쪽으로 치우친 스크립트(예: 30~50)에서 강도를 올릴 때
+     *   **한쪽으로만 늘어난다.** 자체 중앙을 쓰면 중심 기준으로 위아래가 똑같이 벌어진다.
+     *
+     * - 강도 0% = 1배(원본 진폭 그대로). 중심만 사용자가 정한 위치로 옮겨진다.
+     * - 자동 확장이 꺼져 있으면 강도를 쓰지 않는다(1배). 중심 이동만 적용된다.
      * - `interp`(이동시간)는 절대 건드리지 않는다.
      */
     function shapeStroke(pos, ax, shape, intensity) {
@@ -100,7 +103,8 @@
         const center = (outMin + outMax) / 2;
         const gain   = shape.expand ? (shape.gain == null ? 0 : shape.gain) : 0;
 
-        const out = center + (pos - 50) * (1 + gain);
+        const srcCenter = (ax && ax.span > 0) ? (ax.lo + ax.hi) / 2 : 50;
+        const out = center + (pos - srcCenter) * (1 + gain);
         return Math.round(Math.max(outMin, Math.min(outMax, out)));
     }
 
