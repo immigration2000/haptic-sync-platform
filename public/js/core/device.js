@@ -225,14 +225,21 @@
             if (state.kind === 'serial') {
                 if (state.writer) {
                     try { writeOnce(drv().stop); } catch (_) {}
-                    // write를 기다리지 않으므로 큐에 남은 게 있을 수 있다.
-                    // abort()는 대기 중 쓰기를 실패시키며 스트림을 버린다 — 그래야 포트가 풀린다.
+                    // ⚠⚠ **여기서 writer.abort()를 부르면 안 된다.**
+                    //   연결 후 시간이 조금만 지나면 이 포트에서 abort()가 **영영 안 끝나고**,
+                    //   그 뒤 close()까지 같이 매달려 포트가 OS에 열린 채 남는다.
+                    //   한번 그렇게 되면 재시도도 안 된다 ("close() is already in progress").
                     //
-                    // ⚠ abort()가 300ms 안에 안 끝나도 **잠금은 반드시 푼다.**
-                    //   잠긴 채로 close()하면 거부되고, 포트가 OS에 열린 채 남는다.
-                    //   (기기가 이동 명령 수행 중이면 버퍼를 안 빼가 abort가 늦어질 수 있다)
-                    try { await bounded(state.writer.abort(), 300); }
-                    finally { try { state.writer.releaseLock(); } catch (_) {} }
+                    //   2026-08-28 실기기 계측 (CP210x, MiraPlay-Lite 펌웨어):
+                    //     연결 직후          → abort settled @0ms
+                    //     유휴 20초 뒤       → abort TIMEOUT @5000ms, 이어서 close TIMEOUT @8000ms
+                    //     abort 빼고 releaseLock만 → close settled @2ms  ✅
+                    //   순수 Web Serial(우리 코드 없이)로도 그대로 재현된다 — 우리 버그가 아니라
+                    //   이 조합에서의 브라우저/드라이버 동작이다. 그래서 **피해 가는 것이 유일한 대응**이다.
+                    //
+                    //   잠금만 풀어주면 된다. close()가 어차피 writable을 abort하고
+                    //   readable을 cancel한다 (Web Serial 명세).
+                    try { state.writer.releaseLock(); } catch (_) {}
                 }
                 // 읽기 스트림 먼저 정리해야 port.close()가 걸리지 않음
                 if (state.reader) {
@@ -241,7 +248,7 @@
                 }
                 if (state.readDone) { await bounded(state.readDone, 300); }
                 if (state.port) {
-                    await bounded(state.port.close(), 500);
+                    await bounded(state.port.close(), 1500);
                     // 닫히면 readable/writable이 null이 된다. 남아 있으면 닫기 실패다.
                     // bounded()가 거부를 삼키므로 **결과로 확인하는 수밖에 없다.**
                     if (state.port.readable || state.port.writable) leftOpen = state.port;
