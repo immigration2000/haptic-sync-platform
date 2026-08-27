@@ -391,7 +391,10 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
   밀렸던 토큰이 한꺼번에 터져 나가던 문제(40개 폭주)를 막는다.
 - rAF는 페이지가 그려지지 않으면 멈춘다 → `setInterval(40ms)` 병행 + `visibilitychange`에 `resync()`.
 
-⚠ **전송 계층 변경은 실기기 검증 전이다.** 끊김이 실제로 사라졌는지 확인되지 않았다.
+✅ **2026-08-27 실기기 확인** — 영상을 화면 밖으로 스크롤한 상태로 약 76초:
+엔진 발생 수와 실제 전송 수가 한 줄도 어긋나지 않았고(2초당 6~19개), `lastError` 없음,
+연결 유지, **기기도 실제로 움직였다.** 스크롤로 멈추던 증상은 재현되지 않는다.
+⚠ 단, 리모컨(1:N 원격 제어) 경로는 여전히 미검증이다.
 
 ## 7. 주요 트러블슈팅 기록
 
@@ -408,6 +411,7 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
 | 손상 세션 파일(깨진 JSON 또는 cookie 필드 누락) → 해당 쿠키 사용자 500 | app.js에 세션 store get 래퍼 추가 — 손상 세션은 새 세션으로 대체 (2026-06-10) |
 | CSRF가 "적용"으로 기재됐으나 실제 `app.use(doubleCsrfProtection)` 누락 | 2026-06-10 배선 완료 (cookie-parser + csrf-csrf v3 generateToken, 전 폼 _csrf, fetch는 헤더, 멀티파트는 multer 후) |
 | CSRF _csrf 일괄삽입 정규식이 `<%= %>`(action 내) 폼에서 `%>`의 `>`를 태그 끝으로 오인 → hidden input이 태그 중간 삽입돼 폼 깨짐(403) | 2026-06-10 수정: bj_apps·dummy·reports·videos·reset 5폼 _csrf 위치 교정. (CSRF 배포 때부터 폰에도 깨진 채 나갔던 것 — 이번에 함께 배포) |
+| 화면을 스크롤해 영상이 가려지면 기기가 멈춘다 | **해결·실기기 확인(2026-08-27).** 원인은 rAF—브라우저가 페이지를 그리지 않으면 `requestAnimationFrame`이 멈춰 엔진 루프가 서버린다. `setInterval(40ms)` 예비 루프 병행 + `visibilitychange` → `resync()` + 축별 최신 키프레임만 전송(§6-13)으로 해결. 검증: 영상을 화면 밖으로 내린 채 **약 76초 동안 엔진 발생 수 = 실제 전송 수**, 유실·오류 0건, 기기 실제 동작 확인 |
 
 ---
 
@@ -424,7 +428,9 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
       config `provider` 플래그만 바꾸면 붙는 구조. **별도 모듈로 구현 후 연결** 방침
 - [ ] (확장) AWS 이전 — S3/CloudFront. `storage.js` 추상화 완료로 DB 수정 없이 전환 가능(§9-10).
       영상은 **서명 URL** 필요(구독전용 보호), 업로드는 presigned 직업로드 권장
-- [ ] **스트로크/전송 실기기 검증** — mosa식 전송(§6-13)으로 끊김이 사라지는지. **최우선**
+- [x] **스트로크/전송 실기기 검증** — 2026-08-27. 영상을 화면 밖으로 내린 채 76초,
+      유실·0·오류 0·기기 정상 동작. §6-13
+- [ ] 리모컨(1:N 원격 제어) 경로 실기기 검증 — 위 검증은 **로컬 재생 경로만** 다뤄다
 - [ ] 축 매핑 `R0`/`R1` 확정 — 코드는 `.roll`→R0 / `.twist`→R1, AI_NOTES `TCODE_GUIDE.md`는 반대로 적혀 있다. 실기기 필요
 - [ ] 기존 업로드분 `thumb_key` 백필 — 썸네일이 빈 상태(§6-11)
 - [ ] (옛 데모) 수익 시뮬레이터·합법성·로드맵·CTA / 데모 폰 재배포 — task #11·#12
