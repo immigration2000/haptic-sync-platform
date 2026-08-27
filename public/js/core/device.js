@@ -136,6 +136,11 @@
 
     // ─── Serial 연결 ─────────────────────────────────────────
     async function openSerialInternal(port) {
+        // 앞선 해제가 실패해 포트가 열린 채 남아 있을 수 있다(disconnect의 leftOpen).
+        // 그대로 open()하면 InvalidStateError가 나서 재연결이 영영 안 된다 → 먼저 닫아본다.
+        if (port.readable || port.writable) {
+            await bounded(port.close(), 500);
+        }
         await port.open({ baudRate: drv().serialBaud });
         startSerialRead(port);                       // 응답 수신 시작 (await 안 함)
         const writer = port.writable.getWriter();
@@ -215,13 +220,19 @@
     // ─── 공통 disconnect ─────────────────────────────────────
     async function disconnect(opts) {
         const keepIntent = !!(opts && opts.keepIntent);
+        let leftOpen = null;        // 닫는 데 실패한 포트 — 지우지 말고 남겨야 재시도할 수 있다
         try {
             if (state.kind === 'serial') {
                 if (state.writer) {
                     try { writeOnce(drv().stop); } catch (_) {}
                     // write를 기다리지 않으므로 큐에 남은 게 있을 수 있다.
                     // abort()는 대기 중 쓰기를 실패시키며 스트림을 버린다 — 그래야 포트가 풀린다.
-                    await bounded(state.writer.abort(), 300);
+                    //
+                    // ⚠ abort()가 300ms 안에 안 끝나도 **잠금은 반드시 푼다.**
+                    //   잠긴 채로 close()하면 거부되고, 포트가 OS에 열린 채 남는다.
+                    //   (기기가 이동 명령 수행 중이면 버퍼를 안 빼가 abort가 늦어질 수 있다)
+                    try { await bounded(state.writer.abort(), 300); }
+                    finally { try { state.writer.releaseLock(); } catch (_) {} }
                 }
                 // 읽기 스트림 먼저 정리해야 port.close()가 걸리지 않음
                 if (state.reader) {
@@ -231,6 +242,9 @@
                 if (state.readDone) { await bounded(state.readDone, 300); }
                 if (state.port) {
                     await bounded(state.port.close(), 500);
+                    // 닫히면 readable/writable이 null이 된다. 남아 있으면 닫기 실패다.
+                    // bounded()가 거부를 삼키므로 **결과로 확인하는 수밖에 없다.**
+                    if (state.port.readable || state.port.writable) leftOpen = state.port;
                 }
             } else if (state.kind === 'bluetooth') {
                 try { await writeOnce(drv().stop); } catch (_) {}
@@ -239,7 +253,9 @@
                 }
             }
         } finally {
-            state.port = null;
+            // 닫기에 실패했으면 포트 참조를 남긴다. null로 지우면 다시 닫을 방법이 없어져
+            // 페이지를 새로고침할 때까지 OS 포트가 잡힌 채로 남는다.
+            state.port = leftOpen;
             state.writer = null;
             state.reader = null;
             state.readDone = null;
@@ -248,9 +264,17 @@
             state.btChar = null;
             state.kind = null;
             state.connected = false;
-            state.lastError = '';
             state.sentCount = 0;
             state.portLabel = '';
+            // 해제 실패는 **반드시 드러나야 한다.** 예전에는 bounded()가 거부를 삼키고
+            // finally가 무조건 상태를 지워서, 화면은 '해제됨'인데 포트는 열린 채 남았고
+            // 콘솔에 아무 흔적도 없었다.
+            if (leftOpen) {
+                state.lastError = '포트를 닫지 못했습니다. 다시 연결을 시도하거나 페이지를 새로고침해 주세요.';
+                console.warn('[PulseDevice] 포트 닫기 실패 — OS에 열린 채로 남아 있습니다.', leftOpen.getInfo());
+            } else {
+                state.lastError = '';
+            }
             if (!keepIntent) sessionStorage.removeItem(KEY_INTENT);
             notify();
         }
