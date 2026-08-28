@@ -157,23 +157,44 @@
     // 설정은 기기·취향에 묶이므로 브라우저에 저장한다 (VR 재투영 설정과 같은 방식)
     const STROKE_KEY = 'pulse_stroke_cfg';
     const STROKE_DEFAULT = { outMin: 0, outMax: 100, gain: 0, expand: true };   // gain 0 = 원본 그대로
+
+    // 두 손잡이의 최소 간격. 0이면 겹쳐서 **다시 잡을 수 없는 막다른 상태**가 된다.
+    // (funscript.js의 MIN_EXPAND_SPAN과는 다른 값이다 — 저건 '스크립트 진폭'의 하한)
+    const MIN_SPAN = 10;
+
     let stroke = Object.assign({}, STROKE_DEFAULT);
     try {
         const saved = JSON.parse(localStorage.getItem(STROKE_KEY) || 'null');
         if (saved) stroke = Object.assign(stroke, saved);
     } catch (_) {}
+    // 이전 버전이 저장해둔 잘못된 값(예: 0~0)을 여기서 바로잡는다.
+    // 안 하면 화면을 열자마자 막다른 상태로 시작한다.
+    (function normalizeSpan() {
+        let lo = parseInt(stroke.outMin, 10); if (isNaN(lo)) lo = 0;
+        let hi = parseInt(stroke.outMax, 10); if (isNaN(hi)) hi = 100;
+        lo = Math.max(0, Math.min(100 - MIN_SPAN, lo));
+        hi = Math.max(lo + MIN_SPAN, Math.min(100, hi));
+        stroke.outMin = lo;
+        stroke.outMax = hi;
+    })();
 
     function saveStroke() {
         try { localStorage.setItem(STROKE_KEY, JSON.stringify(stroke)); } catch (_) {}
     }
 
-    // 슬라이더 → 상태. 최소가 최대를 넘지 않도록 서로 밀어낸다.
+    // 슬라이더 → 상태.
+    // ⚠ 예전에는 손잡이가 교차하면 **민 쪽을 상대에 맞췄다**(lo = hi).
+    //   그러면 두 손잡이가 같은 값이 되고, 그 뒤로는 min이 max를, max가 min을 서로 막아
+    //   **어느 쪽도 움직일 수 없는 막다른 상태**가 됐다. 최대를 0까지 내리면 특히 확실히 걸렸다.
+    //   지금은 반대로 — **민 쪽이 커서를 따라가고 상대를 밀어낸다.** 간격은 MIN_SPAN으로 유지한다.
     function pullFromUI(changed) {
-        let lo = parseInt(outMinSlider.value, 10);
-        let hi = parseInt(outMaxSlider.value, 10);
-        if (lo > hi) {                       // 손잡이가 교차하면 민 쪽을 상대에 맞춘다
-            if (changed === 'min') { lo = hi; outMinSlider.value = lo; }
-            else                   { hi = lo; outMaxSlider.value = hi; }
+        let lo = parseInt(outMinSlider.value, 10); if (isNaN(lo)) lo = 0;
+        let hi = parseInt(outMaxSlider.value, 10); if (isNaN(hi)) hi = 100;
+        if (hi - lo < MIN_SPAN) {
+            if (changed === 'min') { lo = Math.min(lo, 100 - MIN_SPAN); hi = lo + MIN_SPAN; }
+            else                   { hi = Math.max(hi, MIN_SPAN);       lo = hi - MIN_SPAN; }
+            outMinSlider.value = lo;
+            outMaxSlider.value = hi;
         }
         stroke.outMin = lo;
         stroke.outMax = hi;
@@ -212,9 +233,12 @@
             const r = vRange.getBoundingClientRect();
             return Math.max(0, Math.min(100, Math.round(((r.bottom - clientY) / r.height) * 100)));
         };
+        // 여기서 상대 손잡이에 걸어 막지 않는다. 그렇게 하면 값이 제자리에 머물러
+        // 커서만 따로 노는 데다, 겹친 상태에서는 영영 못 빠져나온다.
+        // 간격 유지는 pullFromUI가 (상대를 밀어내는 방식으로) 책임진다.
         const apply = (which, v) => {
-            if (which === 'min') { outMinSlider.value = Math.min(v, stroke.outMax); pullFromUI('min'); }
-            else                 { outMaxSlider.value = Math.max(v, stroke.outMin); pullFromUI('max'); }
+            if (which === 'min') { outMinSlider.value = v; pullFromUI('min'); }
+            else                 { outMaxSlider.value = v; pullFromUI('max'); }
         };
         const onMove = (e) => {
             if (!dragging) return;
