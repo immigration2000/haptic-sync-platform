@@ -30,6 +30,19 @@
         <% } %>
         <!-- 실제 broadcaster (Socket.IO로 동적 추가) -->
     </div>
+
+    <!-- 통화 대기 중인 스트리머 — 방송과 성격이 달라 섹션을 분리한다.
+         (방송=시청 무료·후원 / 통화=분당 과금) -->
+    <div id="call-section" style="display:none; margin-top:40px;">
+        <div class="list-header">
+            <div>
+                <div class="section-eyebrow">1:1 · 지금 통화 가능</div>
+                <h1 class="section-title" style="margin-bottom:0;">통화 대기 중인 스트리머</h1>
+                <p class="text-dim mt-4">통화 콘솔을 켜둔 스트리머입니다. 분당 요금이 부과됩니다.</p>
+            </div>
+        </div>
+        <div id="call-list" class="grid-list"></div>
+    </div>
 </section>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -65,5 +78,45 @@
     }
     socket.on('broadcast-list',         (list) => render(list));
     socket.on('broadcast-list-update',  (list) => render(list));
+
+    // ── 통화 대기 목록 (bj-list) ──
+    // 서버가 대기 풀이 바뀔 때마다 이 룸에도 쏜다. 없으면 섹션 자체를 숨긴다.
+    const callSection = document.getElementById('call-section');
+    const callListEl  = document.getElementById('call-list');
+    socket.on('bj-list', (list) => {
+        const arr = Array.isArray(list) ? list : [];
+        if (!arr.length) { callSection.style.display = 'none'; callListEl.innerHTML = ''; return; }
+        callSection.style.display = '';
+        callListEl.innerHTML = '';
+        for (const b of arr) {
+            const a = document.createElement('a');
+            a.className = 'card bj-card';
+            a.href = '/bj/call/' + encodeURIComponent(b.userId);
+            const initial = String(b.name || '?').replace(/^BJ-?/, '').charAt(0);
+            const thumb = document.createElement('div');
+            thumb.className = 'bj-thumb';
+            thumb.style.background = 'linear-gradient(135deg, #5EFFB0, #7B2DFF)';
+            thumb.textContent = initial;
+            const info = document.createElement('div');
+            info.className = 'bj-info';
+            const nameEl = document.createElement('div');
+            nameEl.className = 'bj-name';
+            nameEl.textContent = b.name || '스트리머';       // textContent — XSS 차단
+            const badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.style.cssText = 'background:rgba(94,255,176,0.18); color:#5EFFB0; font-size:9px; padding:2px 6px; margin-left:6px;';
+            badge.textContent = '📞 통화 가능';
+            nameEl.appendChild(badge);
+            const desc = document.createElement('div');
+            desc.className = 'bj-desc';
+            desc.textContent = '1:1 통화 대기 중 — 클릭하면 통화 요청';
+            const rate = document.createElement('div');
+            rate.className = 'bj-rate';
+            rate.innerHTML = '<span style="color: var(--c-green);">● 대기중</span><span>분당 과금</span>';
+            info.append(nameEl, desc, rate);
+            a.append(thumb, info);
+            callListEl.appendChild(a);
+        }
+    });
 })();
 </script>

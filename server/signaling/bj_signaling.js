@@ -198,6 +198,9 @@ module.exports = (httpServer, sessionMiddleware) => {
         socket.on('broadcast-lobby-enter', () => {
             socket.join('broadcast-lobby');
             socket.emit('broadcast-list', listBroadcasters());
+            // 통화 콘솔을 켠 스트리머도 로비에 보여준다(별도 섹션).
+            // 변경분은 broadcastLobby()가 이 룸에도 쏘고 있으므로, 입장 시 첫 목록만 보내면 된다.
+            socket.emit('bj-list', bjListPublic());
         });
 
         socket.on('viewer-join', ({ broadcasterUserId }) => {

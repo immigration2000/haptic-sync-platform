@@ -37,6 +37,26 @@
         }
     }
 
+    /**
+     * 액션 배열 → 엔진이 쓰는 축 객체.
+     * 진폭(lo/hi/span)을 여기서 한 번만 재둔다. 이걸 알아야 "원본이 좁아서 안 움직이는 것"과
+     * "사용자가 강도를 줄인 것"을 구분할 수 있고, 좁은 스크립트를 넓게 펴줄 수 있다.
+     *
+     * ⚠ 축을 만드는 곳이 여러 군데(URL 로드 / 로컬 파일)라 **이 함수 하나만 쓴다.**
+     *   따로 계산하면 lo/hi 산출이 조용히 갈라진다.
+     */
+    function buildAxis(actions, url) {
+        const acts = (actions || []).slice().sort((a, b) => a.at - b.at);
+        if (!acts.length) return null;
+        let lo = 100, hi = 0;
+        for (const a of acts) {
+            const v = Math.max(0, Math.min(100, Number(a.pos) || 0));
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+        }
+        return { actions: acts, index: 0, url: url || '', lo, hi, span: hi - lo };
+    }
+
     // 메인 경로 하나로 모든 축 자동 탐색
     async function loadMultiAxis(mainPath) {
         const { base, ext } = splitFunscriptPath(mainPath);
@@ -45,17 +65,24 @@
             const url = base + def.ext + ext;
             const acts = await tryFetch(url);
             if (!acts) return;
-            // 스크립트가 실제로 쓰는 진폭을 재둔다. 이걸 알아야 "원본이 좁아서 안 움직이는 것"과
-            // "사용자가 강도를 줄인 것"을 구분할 수 있고, 좁은 스크립트를 넓게 펴줄 수 있다.
-            let lo = 100, hi = 0;
-            for (const a of acts) {
-                const v = Math.max(0, Math.min(100, Number(a.pos) || 0));
-                if (v < lo) lo = v;
-                if (v > hi) hi = v;
-            }
-            axes[def.tcode] = { actions: acts, index: 0, url, lo, hi, span: hi - lo };
+            const ax = buildAxis(acts, url);
+            if (ax) axes[def.tcode] = ax;
         }));
         return axes;
+    }
+
+    /**
+     * 파일 이름으로 축을 정한다 — 라이브 방송에서 BJ가 로컬 파일을 고를 때 쓴다.
+     * "x.funscript" → L0, "x.roll.funscript" → R0 … (AXIS_DEFS와 같은 규칙)
+     */
+    function axisFromFilename(name) {
+        const { base } = splitFunscriptPath(String(name || '').toLowerCase());
+        let best = null;
+        for (const def of AXIS_DEFS) {
+            if (!def.ext) continue;
+            if (base.endsWith(def.ext)) { if (!best || def.ext.length > best.ext.length) best = def; }
+        }
+        return best ? best.tcode : 'L0';        // 접미사가 없으면 주축
     }
 
     // 강도 슬라이더 범위(%). 관리자가 설정으로 조정한다 (layout이 window.PULSE_TUNING 으로 심는다).
@@ -233,6 +260,8 @@
 
     window.PulseFunscript = {
         loadMultiAxis,
+        buildAxis,
+        axisFromFilename,
         MultiAxisEngine,
         // UI 미리보기가 엔진과 **같은 계산**을 쓰도록 노출한다.
         // 따로 구현하면 공식이 바뀔 때 미리보기만 조용히 어긋난다.

@@ -125,6 +125,7 @@
 
     function enableDeviceControl() {
         broadcasting = true;
+        if (typeof bsPlay !== 'undefined' && bsPlay) bsPlay.disabled = !scriptAxes;
         if (devPanel) { devPanel.style.opacity = '1'; devPanel.style.pointerEvents = 'auto'; }
     }
     const Dev = window.PulseDevice;   // 스트리머 본인 디바이스 (우상단에서 연결)
@@ -165,7 +166,99 @@
         el.value = v; $('bd-' + k + '-v').textContent = v; broadcastAxis(k, v);
     });
 
+    // ── 스크립트 재생 ─────────────────────────────────────────
+    // 슬라이더를 손으로 움직이는 대신 funscript가 값을 만든다.
+    // **나가는 경로는 슬라이더와 완전히 같다** — sendTcode() → bcast-tcode.
+    // 그래서 시청자 쪽은 아무것도 안 바꿔도 된다.
+    const bsFile = $('bs-file'), bsPlay = $('bs-play'), bsStop = $('bs-stop');
+    const bsState = $('bs-state'), bsTime = $('bs-time');
+    let scriptAxes = null, scriptEngine = null, scriptEndMs = 0, bsTimer = null;
+
+    // 엔진은 <video>의 currentTime으로 시간을 읽는다. 라이브에는 영상이 없으므로
+    // 같은 모양의 시계를 만들어 넣는다 (엔진은 이 세 가지만 본다).
+    const clock = {
+        _startedAt: 0, _pausedAt: 0, _paused: true,
+        get paused() { return this._paused; },
+        get ended()  { return false; },
+        get currentTime() {
+            return this._paused ? this._pausedAt : (performance.now() - this._startedAt) / 1000;
+        },
+        start() { this._startedAt = performance.now(); this._paused = false; },
+        stop()  { this._pausedAt = 0; this._paused = true; },
+    };
+
+    function readFileText(f) {
+        return new Promise((resolve) => {
+            const r = new FileReader();
+            r.onload  = () => resolve(String(r.result || ''));
+            r.onerror = () => resolve('');
+            r.readAsText(f);
+        });
+    }
+
+    if (bsFile) bsFile.addEventListener('change', async () => {
+        const FS = window.PulseFunscript;
+        stopScript();
+        scriptAxes = null; scriptEndMs = 0;
+        const files = Array.from(bsFile.files || []);
+        if (!files.length || !FS) { bsState.textContent = '파일 없음'; bsPlay.disabled = true; return; }
+
+        const axes = {};
+        for (const f of files) {
+            let json = null;
+            try { json = JSON.parse(await readFileText(f)); } catch (_) { continue; }
+            // 축 판정·진폭 계산은 엔진 쪽 함수를 그대로 쓴다 (따로 구현하면 갈라진다)
+            const ax = FS.buildAxis(json && json.actions, f.name);
+            if (!ax) continue;
+            axes[FS.axisFromFilename(f.name)] = ax;
+            const last = ax.actions[ax.actions.length - 1];
+            if (last && last.at > scriptEndMs) scriptEndMs = last.at;
+        }
+        const keys = Object.keys(axes);
+        if (!keys.length) { bsState.textContent = '읽을 수 없는 파일'; bsPlay.disabled = true; return; }
+        scriptAxes = axes;
+        bsState.textContent = keys.join('·') + ' · ' + Math.round(scriptEndMs / 1000) + '초';
+        bsPlay.disabled = !broadcasting;
+    });
+
+    function playScript() {
+        const FS = window.PulseFunscript;
+        if (!FS || !scriptAxes || !broadcasting) return;
+        stopScript();
+        for (const k of Object.keys(scriptAxes)) scriptAxes[k].index = 0;
+        clock.start();
+        scriptEngine = new FS.MultiAxisEngine({
+            video: clock,
+            axes: scriptAxes,
+            sendOnce: true,
+            // 성형은 하지 않는다 — 시청자마다 자기 강도·범위 설정이 따로 있다.
+            // (shape 없이 intensity 1이면 shapeStroke가 원본 값을 그대로 돌려준다)
+            onCommand: (cmd) => sendTcode(cmd),
+        });
+        scriptEngine.start();
+        bsPlay.classList.add('hidden');
+        bsStop.classList.remove('hidden');
+        bsTimer = setInterval(() => {
+            const t = clock.currentTime;
+            bsTime.textContent = t.toFixed(1) + 's / ' + (scriptEndMs / 1000).toFixed(1) + 's';
+            if (scriptEndMs && t * 1000 > scriptEndMs) stopScript();
+        }, 200);
+    }
+
+    function stopScript() {
+        if (bsTimer) { clearInterval(bsTimer); bsTimer = null; }
+        if (scriptEngine) { try { scriptEngine.stop(); } catch (_) {} scriptEngine = null; }
+        clock.stop();
+        if (bsPlay) { bsPlay.classList.remove('hidden'); bsPlay.disabled = !(scriptAxes && broadcasting); }
+        if (bsStop) bsStop.classList.add('hidden');
+        if (bsTime) bsTime.textContent = '';
+    }
+
+    if (bsPlay) bsPlay.addEventListener('click', playScript);
+    if (bsStop) bsStop.addEventListener('click', () => { stopScript(); sendTcode('L050I500'); });
+
     function cleanup() {
+        stopScript();                     // 송출을 끊으면 스크립트도 멈춘다
         for (const p of viewerPeers.values()) try { p.destroy(); } catch(_){}
         viewerPeers.clear();
         if (stream) for (const t of stream.getTracks()) t.stop();
