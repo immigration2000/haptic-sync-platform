@@ -12,6 +12,10 @@
             <div id="session-video-view" class="session-videoview hidden">
                 <video id="session-video" controls playsinline style="width:100%; height:100%; object-fit:contain; background:#000;"></video>
                 <div id="session-video-badge" class="session-video-badge hidden">🎬 스트리머가 재생 중</div>
+                <!-- 내 카메라 미리보기. 스트리머에게 보내는 것과 같은 스트림. muted 필수 -->
+                <video id="my-cam" autoplay playsinline muted class="hidden"
+                       style="position:absolute; bottom:12px; right:12px; width:26%; max-width:160px; min-width:88px; aspect-ratio:4/3;
+                              background:#000; border:2px solid rgba(94,255,176,0.6); border-radius:8px; object-fit:cover;"></video>
             </div>
         </div>
 
@@ -54,6 +58,7 @@
                 </div>
                 <div class="flex gap-2 mt-5 hidden" id="call-actions-live">
                     <button id="btn-mic" class="btn btn-secondary" style="flex:1;">🎤 마이크</button>
+                    <button id="btn-cam" class="btn btn-secondary" style="flex:1;" disabled title="연결되면 켤 수 있습니다">📷 카메라</button>
                     <button id="btn-hangup" class="btn btn-ghost" style="flex:1; background: rgba(255,80,80,0.1); border-color: rgba(255,80,80,0.4); color: #FFB8B8;">종료</button>
                 </div>
             </div>
@@ -105,4 +110,4 @@ window.__BJ_CALL__ = {
 <script src="/js/core/device.js"></script>
 <script src="/js/core/funscript.js"></script>
 <script src="/js/core/bj_session.js"></script>
-<script src="/js/pages/bj_call.js?v=svcguard"></script>
+<script src="/js/pages/bj_call.js?v=cam2way"></script>

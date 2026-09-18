@@ -24,6 +24,8 @@
     const actsLive  = $('call-actions-live');
     const btnStart  = $('btn-start');
     const btnMic    = $('btn-mic');
+    const btnCam    = $('btn-cam');
+    const myCam     = $('my-cam');
     const btnHangup = $('btn-hangup');
 
     const callView  = $('session-call-view');
@@ -93,6 +95,7 @@
         peer = new SimplePeer({ initiator, trickle: true, stream: micStream || undefined });
         peer.on('signal', (data) => socket.emit('signal', { to: peerId, data }));
         peer.on('connect', () => {
+            if (btnCam) btnCam.disabled = false;
             startMs = Date.now();
             elapsedTimer = setInterval(() => {
                 const s = Math.floor((Date.now() - startMs) / 1000);
@@ -212,6 +215,37 @@
     function stopFsEngine() { fsLoadSeq++; if (fsEngine) { try { fsEngine.stop(); } catch(_){} fsEngine = null; } }
     video.addEventListener('seeking', () => { if (fsEngine) fsEngine.resync(); });
 
+    // ── 내 카메라 → 스트리머 ──
+    // 마이크와 **다른 스트림**으로 보낸다. 같은 스트림에 트랙을 얹으면 스트리머 쪽에서
+    // 이미 Audio 요소에 물린 스트림이라 영상이 안 보인다. 별도 스트림이면 'stream' 이벤트가
+    // 새로 뜨고 비디오 트랙 유무로 분기할 수 있다 (스트리머 캠을 받는 쪽과 같은 규칙).
+    // 기본 OFF — 사용자가 직접 눌러야만 켜진다.
+    let camStream = null, camOn = false;
+    async function setCam(on) {
+        if (!peer) return;
+        if (on) {
+            try { camStream = await navigator.mediaDevices.getUserMedia({ video: true }); }
+            catch (_) { stateEl.textContent = '카메라 권한이 없습니다'; return; }
+            try { peer.addStream(camStream); } catch (e) { console.warn('addStream', e); }
+            if (myCam) { myCam.srcObject = camStream; myCam.classList.remove('hidden'); }
+            camOn = true;
+        } else {
+            if (camStream) {
+                try { peer.removeStream(camStream); } catch (_) {}
+                for (const t of camStream.getTracks()) t.stop();
+                camStream = null;
+            }
+            if (myCam) { myCam.srcObject = null; myCam.classList.add('hidden'); }
+            camOn = false;
+        }
+        if (btnCam) {
+            btnCam.classList.toggle('btn-primary', camOn);
+            btnCam.classList.toggle('btn-secondary', !camOn);
+            btnCam.textContent = camOn ? '📷 ON' : '📷 카메라';
+        }
+    }
+    if (btnCam) btnCam.addEventListener('click', () => setCam(!camOn));
+
     btnMic.addEventListener('click', () => {
         if (!micStream) return;
         micOn = !micOn;
@@ -230,6 +264,7 @@
         if (session)     { try { session.destroy(); } catch (_) {} session = null; }
         if (peer)        { try { peer.destroy(); } catch (_) {} peer = null; }
         if (micStream)   { for (const t of micStream.getTracks()) t.stop(); micStream = null; }
+        if (camStream)   { for (const t of camStream.getTracks()) t.stop(); camStream = null; }
         if (elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
         if (socket)      { socket.emit('hangup'); socket.disconnect(); socket = null; }
         stateEl.textContent = remote ? 'BJ가 종료했습니다' : '종료됨';
