@@ -126,7 +126,7 @@ app.set('layout extractScripts', true);
 app.set('layout extractStyles', true);
 
 // ─── Static ─────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: 0, etag: true }));
+app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d' }));
 
 // ─── Public utility routes (CSRF 면제) ───────────────────
 app.get('/health',   (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
