@@ -30,6 +30,7 @@
                     <span>디바이스</span><span id="call-device">—</span>
                     <span>제어</span><span id="call-ctrl">스트리머 수동</span>
                     <span>수신</span><span id="call-recv-count">0 cmd</span>
+                    <span>송신</span><span id="call-send-count">0 cmd</span>
                 </div>
 
                 <%
@@ -60,6 +61,29 @@
                     <button id="btn-mic" class="btn btn-secondary" style="flex:1;">🎤 마이크</button>
                     <button id="btn-cam" class="btn btn-secondary" style="flex:1;" disabled title="연결되면 켤 수 있습니다">📷 카메라</button>
                     <button id="btn-hangup" class="btn btn-ghost" style="flex:1; background: rgba(255,80,80,0.1); border-color: rgba(255,80,80,0.4); color: #FFB8B8;">종료</button>
+                </div>
+
+                <!-- 스트리머 기기 제어 — 스트리머가 허용(ALLOW:1)해야 나타난다.
+                     송신은 axis_sender 가 33ms 병합 + 변화율 제한으로 내보낸다. -->
+                <div id="ctl-panel" class="mt-5 hidden" style="border-top:1px solid var(--border-soft); padding-top:14px;">
+                    <div class="flex items-center gap-2 mb-2" style="justify-content:space-between;">
+                        <strong style="font-size:12px;">🎮 스트리머 기기 제어</strong>
+                        <span id="ctl-state" class="text-faint mono" style="font-size:11px;">허용됨</span>
+                    </div>
+                    <% const CAX = [['L0','스트로크 ↑↓','#FF2D5E'],['R0','롤 ←→','#7B2DFF'],['R2','피치 W/S','#5EFFB0']]; %>
+                    <% CAX.forEach(a => { %>
+                        <div style="margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--tx-2);">
+                                <span style="color:<%= a[2] %>; font-weight:700;"><%= a[0] %></span><span><%= a[1] %></span><span id="ctl-<%= a[0] %>-v" class="mono">50</span>
+                            </div>
+                            <input type="range" id="ctl-<%= a[0] %>" min="0" max="99" value="50" style="width:100%; accent-color:<%= a[2] %>;">
+                        </div>
+                    <% }) %>
+                    <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--tx-2); margin-top:6px;">
+                        <span>보간(속도)</span><span id="ctl-interp-v" class="mono">100</span>
+                    </div>
+                    <input type="range" id="ctl-interp" min="50" max="500" value="100" step="10" style="width:100%;">
+                    <p class="text-faint" style="font-size:11px; margin:8px 0 0;">스트리머가 연결한 기기가 움직입니다. 스트리머가 허용을 끄면 이 패널은 사라집니다.</p>
                 </div>
             </div>
 
@@ -107,7 +131,10 @@ window.__BJ_CALL__ = {
 </script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/vendor/simple-peer.min.js"></script>
-<script src="/js/core/device.js"></script>
-<script src="/js/core/funscript.js"></script>
+<%# ⚠ device.js / funscript.js 는 layout.ejs 가 이미 로드한다. 여기서 다시 넣으면
+    window.PulseDevice 가 새 인스턴스로 바뀌어 헤더(첫 인스턴스에 바인딩)와 이 페이지가
+    서로 다른 기기 객체를 보게 된다 — 헤더는 '연결됨'인데 통화 화면은 '미연결'이 되고
+    수신 명령이 기기로 가지 않는다 (2026-09-20 실기기 확인). %>
 <script src="/js/core/bj_session.js"></script>
-<script src="/js/pages/bj_call.js?v=cam2way"></script>
+<script src="/js/core/axis_sender.js?v=1"></script>
+<script src="/js/pages/bj_call.js?v=bidir"></script>
