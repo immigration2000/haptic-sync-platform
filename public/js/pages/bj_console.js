@@ -288,13 +288,22 @@
             peer.send('L050I500');
             // 세션 컨트롤 활성화 + 현재 모드/제어 상태 전송
             activateSessionCtrl();
-            try { peer.send('MODE:' + sessMode); peer.send('CTRL:' + sessCtrlSrc); } catch(_){}
+            try { peer.send('MODE:' + sessMode); peer.send('CTRL:' + sessCtrlSrc); peer.send('ALLOW:' + (allowDev ? '1' : '0')); } catch(_){}
             // 사용자가 '캠' 옵션으로 진입했으면 자동 캠 모드
             if (context && context.tier === 'cam') setSessMode('cam');
         });
         peer.on('data', (chunk) => {
-            // 사용자가 보내는 메시지 — cowatch에서 영상 시간 동기용
             const text = chunk.toString();
+            // 사용자 → 내 기기 (허용했을 때만). 원격 입력이므로 반드시 sendRemote 로 검증한다.
+            if (/^[LR][0-9]/.test(text)) {
+                if (!allowDev) return;
+                const D = window.PulseDevice;
+                if (!D || !D.isConnected) return;
+                const n = D.sendRemote(text);
+                if (n) { devRecv += n; if (devRecvEl) devRecvEl.textContent = devRecv.toLocaleString(); }
+                return;
+            }
+            // 사용자가 보내는 메시지 — cowatch에서 영상 시간 동기용
             if (text.startsWith('TIME:')) {
                 const sec = parseFloat(text.slice(5));
                 if (!isNaN(sec) && cowatchVideo) {
@@ -336,6 +345,18 @@
             startBJCamera(peer);
         }
     }
+
+    // ── 사용자 제어 허용 ──
+    // 기본 ON. 끄면 그 즉시 사용자 명령을 버리고, 상대에게 ALLOW:0 을 보내 패널을 접게 한다.
+    const allowDevEl = $('allow-dev'), devRecvEl = $('dev-recv-count');
+    let allowDev = allowDevEl ? allowDevEl.checked : true;
+    let devRecv = 0;
+    if (allowDevEl) allowDevEl.addEventListener('change', () => {
+        allowDev = allowDevEl.checked;
+        sendToPeers('ALLOW:' + (allowDev ? '1' : '0'));
+        // 끄는 순간 기기를 안전 위치로 — 사용자가 밀어둔 위치에 머물지 않게
+        if (!allowDev) { const D = window.PulseDevice; if (D && D.isConnected) { try { D.send('L050I300'); } catch (_) {} } }
+    });
 
     // ── 화면 배치 (반반 / 내 화면 크게 / 상대 화면 크게) ──
     // data-layout 하나로 CSS 가 배치한다. 선택은 브라우저에 저장.

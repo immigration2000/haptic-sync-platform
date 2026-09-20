@@ -36,6 +36,16 @@
             <!-- 세션 컨트롤 — 통화 연결 시 활성 -->
             <div class="card card-body" id="session-ctrl" style="opacity:0.5; pointer-events:none;">
                 <div class="panel-title">세션 컨트롤 (스트리머 주도)</div>
+                <!-- 사용자가 내 기기를 움직이게 허용 — 하드웨어를 연결한 쪽이 통제권을 갖는다 -->
+                <div class="flex items-center gap-2 mb-3" style="justify-content:space-between; padding:8px 10px; background:var(--bg-2); border-radius:8px;">
+                    <div>
+                        <div style="font-size:12px; font-weight:600;">🎮 사용자 제어 허용</div>
+                        <div id="allow-dev-hint" class="text-faint" style="font-size:11px;">사용자가 내 기기를 움직일 수 있습니다 · 수신 <span id="dev-recv-count" class="mono">0</span> cmd</div>
+                    </div>
+                    <label class="sw-row" style="margin:0; cursor:pointer;">
+                        <input type="checkbox" class="sw" id="allow-dev" checked>
+                    </label>
+                </div>
 
                 <div class="mb-4">
                     <div class="text-faint mb-2" style="font-size:12px;">모드</div>
@@ -147,4 +157,4 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/vendor/simple-peer.min.js"></script>
 <script>window.__BJ_CONSOLE__ = { userId: <%= user.id %>, name: "<%= profile.stage_name %>" };</script>
-<script src="/js/pages/bj_console.js?v=layout3"></script>
+<script src="/js/pages/bj_console.js?v=bidir"></script>
