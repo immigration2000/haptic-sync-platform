@@ -62,9 +62,10 @@
         }
     }, 3000);
 
+    const escHtml = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     socket.on('paired', ({ peerId, peerName, initiator }) => {
         actsEl.classList.remove('hidden');
-        stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● 비공개 라이브 중</span> — ${peerName}`;
+        stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● 비공개 라이브 중</span> — ${escHtml(peerName)}`;   // 활동명 이스케이프 (XSS)
         startPeer(peerId, initiator);
     });
     socket.on('signal', ({ data }) => peer && peer.signal(data));

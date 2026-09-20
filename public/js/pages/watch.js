@@ -39,9 +39,11 @@
 
     socket.emit('viewer-join', { broadcasterUserId: CFG.bjUserId });
 
+    const escHtml = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     socket.on('viewer-ready', ({ broadcasterId, broadcasterName, mode }) => {
         const isVoice = (mode === 'voice');
-        stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● LIVE</span> — ${broadcasterName}`
+        // ⚠ 활동명은 스트리머 입력값 — 소켓으로 그대로 온다. 이스케이프 없이 innerHTML 에 넣으면 저장형 XSS.
+        stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● LIVE</span> — ${escHtml(broadcasterName)}`
             + (isVoice ? ' <span class="text-faint" style="font-size:11px;">📻 음성 방송</span>' : '');
         // 음성 방송이면 검은 비디오 대신 안내 화면을 보여준다 (오디오는 그대로 재생)
         if (isVoice) {

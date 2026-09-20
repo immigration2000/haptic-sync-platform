@@ -75,7 +75,8 @@
         socket.on('paired', ({ peerId, peerName, initiator }) => {
             actsStart.classList.add('hidden');
             actsLive.classList.remove('hidden');
-            stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● 통화 중</span> — ${peerName}`;
+            // ⚠ peerName 은 상대 활동명(사용자 입력) — 이스케이프 없이 innerHTML 에 넣으면 저장형 XSS.
+            stateEl.innerHTML = `<span style="color: var(--c-green); font-weight:600;">● 통화 중</span> — ${escHtml(peerName)}`;
             modeEl.textContent = '통화 전용';
             startPeer(peerId, initiator);
         });
@@ -91,6 +92,7 @@
         });
     });
 
+    const escHtml = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     function startPeer(peerId, initiator) {
         peer = new SimplePeer({ initiator, trickle: true, stream: micStream || undefined });
         peer.on('signal', (data) => socket.emit('signal', { to: peerId, data }));

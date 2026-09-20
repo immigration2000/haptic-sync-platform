@@ -421,7 +421,7 @@
             div.className = 'card card-body';
             div.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:8px;background:rgba(0,220,130,0.08);border-color:rgba(0,220,130,0.3);padding:12px 16px;';
             div.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:var(--c-green);"></span>
-                             <span style="flex:1;">${e.name || '사용자'} (${id.slice(0,6)}) <span class="mono text-faint" style="font-size:11px;">${kindBadge}</span></span>
+                             <span style="flex:1;">${escHtml(e.name || '사용자')} (${escHtml(id.slice(0,6))}) <span class="mono text-faint" style="font-size:11px;">${kindBadge}</span></span>
                              <span class="mono text-faint" style="font-size:11px;">${e.dataReady ? 'P2P' : '연결 중'}</span>`;
             userListEl.appendChild(div);
         }

@@ -65,7 +65,7 @@
             div.innerHTML = `
                 <div class="bj-thumb">${initial}</div>
                 <div class="bj-info">
-                    <div class="bj-name">${b.name} <span class="badge" style="background:rgba(255,80,80,0.2); color:#FF8080; font-size:9px; padding:2px 6px; margin-left:6px;">🔴 LIVE</span></div>
+                    <div class="bj-name"><span class="bj-name-txt"></span> <span class="badge" style="background:rgba(255,80,80,0.2); color:#FF8080; font-size:9px; padding:2px 6px; margin-left:6px;">🔴 LIVE</span></div>
                     <div class="bj-desc">${b.mode === 'voice' ? '📻 음성 방송' : '📺 영상 방송'} — 입장 무료 · 후원</div>
                     <div class="bj-rate">
                         <span style="color: var(--c-green);">● 송출중</span>
@@ -73,6 +73,7 @@
                     </div>
                 </div>
             `;
+            div.querySelector('.bj-name-txt').textContent = String(b.name || '');   // 활동명 — textContent (XSS 차단)
             listEl.appendChild(div);
         }
     }
