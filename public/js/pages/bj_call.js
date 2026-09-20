@@ -24,6 +24,8 @@
     const actsLive  = $('call-actions-live');
     const btnStart  = $('btn-start');
     const btnMic    = $('btn-mic');
+    const btnCam    = $('btn-cam');
+    const myCam     = $('my-cam');
     const btnHangup = $('btn-hangup');
 
     const callView  = $('session-call-view');
@@ -93,6 +95,7 @@
         peer = new SimplePeer({ initiator, trickle: true, stream: micStream || undefined });
         peer.on('signal', (data) => socket.emit('signal', { to: peerId, data }));
         peer.on('connect', () => {
+            if (btnCam) btnCam.disabled = false;
             startMs = Date.now();
             elapsedTimer = setInterval(() => {
                 const s = Math.floor((Date.now() - startMs) / 1000);
@@ -129,6 +132,7 @@
             if (t.startsWith('MODE:'))      setMode(t.slice(5));
             else if (t.startsWith('VIDEO:')) loadVideo(t.slice(6));
             else if (t.startsWith('CTRL:'))  setCtrl(t.slice(5));
+            else if (t.startsWith('ALLOW:')) setCtlAllowed(t.slice(6) === '1');
             else if (/^[LR][0-9]/.test(t)) {
                 // 스트리머 수동 TCode — 통화모드 또는 영상 manual일 때 적용.
                 // ⚠ 예전에는 줄 앞부분만 정규식으로 보고 토큰을 전부 보냈다.
@@ -212,6 +216,89 @@
     function stopFsEngine() { fsLoadSeq++; if (fsEngine) { try { fsEngine.stop(); } catch(_){} fsEngine = null; } }
     video.addEventListener('seeking', () => { if (fsEngine) fsEngine.resync(); });
 
+    // ── 스트리머 기기 제어 (사용자 → 스트리머 기기) ──
+    // 스트리머가 ALLOW:1 을 보내야만 패널이 열린다. 하드웨어를 몸에 연결한 쪽이 통제권을 가진다.
+    // 송신은 PulseAxisSender 가 33ms 병합 + 변화율 제한으로 내보낸다 (노트북이 실기기로 검증한 수치).
+    const ctlPanel = $('ctl-panel'), ctlState = $('ctl-state'), sendCountEl = $('call-send-count');
+    const ctlAxes = { L0: $('ctl-L0'), R0: $('ctl-R0'), R2: $('ctl-R2') };
+    const ctlInterp = $('ctl-interp');
+    let ctlAllowed = false, axisTx = null;
+
+    function ensureTx() {
+        if (axisTx || !window.PulseAxisSender) return axisTx;
+        axisTx = window.PulseAxisSender.create({
+            send: (line) => {
+                if (!peer || !ctlAllowed) return;
+                try { peer.send(line); } catch (_) { return; }
+                if (sendCountEl) sendCountEl.textContent = axisTx.sentCount.toLocaleString() + ' cmd';
+            },
+            interp: ctlInterp ? parseInt(ctlInterp.value, 10) : 100,
+        });
+        return axisTx;
+    }
+    function setCtlAllowed(on) {
+        ctlAllowed = !!on;
+        if (ctlPanel) ctlPanel.classList.toggle('hidden', !ctlAllowed);
+        if (ctlState) ctlState.textContent = ctlAllowed ? '허용됨' : '스트리머가 꺼둠';
+        if (!ctlAllowed && axisTx) axisTx.stop();
+    }
+    Object.keys(ctlAxes).forEach((k) => {
+        const el = ctlAxes[k]; if (!el) return;
+        el.addEventListener('input', () => {
+            const v = parseInt(el.value, 10);
+            const lbl = $('ctl-' + k + '-v'); if (lbl) lbl.textContent = v;
+            const tx = ensureTx(); if (tx) tx.set(k, v);
+        });
+    });
+    if (ctlInterp) ctlInterp.addEventListener('input', () => {
+        const v = parseInt(ctlInterp.value, 10);
+        const lbl = $('ctl-interp-v'); if (lbl) lbl.textContent = v;
+        if (axisTx) axisTx.setInterp(v);
+    });
+    // 데스크톱 키보드 — 콘솔과 같은 키 배치
+    const CTL_KEYS = { ArrowUp:['L0',+5], ArrowDown:['L0',-5], ArrowLeft:['R0',-5], ArrowRight:['R0',+5], KeyW:['R2',+5], KeyS:['R2',-5] };
+    document.addEventListener('keydown', (e) => {
+        if (!ctlAllowed) return;
+        if (document.activeElement && ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+        const m = CTL_KEYS[e.code]; if (!m) return;
+        e.preventDefault();
+        const [k, d] = m, el = ctlAxes[k]; if (!el) return;
+        const v = Math.max(0, Math.min(99, parseInt(el.value, 10) + d));
+        el.value = v; const lbl = $('ctl-' + k + '-v'); if (lbl) lbl.textContent = v;
+        const tx = ensureTx(); if (tx) tx.set(k, v);
+    });
+
+    // ── 내 카메라 → 스트리머 ──
+    // 마이크와 **다른 스트림**으로 보낸다. 같은 스트림에 트랙을 얹으면 스트리머 쪽에서
+    // 이미 Audio 요소에 물린 스트림이라 영상이 안 보인다. 별도 스트림이면 'stream' 이벤트가
+    // 새로 뜨고 비디오 트랙 유무로 분기할 수 있다 (스트리머 캠을 받는 쪽과 같은 규칙).
+    // 기본 OFF — 사용자가 직접 눌러야만 켜진다.
+    let camStream = null, camOn = false;
+    async function setCam(on) {
+        if (!peer) return;
+        if (on) {
+            try { camStream = await navigator.mediaDevices.getUserMedia({ video: true }); }
+            catch (_) { stateEl.textContent = '카메라 권한이 없습니다'; return; }
+            try { peer.addStream(camStream); } catch (e) { console.warn('addStream', e); }
+            if (myCam) { myCam.srcObject = camStream; myCam.classList.remove('hidden'); }
+            camOn = true;
+        } else {
+            if (camStream) {
+                try { peer.removeStream(camStream); } catch (_) {}
+                for (const t of camStream.getTracks()) t.stop();
+                camStream = null;
+            }
+            if (myCam) { myCam.srcObject = null; myCam.classList.add('hidden'); }
+            camOn = false;
+        }
+        if (btnCam) {
+            btnCam.classList.toggle('btn-primary', camOn);
+            btnCam.classList.toggle('btn-secondary', !camOn);
+            btnCam.textContent = camOn ? '📷 ON' : '📷 카메라';
+        }
+    }
+    if (btnCam) btnCam.addEventListener('click', () => setCam(!camOn));
+
     btnMic.addEventListener('click', () => {
         if (!micStream) return;
         micOn = !micOn;
@@ -230,6 +317,8 @@
         if (session)     { try { session.destroy(); } catch (_) {} session = null; }
         if (peer)        { try { peer.destroy(); } catch (_) {} peer = null; }
         if (micStream)   { for (const t of micStream.getTracks()) t.stop(); micStream = null; }
+        if (camStream)   { for (const t of camStream.getTracks()) t.stop(); camStream = null; }
+        if (axisTx)      { try { axisTx.stop(); } catch (_) {} }
         if (elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
         if (socket)      { socket.emit('hangup'); socket.disconnect(); socket = null; }
         stateEl.textContent = remote ? 'BJ가 종료했습니다' : '종료됨';

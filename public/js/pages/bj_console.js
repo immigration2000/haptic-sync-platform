@@ -274,6 +274,13 @@
         const peer = new SimplePeer({ initiator, trickle: true, stream: micStream || undefined });
         const entry = { peer, dataReady: false, name: userName, kind, context };
         peers.set(userId, entry);
+        // ⚠ 캠이 이미 켜져 있으면 **이 peer에도** 트랙을 넣어야 한다.
+        //   ensureCamera()는 그 시점에 있던 peer에만 넣고, 두 번째 호출부터는 camStream이
+        //   있다며 바로 빠진다. 그래서 사용자가 나갔다 다시 들어오면 새 peer는 영상을 못 받는데
+        //   MODE:cam은 보내니까 사용자 화면이 빈 채로 남았다 (2026-09-18 실기기 제보).
+        if (camStream) {
+            try { for (const t of camStream.getVideoTracks()) peer.addTrack(t, camStream); } catch (_) {}
+        }
         peer.on('signal', (d) => socket.emit('signal', { to: userId, data: d }));
         peer.on('connect', () => {
             entry.dataReady = true;
@@ -281,13 +288,22 @@
             peer.send('L050I500');
             // 세션 컨트롤 활성화 + 현재 모드/제어 상태 전송
             activateSessionCtrl();
-            try { peer.send('MODE:' + sessMode); peer.send('CTRL:' + sessCtrlSrc); } catch(_){}
+            try { peer.send('MODE:' + sessMode); peer.send('CTRL:' + sessCtrlSrc); peer.send('ALLOW:' + (allowDev ? '1' : '0')); } catch(_){}
             // 사용자가 '캠' 옵션으로 진입했으면 자동 캠 모드
             if (context && context.tier === 'cam') setSessMode('cam');
         });
         peer.on('data', (chunk) => {
-            // 사용자가 보내는 메시지 — cowatch에서 영상 시간 동기용
             const text = chunk.toString();
+            // 사용자 → 내 기기 (허용했을 때만). 원격 입력이므로 반드시 sendRemote 로 검증한다.
+            if (/^[LR][0-9]/.test(text)) {
+                if (!allowDev) return;
+                const D = window.PulseDevice;
+                if (!D || !D.isConnected) return;
+                const n = D.sendRemote(text);
+                if (n) { devRecv += n; if (devRecvEl) devRecvEl.textContent = devRecv.toLocaleString(); }
+                return;
+            }
+            // 사용자가 보내는 메시지 — cowatch에서 영상 시간 동기용
             if (text.startsWith('TIME:')) {
                 const sec = parseFloat(text.slice(5));
                 if (!isNaN(sec) && cowatchVideo) {
@@ -298,6 +314,9 @@
             }
         });
         peer.on('stream', (stream) => {
+            // 사용자 카메라 — 비디오 트랙이 있는 스트림. 마이크와 별도 스트림으로 오므로
+            // 여기서 갈라진다 (사용자 쪽이 스트리머 캠을 받을 때와 같은 규칙).
+            if (stream.getVideoTracks().length) { showUserCam(stream); return; }
             const audio = new Audio();
             audio.srcObject = stream;
             audio.autoplay = true;
@@ -305,7 +324,10 @@
             if (selectedOutput && audio.setSinkId) audio.setSinkId(selectedOutput).catch(()=>{});
             entry.audio = audio;
         });
-        peer.on('close', () => { peers.delete(userId); renderUserList(); cowatchPanel.classList.add('hidden'); if (peers.size === 0) deactivateSessionCtrl(); });
+        peer.on('track', (track, stream) => {          // 재협상으로 나중에 추가된 카메라 트랙
+            if (track.kind === 'video') showUserCam(stream);
+        });
+        peer.on('close', () => { peers.delete(userId); renderUserList(); cowatchPanel.classList.add('hidden'); hideUserCam(); if (peers.size === 0) deactivateSessionCtrl(); });
         peer.on('error', (e) => console.warn('peer err', e));
 
         // cowatch 모드면 영상 표시
@@ -322,6 +344,67 @@
             // BJ 카메라 시작 (간단 버전 — 추가 처리)
             startBJCamera(peer);
         }
+    }
+
+    // ── 사용자 제어 허용 ──
+    // 기본 ON. 끄면 그 즉시 사용자 명령을 버리고, 상대에게 ALLOW:0 을 보내 패널을 접게 한다.
+    const allowDevEl = $('allow-dev'), devRecvEl = $('dev-recv-count');
+    let allowDev = allowDevEl ? allowDevEl.checked : true;
+    let devRecv = 0;
+    if (allowDevEl) allowDevEl.addEventListener('change', () => {
+        allowDev = allowDevEl.checked;
+        sendToPeers('ALLOW:' + (allowDev ? '1' : '0'));
+        // 끄는 순간 기기를 안전 위치로 — 사용자가 밀어둔 위치에 머물지 않게
+        if (!allowDev) { const D = window.PulseDevice; if (D && D.isConnected) { try { D.send('L050I300'); } catch (_) {} } }
+    });
+
+    // ── 화면 배치 (반반 / 내 화면 크게 / 상대 화면 크게) ──
+    // data-layout 하나로 CSS 가 배치한다. 선택은 브라우저에 저장.
+    const stage = $('stage'), layoutPicker = $('layout-picker'), stageEmpty = $('stage-empty');
+    const LAYOUT_KEY = 'pulse_console_layout';
+    function setLayout(v) {
+        if (!stage) return;
+        const val = ['split', 'me', 'them'].includes(v) ? v : 'them';
+        stage.setAttribute('data-layout', val);
+        if (layoutPicker) for (const b of layoutPicker.querySelectorAll('[data-layout]')) {
+            b.classList.toggle('is-active', b.getAttribute('data-layout') === val);
+        }
+        try { localStorage.setItem(LAYOUT_KEY, val); } catch (_) {}
+    }
+    if (layoutPicker) layoutPicker.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-layout]'); if (b) setLayout(b.getAttribute('data-layout'));
+    });
+    let savedLayout = null; try { savedLayout = localStorage.getItem(LAYOUT_KEY); } catch (_) {}
+    setLayout(savedLayout || 'them');
+    // :has() 를 지원하지 않는 브라우저용 — 상자 표시 상태가 바뀔 때 안내문을 직접 토글
+    function syncStageEmpty() {
+        if (!stage || !stageEmpty) return;
+        const any = Array.from(stage.querySelectorAll('.stage-box')).some(b => !b.classList.contains('hidden'));
+        stageEmpty.style.display = any ? 'none' : '';
+    }
+    if (stage && window.MutationObserver) {
+        new MutationObserver(syncStageEmpty).observe(stage, { attributes: true, attributeFilter: ['class'], subtree: true });
+    }
+    syncStageEmpty();
+
+    // ── 사용자 카메라 표시 ──
+    // 사용자가 끄면(removeStream) 트랙이 ended 되므로 그때 패널을 접는다.
+    const userCamPanel = $('user-cam-panel'), userCamVideo = $('user-cam-video');
+    function showUserCam(stream) {
+        if (!userCamPanel || !userCamVideo) return;
+        userCamVideo.srcObject = stream;
+        userCamVideo.muted = true;                    // 음성은 Audio 요소가 담당 — 겹치면 되먹임
+        userCamVideo.play().catch(() => {});
+        userCamPanel.classList.remove('hidden');
+        for (const t of stream.getVideoTracks()) {
+            t.addEventListener('ended', hideUserCam, { once: true });
+            t.addEventListener('mute',  hideUserCam, { once: true });
+        }
+    }
+    function hideUserCam() {
+        if (!userCamPanel || !userCamVideo) return;
+        userCamVideo.srcObject = null;
+        userCamPanel.classList.add('hidden');
     }
 
     async function startBJCamera(peer) {

@@ -646,3 +646,42 @@
 .v-num { display: inline-block; width: 3ch; text-align: right; }
 .v-num-r { text-align: left; }
 .v-sep { opacity: .6; padding: 0 1px; }
+
+
+/* ── 스트리머 콘솔 — 좌우 꽉 채움, 컨트롤(좌) / 화면(우) ─────────────────
+   화면(stage)은 두 상자(내 화면 · 상대 화면)를 data-layout 하나로 세 가지 배치한다.
+   상자 id 는 JS 가 .hidden 을 토글하는 데 쓰므로 바꾸지 않는다. */
+.console-wide { max-width: none; }
+.console-grid { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+@media (max-width: 1100px) { .console-grid { grid-template-columns: 1fr; } }
+
+.stage { position: relative; background: #000; border-radius: var(--rad-md); overflow: hidden;
+         aspect-ratio: 16 / 9; min-height: 240px; }
+.stage-box { position: absolute; inset: 0; background: #000; }
+.stage-box video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }   /* contain — 잘리지 않게. 카메라는 16:9가 아닐 수 있다 */
+.stage-cap { position: absolute; left: 10px; bottom: 10px; font-size: 11px; color: #fff;
+             background: rgba(0,0,0,.55); padding: 3px 9px; border-radius: 6px; pointer-events: none; }
+.stage-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+               color: var(--tx-3); font-size: 12px; text-align: center; padding: 24px; }
+/* 상자가 하나라도 보이면 안내문은 숨긴다 (:has 미지원 브라우저는 JS 가 대신 처리) */
+.stage:has(.stage-box:not(.hidden)) .stage-empty { display: none; }
+
+/* ⊟ 반반 — stage 전체가 아니라 **상자 각각**을 16:9 로 둔다.
+   stage 에 32/9 + min-height 를 걸면 좁은 화면에서 상자가 세로로 길어져 영상이 어긋난다.
+   넓으면 나란히(합쳐서 32:9), 좁으면 세로로 쌓인다. 어느 쪽이든 잘리지 않는다. */
+.stage[data-layout="split"] { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; aspect-ratio: auto; min-height: 0; }
+.stage[data-layout="split"] .stage-box { position: relative; inset: auto; aspect-ratio: 16 / 9; }
+.stage[data-layout="split"] .stage-empty { position: absolute; grid-column: 1 / -1; }
+@media (max-width: 700px) { .stage[data-layout="split"] { grid-template-columns: 1fr; } }
+
+/* ▣ 내 화면 크게 · 상대는 우측 하단 (PiP)  /  ▣ 상대 화면 크게 · 내 화면은 우측 하단 (PiP) */
+.stage[data-layout="me"] #user-cam-panel,
+.stage[data-layout="them"] #cowatch-panel {
+    inset: auto 12px 12px auto; width: 28%; min-width: 160px; aspect-ratio: 16 / 9;
+    border: 2px solid rgba(255,255,255,.35); border-radius: 8px; overflow: hidden; z-index: 2;
+    box-shadow: 0 6px 20px rgba(0,0,0,.5);
+}
+.stage[data-layout="me"] #user-cam-panel .stage-cap,
+.stage[data-layout="them"] #cowatch-panel .stage-cap { left: 6px; bottom: 6px; font-size: 10px; padding: 2px 6px; }
+
+#layout-picker .btn.is-active { background: var(--c-purple); color: #fff; border-color: var(--c-purple); }
