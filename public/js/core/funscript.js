@@ -85,18 +85,6 @@
         return best ? best.tcode : 'L0';        // 접미사가 없으면 주축
     }
 
-    // 강도 슬라이더 범위(%). 관리자가 설정으로 조정한다 (layout이 window.PULSE_TUNING 으로 심는다).
-    // 0% = 원본 그대로. 음수는 진폭 축소, 양수는 확대.
-    const GAIN_MIN_DEFAULT = -80, GAIN_MAX_DEFAULT = 80;
-    function gainRange() {
-        const t = window.PULSE_TUNING || {};
-        let lo = parseFloat(t.gainMin), hi = parseFloat(t.gainMax);
-        if (isNaN(lo)) lo = GAIN_MIN_DEFAULT;
-        if (isNaN(hi)) hi = GAIN_MAX_DEFAULT;
-        if (hi < lo) { const x = lo; lo = hi; hi = x; }
-        return { min: lo, max: hi };
-    }
-
     // 타이머 루프 주기(ms). 화면이 가려져 rAF가 멈춘 동안의 예비 경로다.
     // ⚠ 브라우저는 숨겨진 탭의 타이머를 1초 이상으로 늦춘다(오디오 재생 중이면 완화).
     //   즉 백그라운드에서는 정밀도가 떨어진다 — 완전히 멈추는 것보다 낫다는 수준이다.
@@ -282,7 +270,6 @@
         shapeCenter,
         SHAPE_DEFAULT,
         MIN_EXPAND_SPAN,
-        gainRange,                // (v1 잔재) 관리자 강도 범위 — v2 UI 는 쓰지 않는다
         splitFunscriptPath,
         AXIS_DEFS,
     };

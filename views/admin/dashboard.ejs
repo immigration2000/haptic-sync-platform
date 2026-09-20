@@ -75,26 +75,6 @@
                         <input class="form-input" type="text" name="site_message" value="<%= siteMessage %>" maxlength="200" placeholder="예: 6/15 정기 점검 안내…">
                     </div>
 
-                    <div class="form-row mt-4">
-                        <div class="form-label" style="margin-bottom:8px;">스트로크 강도 범위
-                            <span class="text-faint" style="font-size:11px;">(플레이어 강도 슬라이더의 최소·최대)</span></div>
-                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                            <input class="form-input" type="number" name="stroke_gain_min"
-                                   min="-100" max="0" step="5" value="<%= strokeGainMin %>" style="width:100px;">
-                            <span class="text-faint" style="font-size:12px;">% ~</span>
-                            <input class="form-input" type="number" name="stroke_gain_max"
-                                   min="0" max="500" step="5" value="<%= strokeGainMax %>" style="width:100px;">
-                            <span class="text-faint" style="font-size:12px;">%</span>
-                        </div>
-                        <p class="text-faint" style="font-size:11px;margin:6px 0 0;">
-                            <strong>0% = 스크립트 원본 그대로</strong>입니다. 음수는 진폭 축소, 양수는 확대.
-                            기기가 더 큰 진폭을 감당하면 최대값을 올리세요.
-                            <span class="mono">+<%= strokeGainMax %>%</span> = 원본의
-                            <span class="mono"><%= (1 + strokeGainMax / 100).toFixed(2) %>배</span>,
-                            <span class="mono"><%= strokeGainMin %>%</span> =
-                            <span class="mono"><%= (1 + strokeGainMin / 100).toFixed(2) %>배</span>.
-                        </p>
-                    </div>
 
                     <div class="form-row mt-4">
                         <div class="form-label" style="margin-bottom:8px;">업로드 용량 가드

@@ -37,8 +37,6 @@ router.get('/', (req, res) => {
     res.render('admin/dashboard', {
         title: '관리자', stats,
         disk: diskGuard.status(),
-        strokeGainMin: parseFloat(getSetting('stroke_gain_min', '-80')),
-        strokeGainMax: parseFloat(getSetting('stroke_gain_max', '80')),
         dummyEnabled: getSettingBool('dummy_bj_enabled', true),
         siteMessage:  getSetting('site_message', ''),
         maintMode:    getSettingBool('maintenance_mode', false),
@@ -77,9 +75,6 @@ router.post('/settings', (req, res) => {
     numSet('upload_max_file_mb',   upload_max_file_mb,   50, 4000);
     numSet('upload_quota_user_gb', upload_quota_user_gb,  1,  500);
     numSet('upload_min_free_gb',   upload_min_free_gb,    1,  200);
-    // 강도 슬라이더 범위(%). 0%가 원본 그대로이므로 음수~양수로 잡는다.
-    numSet('stroke_gain_min', req.body.stroke_gain_min, -100, 0);
-    numSet('stroke_gain_max', req.body.stroke_gain_max, 0, 500);
     setSetting('dummy_bj_enabled',  dummy_bj_enabled === 'on'  ? '1' : '0');
     setSetting('maintenance_mode',  maintenance_mode === 'on' ? '1' : '0');
     setSetting('site_message',      (site_message || '').slice(0, 200));
