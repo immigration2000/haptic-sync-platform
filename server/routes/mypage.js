@@ -31,6 +31,8 @@ router.post('/settings/password', async (req, res) => {
 
 router.post('/settings/nickname', (req, res) => {
     const nickname = (req.body.nickname || '').trim();
+    const nameErr = require('../services/name_policy').nameProblem(nickname);
+    if (nameErr) { req.session.flash = nameErr; return res.redirect('/mypage/settings'); }
     if (nickname.length < 2 || nickname.length > 20) {
         req.session.flash = '닉네임 2~20자.'; return res.redirect('/mypage/settings');
     }
@@ -64,6 +66,8 @@ router.get('/bj-apply', (req, res) => {
 
 router.post('/bj-apply', (req, res) => {
     const { stage_name, description, intro_message } = req.body;
+    const nameErr2 = require('../services/name_policy').nameProblem(stage_name);
+    if (nameErr2) { req.session.flash = nameErr2; return res.redirect('/mypage/bj-apply'); }
     if (!stage_name || stage_name.length < 2) {
         req.session.flash = '활동명 2자 이상.'; return res.redirect('/mypage/bj-apply');
     }

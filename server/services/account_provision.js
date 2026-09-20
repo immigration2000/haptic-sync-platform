@@ -31,6 +31,8 @@ function provisionStreamer({ loginId, stageName, password, subPrice, subDays }) 
     const stage = String(stageName || '').trim().slice(0, 40);
 
     if (!login || !stage) return { ok: false, error: '로그인 ID와 활동명은 필수입니다.' };
+    const nameErr = require('./name_policy').nameProblem(stage);
+    if (nameErr) return { ok: false, error: nameErr };
     if (login.length > 60)  return { ok: false, error: '로그인 ID가 너무 깁니다.' };
 
     const generated = !password;

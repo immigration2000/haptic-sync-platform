@@ -87,6 +87,8 @@ router.get('/profile', (req, res) => {
 router.post('/profile', (req, res) => {
     const { stage_name, description, rate_per_minute, tags, free_preview_sec, session_block_min,
             rate_cam, sub_price, sub_days } = req.body;
+    const nameErr = require('../services/name_policy').nameProblem(stage_name);
+    if (nameErr) { req.session.flash = nameErr; return res.redirect('/bj-studio/profile'); }
     if (!stage_name || stage_name.length < 2 || stage_name.length > 30) {
         req.session.flash = '활동명 2~30자.'; return res.redirect('/bj-studio/profile');
     }

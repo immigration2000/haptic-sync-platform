@@ -69,6 +69,8 @@ router.post('/register', async (req, res) => {
     if (password.length < 8) {
         req.session.flash = '비밀번호는 8자 이상이어야 합니다.'; return res.redirect('/auth/register');
     }
+    const nameErr = require('../services/name_policy').nameProblem(nickname);
+    if (nameErr) { req.session.flash = nameErr; return res.redirect('/auth/register'); }
     if (nickname.length < 2 || nickname.length > 20) {
         req.session.flash = '닉네임은 2~20자.'; return res.redirect('/auth/register');
     }
