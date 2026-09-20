@@ -54,8 +54,8 @@
         name: 'TCode V3 (OSR2 · SR6 · PULSE)',
         serialBaud: 115200,          // TCode 기기 표준. 9600이면 포트는 열리지만 기기가 명령을 못 읽어 안 움직임.
         ble: {
-            service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',   // Nordic UART Service
-            txChar:  '6e400002-b5a3-f393-e0a9-e50e24dcca9e',   // client → device (write)
+			service: '2d10a187-a483-4a60-8ca2-59b7d1704146', txChar: '216f3732-6f41-4fde-98fa-e3033a2ace80',	// ESP32
+		//	service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', txChar: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',	// NUS; Nordic UART Service		
             write:   'withoutResponse',
         },
         init: ['D1', 'L050I500'],

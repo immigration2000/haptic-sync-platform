@@ -24,7 +24,11 @@
     // 활성 하드웨어 드라이버 (device_drivers.js). 미로드 시 TCode V3 폴백.
     const FALLBACK_DRIVER = {
         id: 'tcode_v3', name: 'TCode V3', serialBaud: 115200,   // TCode 표준 (9600이면 기기가 명령 못 읽음)
-        ble: { service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', txChar: '6e400002-b5a3-f393-e0a9-e50e24dcca9e', write: 'withoutResponse' },
+        ble: {
+			service: '2d10a187-a483-4a60-8ca2-59b7d1704146', txChar: '216f3732-6f41-4fde-98fa-e3033a2ace80',	// ESP32
+		//	service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', txChar: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',	// NUS; Nordic UART Service
+			write: 'withoutResponse'
+		},
         init: ['D1', 'L050I500'], stop: 'DSTOP', idle: 'L050I300',
         encode: (cmd) => new TextEncoder().encode(cmd + '\n'),
     };
@@ -47,6 +51,8 @@
         btChar: null,
     };
     const listeners = new Set();
+	
+	let bleWriteQueue = Promise.resolve();
 
     function notify() {
         for (const cb of listeners) {
@@ -78,21 +84,34 @@
 
     /** 드라이버 인코딩 후 쓰기 1회. 큐에 넣기만 하고 결과를 기다리지 않는다. */
     function writeOnce(cmd) {
-        const data = drv().encode(cmd);                 // 캐노니컬 → 기기 바이트 (드라이버가 변환)
-        if (state.kind === 'serial' && state.writer) {
-            state.writer.write(data).catch(noteWriteError);
-            return true;
-        }
-        if (state.kind === 'bluetooth' && state.btChar) {
-            const wantNoResp = drv().ble.write !== 'withResponse';
-            const op = (wantNoResp && state.btChar.writeValueWithoutResponse)
-                ? state.btChar.writeValueWithoutResponse(data)
-                : state.btChar.writeValue(data);
-            if (op && op.catch) op.catch(noteWriteError);
-            return true;
-        }
-        return false;
-    }
+		const data = drv().encode(cmd);
+
+		// Serial — 기존 동작 유지
+		if (state.kind === 'serial' && state.writer) {
+			state.writer.write(data).catch(noteWriteError);
+			return true;
+		}
+
+		// Bluetooth — GATT write를 직렬화
+		if (state.kind === 'bluetooth' && state.btChar) {
+			const char = state.btChar;
+			const wantNoResp = drv().ble.write !== 'withResponse';
+
+			bleWriteQueue = bleWriteQueue
+				.catch(() => {})
+				.then(() => {
+					if (wantNoResp && char.writeValueWithoutResponse) {
+						return char.writeValueWithoutResponse(data);
+					}
+					return char.writeValue(data);
+				})
+				.catch(noteWriteError);
+
+			return true;
+		}
+
+		return false;
+	}
 
     // 쓰기 실패는 진단용으로만 남긴다 (연결을 끊지 않는다).
     // 같은 오류가 쏟아질 수 있으므로 처음 1회와 100회마다만 콘솔에 찍는다.
@@ -176,7 +195,8 @@
 
         const ble = drv().ble;
         const device = await navigator.bluetooth.requestDevice({
-            filters: [{ services: [ble.service] }],
+            //filters: [{ services: [ble.service] }],
+			acceptAllDevices: true,
             optionalServices: [ble.service],
         });
 
@@ -192,9 +212,21 @@
             }
         });
 
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(ble.service);
-        const txChar = await service.getCharacteristic(ble.txChar);
+		console.time('[BLE] total');
+
+		console.time('[BLE] gatt.connect');
+		const server = await device.gatt.connect();
+		console.timeEnd('[BLE] gatt.connect');
+
+		console.time('[BLE] getPrimaryService');
+		const service = await server.getPrimaryService(ble.service);
+		console.timeEnd('[BLE] getPrimaryService');
+
+		console.time('[BLE] getCharacteristic');
+		const txChar = await service.getCharacteristic(ble.txChar);
+		console.timeEnd('[BLE] getCharacteristic');
+
+		console.timeEnd('[BLE] total');
 
         state.btDevice  = device;
         state.btChar    = txChar;
@@ -289,12 +321,13 @@
 
     // ─── 공통 send ───────────────────────────────────────────
     function send(cmd) {
-        if (!state.connected) return false;
-        if (!writeOnce(cmd)) return false;
-        state.sentCount++;
-        if (state.sentCount % 5 === 0) notify();
-        return true;
-    }
+		if (!state.connected) return false;
+		if (!writeOnce(cmd)) return false;
+
+		state.sentCount++;
+		if (state.sentCount % 5 === 0) notify();
+		return true;
+	}
 
     // ─── 원격 수신 명령 전용 송신 ─────────────────────────────
     // ⚠ 드라이버의 정규화 함수는 **검증기가 아니다.** 축 패턴과 안 맞는 토큰은
