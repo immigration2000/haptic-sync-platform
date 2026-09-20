@@ -134,13 +134,12 @@
             else if (t.startsWith('CTRL:'))  setCtrl(t.slice(5));
             else if (t.startsWith('ALLOW:')) setCtlAllowed(t.slice(6) === '1');
             else if (/^[LR][0-9]/.test(t)) {
-                // 스트리머 수동 TCode — 통화모드 또는 영상 manual일 때 적용.
-                // ⚠ 예전에는 줄 앞부분만 정규식으로 보고 토큰을 전부 보냈다.
-                //    'L050I100 <임의문자열>' 같은 줄이 통과했다. 이제 토큰별로 검증한다.
-                if ((mode === 'call' || ctrl === 'manual') && Dev && Dev.isConnected) {
-                    const n = Dev.sendRemote(t);
-                    if (n) { recvCount += n; recvEl.textContent = recvCount.toLocaleString() + ' cmd'; }
-                }
+                // 스트리머 수동 TCode. 검증·기기 전달은 공용 receive (토큰별 sendRemote).
+                // 통화만 있는 조건 — 통화모드 또는 영상 manual 일 때만 — 은 게이트로 넘긴다.
+                if (window.PulseAxisControl) window.PulseAxisControl.receive(t, {
+                    gate: () => (mode === 'call' || ctrl === 'manual'),
+                    onCount: (n) => { recvCount += n; recvEl.textContent = recvCount.toLocaleString() + ' cmd'; },
+                });
             }
         }
     }
@@ -218,55 +217,30 @@
 
     // ── 스트리머 기기 제어 (사용자 → 스트리머 기기) ──
     // 스트리머가 ALLOW:1 을 보내야만 패널이 열린다. 하드웨어를 몸에 연결한 쪽이 통제권을 가진다.
-    // 송신은 PulseAxisSender 가 33ms 병합 + 변화율 제한으로 내보낸다 (노트북이 실기기로 검증한 수치).
+    // 송신은 PulseAxisControl 이 33ms 병합 + 변화율 제한으로 내보낸다 (노트북이 실기기로 검증한 수치).
     const ctlPanel = $('ctl-panel'), ctlState = $('ctl-state'), sendCountEl = $('call-send-count');
-    const ctlAxes = { L0: $('ctl-L0'), R0: $('ctl-R0'), R2: $('ctl-R2') };
-    const ctlInterp = $('ctl-interp');
-    let ctlAllowed = false, axisTx = null;
+    let ctlAllowed = false;
 
-    function ensureTx() {
-        if (axisTx || !window.PulseAxisSender) return axisTx;
-        axisTx = window.PulseAxisSender.create({
-            send: (line) => {
-                if (!peer || !ctlAllowed) return;
-                try { peer.send(line); } catch (_) { return; }
-                if (sendCountEl) sendCountEl.textContent = axisTx.sentCount.toLocaleString() + ' cmd';
-            },
-            interp: ctlInterp ? parseInt(ctlInterp.value, 10) : 100,
-        });
-        return axisTx;
-    }
+    // 슬라이더·키보드·속도제한·명령 조립은 PulseAxisControl (방송·콘솔과 같은 코드).
+    // 사용자 화면이 다른 부분은 전송로(P2P 데이터채널)와 게이트(스트리머 허용)뿐.
+    const axisCtl = window.PulseAxisControl && window.PulseAxisControl.bind({
+        axes: { L0: { el: $('ctl-L0'), val: $('ctl-L0-v') },
+                R0: { el: $('ctl-R0'), val: $('ctl-R0-v') },
+                R2: { el: $('ctl-R2'), val: $('ctl-R2-v') } },
+        interpEl: $('ctl-interp'), interpVal: $('ctl-interp-v'),
+        send: (line) => {
+            if (!peer || !ctlAllowed) return;
+            try { peer.send(line); } catch (_) { return; }
+            if (sendCountEl && axisCtl) sendCountEl.textContent = axisCtl.sender.sentCount.toLocaleString() + ' cmd';
+        },
+        enabled: () => ctlAllowed,
+    });
     function setCtlAllowed(on) {
         ctlAllowed = !!on;
         if (ctlPanel) ctlPanel.classList.toggle('hidden', !ctlAllowed);
         if (ctlState) ctlState.textContent = ctlAllowed ? '허용됨' : '스트리머가 꺼둠';
-        if (!ctlAllowed && axisTx) axisTx.stop();
+        if (!ctlAllowed && axisCtl) axisCtl.sender.stop();
     }
-    Object.keys(ctlAxes).forEach((k) => {
-        const el = ctlAxes[k]; if (!el) return;
-        el.addEventListener('input', () => {
-            const v = parseInt(el.value, 10);
-            const lbl = $('ctl-' + k + '-v'); if (lbl) lbl.textContent = v;
-            const tx = ensureTx(); if (tx) tx.set(k, v);
-        });
-    });
-    if (ctlInterp) ctlInterp.addEventListener('input', () => {
-        const v = parseInt(ctlInterp.value, 10);
-        const lbl = $('ctl-interp-v'); if (lbl) lbl.textContent = v;
-        if (axisTx) axisTx.setInterp(v);
-    });
-    // 데스크톱 키보드 — 콘솔과 같은 키 배치
-    const CTL_KEYS = { ArrowUp:['L0',+5], ArrowDown:['L0',-5], ArrowLeft:['R0',-5], ArrowRight:['R0',+5], KeyW:['R2',+5], KeyS:['R2',-5] };
-    document.addEventListener('keydown', (e) => {
-        if (!ctlAllowed) return;
-        if (document.activeElement && ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
-        const m = CTL_KEYS[e.code]; if (!m) return;
-        e.preventDefault();
-        const [k, d] = m, el = ctlAxes[k]; if (!el) return;
-        const v = Math.max(0, Math.min(99, parseInt(el.value, 10) + d));
-        el.value = v; const lbl = $('ctl-' + k + '-v'); if (lbl) lbl.textContent = v;
-        const tx = ensureTx(); if (tx) tx.set(k, v);
-    });
 
     // ── 내 카메라 → 스트리머 ──
     // 마이크와 **다른 스트림**으로 보낸다. 같은 스트림에 트랙을 얹으면 스트리머 쪽에서
@@ -318,7 +292,7 @@
         if (peer)        { try { peer.destroy(); } catch (_) {} peer = null; }
         if (micStream)   { for (const t of micStream.getTracks()) t.stop(); micStream = null; }
         if (camStream)   { for (const t of camStream.getTracks()) t.stop(); camStream = null; }
-        if (axisTx)      { try { axisTx.stop(); } catch (_) {} }
+        if (axisCtl)     { try { axisCtl.stop(); } catch (_) {} }
         if (elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
         if (socket)      { socket.emit('hangup'); socket.disconnect(); socket = null; }
         stateEl.textContent = remote ? 'BJ가 종료했습니다' : '종료됨';

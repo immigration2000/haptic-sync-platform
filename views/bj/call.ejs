@@ -64,7 +64,7 @@
                 </div>
 
                 <!-- 스트리머 기기 제어 — 스트리머가 허용(ALLOW:1)해야 나타난다.
-                     송신은 axis_sender 가 33ms 병합 + 변화율 제한으로 내보낸다. -->
+                     송신은 axis_control 이 33ms 병합 + 변화율 제한으로 내보낸다. -->
                 <div id="ctl-panel" class="mt-5 hidden" style="border-top:1px solid var(--border-soft); padding-top:14px;">
                     <div class="flex items-center gap-2 mb-2" style="justify-content:space-between;">
                         <strong style="font-size:12px;">🎮 스트리머 기기 제어</strong>
@@ -136,5 +136,4 @@ window.__BJ_CALL__ = {
     서로 다른 기기 객체를 보게 된다 — 헤더는 '연결됨'인데 통화 화면은 '미연결'이 되고
     수신 명령이 기기로 가지 않는다 (2026-09-20 실기기 확인). %>
 <script src="/js/core/bj_session.js"></script>
-<script src="/js/core/axis_sender.js?v=1"></script>
-<script src="/js/pages/bj_call.js?v=bidir"></script>
+<script src="/js/pages/bj_call.js?v=axisctl"></script>

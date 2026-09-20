@@ -20,34 +20,16 @@
     };
 
     // ── Sliders / keys
-    const axes = {
-        L0: { el: $('ax-l0'), val: $('l0-val'), v: 50 },
-        R0: { el: $('ax-r0'), val: $('r0-val'), v: 50 },
-        R2: { el: $('ax-r2'), val: $('r2-val'), v: 50 },
-    };
-    const interpEl = $('ax-interp'), interpVal = $('interp-val');
-    let interp = 100;
-    interpEl.addEventListener('input', () => { interp = parseInt(interpEl.value,10); interpVal.textContent = interp; });
-    for (const k of Object.keys(axes)) {
-        const s = axes[k];
-        s.el.addEventListener('input', () => { s.v = parseInt(s.el.value,10); s.val.textContent = s.v; broadcastAxis(k, s.v); });
-    }
-    const KEYS = { ArrowUp:['L0',+5], ArrowDown:['L0',-5], ArrowLeft:['R0',-5], ArrowRight:['R0',+5], KeyW:['R2',+5], KeyS:['R2',-5] };
-    document.addEventListener('keydown', (e) => {
-        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT')) return;
-        const m = KEYS[e.code]; if (!m) return;
-        e.preventDefault();
-        const [k, d] = m, s = axes[k];
-        s.v = Math.max(0, Math.min(99, s.v + d));
-        s.el.value = s.v; s.val.textContent = s.v;
-        broadcastAxis(k, s.v);
+    // 슬라이더·키보드·속도제한·명령 조립은 PulseAxisControl 이 한다 (방송·통화와 같은 코드).
+    // 콘솔이 다른 부분은 전송로뿐 — P2P 데이터채널로 상대에게.
+    const axisCtl = window.PulseAxisControl && window.PulseAxisControl.bind({
+        axes: { L0: { el: $('ax-l0'), val: $('l0-val') },
+                R0: { el: $('ax-r0'), val: $('r0-val') },
+                R2: { el: $('ax-r2'), val: $('r2-val') } },
+        interpEl: $('ax-interp'), interpVal: $('interp-val'),
+        send: (line) => { pushLog(line); sendToPeers(line); },
     });
 
-    function broadcastAxis(axis, pos) {
-        const cmd = `${axis}${pos.toString().padStart(2,'0')}I${interp}`;
-        pushLog(cmd, axis, pos);
-        sendToPeers(cmd);
-    }
     // 모든 페어에 임의 메시지 전송 (MODE/VIDEO/CTRL/TCode)
     function sendToPeers(msg) {
         for (const { peer, dataReady } of peers.values()) {
@@ -150,14 +132,19 @@
     btnCtrlManual.addEventListener('click', () => setCtrlSrc('manual'));
 
     const logEl = $('tcode-log');
-    function pushLog(cmd, axis, pos) {
+    // 한 줄에 여러 토큰이 올 수 있다 (다축 병합) — 토큰마다 색을 입힌다
+    function pushLog(cmdLine) {
         const t = ((Date.now() - (startMs || Date.now())) / 1000).toFixed(2).padStart(6, ' ');
-        const line = document.createElement('div');
         const colors = { L0: '#FF2D5E', R0: '#7B2DFF', R2: '#5EFFB0' };
-        line.innerHTML = `<span style="color: var(--tx-3); min-width:60px; display:inline-block;">${t}s</span> ` +
-                         `<span style="color: ${colors[axis] || '#fff'}; font-weight: 700;">${axis}</span>` +
-                         `<span style="color: #5EFFB0;">${pos.toString().padStart(2,'0')}</span>` +
-                         `<span style="color: #B395FF;">I${interp}</span>`;
+        const parts = String(cmdLine).split(/\s+/).map((tok) => {
+            const m = tok.match(/^([LR]\d)(\d\d)I(\d+)$/);
+            if (!m) return `<span>${tok}</span>`;
+            return `<span style="color: ${colors[m[1]] || '#fff'}; font-weight: 700;">${m[1]}</span>` +
+                   `<span style="color: #5EFFB0;">${m[2]}</span>` +
+                   `<span style="color: #B395FF;">I${m[3]}</span>`;
+        });
+        const line = document.createElement('div');
+        line.innerHTML = `<span style="color: var(--tx-3); min-width:60px; display:inline-block;">${t}s</span> ` + parts.join(' ');
         logEl.appendChild(line);
         while (logEl.children.length > 12) logEl.removeChild(logEl.firstChild);
     }
@@ -294,13 +281,12 @@
         });
         peer.on('data', (chunk) => {
             const text = chunk.toString();
-            // 사용자 → 내 기기 (허용했을 때만). 원격 입력이므로 반드시 sendRemote 로 검증한다.
+            // 사용자 → 내 기기. 검증·기기 전달은 공용 receive 가 하고, 콘솔은 게이트('허용')만 넘긴다.
             if (/^[LR][0-9]/.test(text)) {
-                if (!allowDev) return;
-                const D = window.PulseDevice;
-                if (!D || !D.isConnected) return;
-                const n = D.sendRemote(text);
-                if (n) { devRecv += n; if (devRecvEl) devRecvEl.textContent = devRecv.toLocaleString(); }
+                if (window.PulseAxisControl) window.PulseAxisControl.receive(text, {
+                    gate: () => allowDev,
+                    onCount: (n) => { devRecv += n; if (devRecvEl) devRecvEl.textContent = devRecv.toLocaleString(); },
+                });
                 return;
             }
             // 사용자가 보내는 메시지 — cowatch에서 영상 시간 동기용

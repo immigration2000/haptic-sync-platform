@@ -121,7 +121,7 @@
     const bdLog = $('bd-log');
     const interpEl = $('bd-interp');
     const bdAxes = { L0: $('bd-L0'), R0: $('bd-R0'), R2: $('bd-R2') };
-    let interp = 100, broadcasting = false;
+    let broadcasting = false;
 
     function enableDeviceControl() {
         broadcasting = true;
@@ -137,33 +137,27 @@
             : '💡 우상단에서 <strong>본인 디바이스를 연결</strong>하면 같은 동작이 본인 기기에도 재생됩니다(미리보기).';
     }
     if (Dev) { renderBdDev(Dev.getStatus()); Dev.onChange(renderBdDev); }
+    // 전송로 — 방송이 통화와 다른 **유일한** 부분: 서버를 거쳐 시청자 전원에게 + 본인 기기 미러.
+    // 슬라이더·키보드·속도제한·명령 조립은 PulseAxisControl 이 한다 (콘솔·통화와 같은 코드).
     function sendTcode(cmd) {
         if (!broadcasting || !socket) return;
         socket.emit('bcast-tcode', { cmd });                 // 시청자 전원
         if (Dev && Dev.isConnected) { try { Dev.send(cmd); } catch (_) {} }  // 본인 디바이스도 같이
         logCmd(cmd);
     }
-    function broadcastAxis(axis, pos) { sendTcode(`${axis}${String(pos).padStart(2,'0')}I${interp}`); }
     function logCmd(cmd) {
         if (!bdLog) return;
         const line = document.createElement('div'); line.textContent = '→ ' + cmd;
         bdLog.appendChild(line);
         while (bdLog.children.length > 5) bdLog.removeChild(bdLog.firstChild);
     }
-    if (interpEl) interpEl.addEventListener('input', () => { interp = parseInt(interpEl.value, 10); $('bd-interp-v').textContent = interp; });
-    Object.keys(bdAxes).forEach(k => {
-        const el = bdAxes[k]; if (!el) return;
-        el.addEventListener('input', () => { const v = parseInt(el.value, 10); $('bd-' + k + '-v').textContent = v; broadcastAxis(k, v); });
-    });
-    const DKEYS = { ArrowUp:['L0',+5], ArrowDown:['L0',-5], ArrowLeft:['R0',-5], ArrowRight:['R0',+5], KeyW:['R2',+5], KeyS:['R2',-5] };
-    document.addEventListener('keydown', (e) => {
-        if (!broadcasting) return;
-        if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
-        const m = DKEYS[e.code]; if (!m) return;
-        e.preventDefault();
-        const [k, d] = m, el = bdAxes[k]; if (!el) return;
-        const v = Math.max(0, Math.min(99, parseInt(el.value, 10) + d));
-        el.value = v; $('bd-' + k + '-v').textContent = v; broadcastAxis(k, v);
+    const axisCtl = window.PulseAxisControl && window.PulseAxisControl.bind({
+        axes: { L0: { el: bdAxes.L0, val: $('bd-L0-v') },
+                R0: { el: bdAxes.R0, val: $('bd-R0-v') },
+                R2: { el: bdAxes.R2, val: $('bd-R2-v') } },
+        interpEl, interpVal: $('bd-interp-v'),
+        send: sendTcode,
+        enabled: () => broadcasting,
     });
 
     // ── 스크립트 재생 ─────────────────────────────────────────
@@ -259,6 +253,7 @@
 
     function cleanup() {
         stopScript();                     // 송출을 끊으면 스크립트도 멈춘다
+        if (axisCtl) axisCtl.sender.stop();
         for (const p of viewerPeers.values()) try { p.destroy(); } catch(_){}
         viewerPeers.clear();
         if (stream) for (const t of stream.getTracks()) t.stop();
