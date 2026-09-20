@@ -107,32 +107,52 @@
     const MIN_EXPAND_SPAN = 10;
 
     /**
-     * 스크립트 위치(0~100) → 실제 출력 위치
+     * 스크립트 위치(0~100) → 실제 출력 위치 (v2 — 모든 축 공통)
      *
-     *   center = (최소 + 최대) / 2                 ← 최소·최대는 '움직임의 중심'을 정한다
-     *   dev    = pos - 스크립트 자체 중앙((lo+hi)/2)
-     *   out    = center + dev * (1 + gain)        ← 확장 OFF면 gain = 0
-     *   → [최소, 최대] 클램프 → [0, 99]
+     *   cfg = { hwMin, hwMax, centerFrac, gain, auto }
+     *   center = hwMin + centerFrac × (hwMax − hwMin)      ← 가동범위 안에서 중심 위치 (비율)
+     *   g      = auto ? autoGain(ax, cfg) : gain            ← 강도. 100% = 원본 그대로
+     *   out    = clamp(hwMin, hwMax,  center + (pos − 원본중앙) × g)
      *
-     * ⚠ 편차 기준은 **스크립트 자체 중앙**이어야 한다. 50 같은 고정값을 기준으로 잡으면
-     *   원본이 한쪽으로 치우친 스크립트(예: 30~50)에서 강도를 올릴 때
-     *   **한쪽으로만 늘어난다.** 자체 중앙을 쓰면 중심 기준으로 위아래가 똑같이 벌어진다.
+     * 왜 비율(centerFrac)인가: 가동범위를 바꾸면 중심도 같이 움직여야 한다. 절대값으로 두면
+     *   범위를 좁힐 때 중심이 범위 밖으로 나간다. 비율이면 "중앙에 뒀으면 계속 중앙"이 저절로 된다.
      *
-     * - 강도 0% = 1배(원본 진폭 그대로). 중심만 사용자가 정한 위치로 옮겨진다.
-     * - 자동 확장이 꺼져 있으면 강도를 쓰지 않는다(1배). 중심 이동만 적용된다.
-     * - `interp`(이동시간)는 절대 건드리지 않는다.
+     * ⚠ 편차 기준은 **스크립트 자체 중앙**이다. 50 같은 고정값을 쓰면 치우친 스크립트(30~50)에서
+     *   강도를 올릴 때 한쪽으로만 늘어난다.
+     * ⚠ `interp`(이동시간)는 절대 건드리지 않는다. 하드웨어가 보간한다.
      */
-    function shapeStroke(pos, ax, shape, intensity) {
-        if (!shape) return Math.round(50 + (pos - 50) * intensity);   // 구버전 호출부 호환
+    const SHAPE_DEFAULT = { hwMin: 0, hwMax: 100, centerFrac: 0.5, gain: 1, auto: false };
 
-        const outMin = Math.max(0, Math.min(100, shape.outMin));
-        const outMax = Math.max(outMin, Math.min(100, shape.outMax));
-        const center = (outMin + outMax) / 2;
-        const gain   = shape.expand ? (shape.gain == null ? 0 : shape.gain) : 0;
+    function shapeCenter(cfg) {
+        const lo = Math.max(0, Math.min(100, cfg.hwMin));
+        const hi = Math.max(lo, Math.min(100, cfg.hwMax));
+        return { lo, hi, center: lo + Math.max(0, Math.min(1, cfg.centerFrac)) * (hi - lo) };
+    }
 
-        const srcCenter = (ax && ax.span > 0) ? (ax.lo + ax.hi) / 2 : 50;
-        const out = center + (pos - srcCenter) * (1 + gain);
-        return Math.round(Math.max(outMin, Math.min(outMax, out)));
+    /**
+     * 자동 맞춤 — 스크립트 진폭이 가동범위에 (중심 위치를 존중하면서) 꽉 차는 최대 배율.
+     * 양쪽 중 좁은 쪽에 맞춘다. 상한 없음 — 슬라이더 300% 는 수동 조절 범위일 뿐이다.
+     * 원본 폭 < MIN_EXPAND_SPAN 이면 증폭하지 않는다(=1).
+     */
+    function autoGain(ax, cfg) {
+        if (!ax || !(ax.span >= MIN_EXPAND_SPAN)) return 1;
+        const { lo, hi, center } = shapeCenter(cfg);
+        const srcC = (ax.lo + ax.hi) / 2;
+        const up = (srcC - ax.lo) > 0 ? (center - lo) / (srcC - ax.lo) : Infinity;
+        const dn = (ax.hi - srcC) > 0 ? (hi - center) / (ax.hi - srcC) : Infinity;
+        return Math.max(0, Math.min(up, dn));
+    }
+
+    function effectiveGain(ax, cfg) {
+        return cfg.auto ? autoGain(ax, cfg) : (cfg.gain == null ? 1 : Math.max(0, cfg.gain));
+    }
+
+    function shapeAxis(pos, ax, cfg) {
+        if (!cfg) return Math.round(Math.max(0, Math.min(100, pos)));     // 설정 없으면 원본 그대로
+        const { lo, hi, center } = shapeCenter(cfg);
+        const srcC = (ax && ax.span > 0) ? (ax.lo + ax.hi) / 2 : 50;
+        const out = center + (pos - srcC) * effectiveGain(ax, cfg);
+        return Math.round(Math.max(lo, Math.min(hi, out)));
     }
 
     /**
@@ -142,15 +162,11 @@
      *   - sendOnce(true): 한 tick에 여러 축이 동시 트리거되면 단일 TCode 라인으로 합쳐 송신
      */
     class MultiAxisEngine {
-        constructor({ video, axes, onCommand, intensityGetter, shapeGetter, sendOnce = true }) {
+        constructor({ video, axes, onCommand, shapeGetter, sendOnce = true }) {
             this.video = video;
             this.axes  = axes;             // { L0: {actions, index}, R0: {...}, ... }
             this.onCommand = onCommand;    // (tcodeStr, perAxisDetails[]) => void
-            this.getIntensity = intensityGetter || (() => 1);
-            // 출력 성형 설정. 없으면 기존 동작과 완전히 동일하게 둔다.
-            //   outMin/outMax : 장치가 실제로 오갈 범위 (0~100)
-            //   gain          : 그 범위 안에서의 진폭 배율 (강도)
-            //   expand        : 스크립트 자체 진폭을 outMin~outMax로 펴줄지
+            // 출력 성형 설정 — 축 키를 받아 그 축의 cfg 를 돌려준다 (shapeAxis 참조). 없으면 원본 그대로.
             this.getShape = shapeGetter || null;
             this.sendOnce = sendOnce;
             this._running = false;
@@ -205,8 +221,6 @@
             }
             this._lastMs = ms;
 
-            const intensity = this.getIntensity();
-            const shape = this.getShape ? this.getShape() : null;
             const triggered = [];   // 이번 tick에서 트리거된 축
 
             for (const k of Object.keys(this.axes)) {
@@ -222,12 +236,9 @@
                     const cur  = ax.actions[ax.index];
                     const next = ax.actions[ax.index + 1];
                     const interp = Math.max(1, next.at - cur.at);
-                    // 출력 성형 (L0만 — 회전축은 그대로)
-                    const isStroke = (k === 'L0');
-                    const scaled = isStroke
-                        ? shapeStroke(next.pos, ax, shape, intensity)
-                        : next.pos;
-                    const pos = Math.max(0, Math.min(99, scaled));
+                    // 출력 성형 — v2 부터 **모든 축**에 축별 설정을 적용한다 (SR6 전 축)
+                    const cfg = this.getShape ? this.getShape(k) : null;
+                    const pos = Math.max(0, Math.min(99, shapeAxis(next.pos, ax, cfg)));
                     if (latest) skipped++;
                     latest = { axis: k, pos, interp, atMs: next.at, skipped: 0 };
                     ax.index++;
@@ -265,9 +276,13 @@
         MultiAxisEngine,
         // UI 미리보기가 엔진과 **같은 계산**을 쓰도록 노출한다.
         // 따로 구현하면 공식이 바뀔 때 미리보기만 조용히 어긋난다.
-        shapeStroke,
+        shapeAxis,
+        autoGain,
+        effectiveGain,
+        shapeCenter,
+        SHAPE_DEFAULT,
         MIN_EXPAND_SPAN,
-        gainRange,                // 관리자가 정한 강도 범위 (%)
+        gainRange,                // (v1 잔재) 관리자 강도 범위 — v2 UI 는 쓰지 않는다
         splitFunscriptPath,
         AXIS_DEFS,
     };

@@ -6,26 +6,6 @@
     const video = document.getElementById('player-video');
     const fsAxesLbl = document.getElementById('fs-axes');
     const devStatusEl = document.getElementById('player-dev-status');
-    const intensitySlider = document.getElementById('intensity-slider');
-    const intensityValue  = document.getElementById('intensity-value');
-    const outMinSlider    = document.getElementById('out-min-slider');
-    const outMinValue     = document.getElementById('out-min-value');
-    const outMaxSlider    = document.getElementById('out-max-slider');
-    const outMaxValue     = document.getElementById('out-max-value');
-    const expandToggle    = document.getElementById('expand-toggle');
-    const fsSpanLabel     = document.getElementById('fs-span-label');
-    const strokeReset     = document.getElementById('stroke-reset');
-    const vizLimit        = document.getElementById('viz-limit');
-    const vizActual       = document.getElementById('viz-actual');
-    const vizMarker       = document.getElementById('viz-marker');
-    const vizSrc          = document.getElementById('viz-src');
-    const vizSrcLbl       = document.getElementById('viz-src-lbl');
-    const vizText         = document.getElementById('viz-text');
-    const gainRow         = document.getElementById('gain-row');
-    const vRange          = document.getElementById('vlimit');
-    const vFill           = document.getElementById('v-fill');
-    const vThumbMin       = document.getElementById('v-thumb-min');
-    const vThumbMax       = document.getElementById('v-thumb-max');
 
     // 관리자 기본값(서버 설정) + 사용자 개별 조정(localStorage)
     const VR_ADMIN = Object.assign({ hFovDeg: 100, fisheyeFovDeg: 100, pitchDeg: 30, yawDeg: 0, eye: 'left' }, CFG.vrDefaults || {});
@@ -135,7 +115,6 @@
     // VR 재투영 시작 — 위의 const/함수 정의가 모두 끝난 뒤 호출 (TDZ 회피)
     if (CFG.type === 'vr') initVRReproject(video);
 
-    let intensity = 1.0;
     let engine = null;
 
     if (!window.PulseDevice || !window.PulseFunscript) return;
@@ -153,199 +132,149 @@
     renderDev(Dev.getStatus());
     Dev.onChange(renderDev);
 
-    // ─── 스트로크 제어 (최소·최대·강도·자동확장) ───────────────
-    // 설정은 기기·취향에 묶이므로 브라우저에 저장한다 (VR 재투영 설정과 같은 방식)
-    const STROKE_KEY = 'pulse_stroke_cfg';
-    const STROKE_DEFAULT = { outMin: 0, outMax: 100, gain: 0, expand: true };   // gain 0 = 원본 그대로
+    // ─── 스트로크 제어 v2 — SR6 전 축, 축마다 같은 설정 ──────────────
+    // 설정 구조·공식은 funscript.js (SHAPE_DEFAULT / shapeAxis / autoGain).
+    // 여기서는 공식을 다시 구현하지 않는다 — 미리보기도 엔진과 같은 함수를 부른다.
+    const $s = (id) => document.getElementById(id);
+    const AXES = [
+        { id: 'L0', label: '스트로크', color: '#FF2D5E' },
+        { id: 'L1', label: '서지',     color: '#FF8A5E' },
+        { id: 'L2', label: '스웨이',   color: '#FFD15E' },
+        // ⚠ R0/R1 라벨은 현재 코드 매핑(funscript.js AXIS_DEFS)을 따른다. T-Code 표준과 반대일 수 있음 — 실기기 확인 전.
+        { id: 'R0', label: '롤',       color: '#7B2DFF' },
+        { id: 'R1', label: '트위스트', color: '#5EB0FF' },
+        { id: 'R2', label: '피치',     color: '#5EFFB0' },
+    ];
+    const STROKE_KEY = 'pulse_stroke_cfg_v2';
+    const MIN_SPAN = 10;                                  // 가동범위 두 손잡이 최소 간격
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const pct = (v) => clamp(v, 0, 100) + '%';
 
-    // 두 손잡이의 최소 간격. 0이면 겹쳐서 **다시 잡을 수 없는 막다른 상태**가 된다.
-    // (funscript.js의 MIN_EXPAND_SPAN과는 다른 값이다 — 저건 '스크립트 진폭'의 하한)
-    const MIN_SPAN = 10;
-
-    let stroke = Object.assign({}, STROKE_DEFAULT);
+    let strokeCfg = {}; for (const a of AXES) strokeCfg[a.id] = Object.assign({}, FS.SHAPE_DEFAULT);
     try {
         const saved = JSON.parse(localStorage.getItem(STROKE_KEY) || 'null');
-        if (saved) stroke = Object.assign(stroke, saved);
+        if (saved) for (const k of Object.keys(saved)) if (strokeCfg[k]) strokeCfg[k] = Object.assign({}, FS.SHAPE_DEFAULT, saved[k]);
     } catch (_) {}
-    // 이전 버전이 저장해둔 잘못된 값(예: 0~0)을 여기서 바로잡는다.
-    // 안 하면 화면을 열자마자 막다른 상태로 시작한다.
-    (function normalizeSpan() {
-        let lo = parseInt(stroke.outMin, 10); if (isNaN(lo)) lo = 0;
-        let hi = parseInt(stroke.outMax, 10); if (isNaN(hi)) hi = 100;
-        lo = Math.max(0, Math.min(100 - MIN_SPAN, lo));
-        hi = Math.max(lo + MIN_SPAN, Math.min(100, hi));
-        stroke.outMin = lo;
-        stroke.outMax = hi;
-    })();
+    function saveStroke() { try { localStorage.setItem(STROKE_KEY, JSON.stringify(strokeCfg)); } catch (_) {} }
 
-    function saveStroke() {
-        try { localStorage.setItem(STROKE_KEY, JSON.stringify(stroke)); } catch (_) {}
-    }
+    let loadedAxes = {};              // 스크립트 로드 후 채워진다 — 축별 원본 진폭(lo/hi/span)
+    let activeAxis = 'L0';
 
-    // 슬라이더 → 상태.
-    // ⚠ 예전에는 손잡이가 교차하면 **민 쪽을 상대에 맞췄다**(lo = hi).
-    //   그러면 두 손잡이가 같은 값이 되고, 그 뒤로는 min이 max를, max가 min을 서로 막아
-    //   **어느 쪽도 움직일 수 없는 막다른 상태**가 됐다. 최대를 0까지 내리면 특히 확실히 걸렸다.
-    //   지금은 반대로 — **민 쪽이 커서를 따라가고 상대를 밀어낸다.** 간격은 MIN_SPAN으로 유지한다.
-    function pullFromUI(changed) {
-        let lo = parseInt(outMinSlider.value, 10); if (isNaN(lo)) lo = 0;
-        let hi = parseInt(outMaxSlider.value, 10); if (isNaN(hi)) hi = 100;
-        if (hi - lo < MIN_SPAN) {
-            if (changed === 'min') { lo = Math.min(lo, 100 - MIN_SPAN); hi = lo + MIN_SPAN; }
-            else                   { hi = Math.max(hi, MIN_SPAN);       lo = hi - MIN_SPAN; }
-            outMinSlider.value = lo;
-            outMaxSlider.value = hi;
+    const el = {
+        tabs: $s('ax-tabs'), summary: $s('ax-summary'),
+        vizLimit: $s('viz-limit'), vizActual: $s('viz-actual'), vizCenter: $s('viz-center'), vizMarker: $s('viz-marker'),
+        vizSrc: $s('viz-src'), vizSrcLbl: $s('viz-src-lbl'), vizText: $s('viz-text'),
+        vRange: $s('v-range'), vFill: $s('v-fill'), tMin: $s('v-thumb-min'), tMax: $s('v-thumb-max'), hwMin: $s('hw-min'), hwMax: $s('hw-max'),
+        vCenter: $s('v-center'), vcFill: $s('vc-fill'), tC: $s('v-thumb-c'), centerVal: $s('center-val'),
+        auto: $s('auto-toggle'), gain: $s('gain'), gainVal: $s('gain-val'), gainRow: $s('gain-row'), hint: $s('ax-hint'),
+    };
+    const strokeUIReady = !!(el.tabs && el.vRange && el.vCenter && el.gain && el.auto);
+
+    function renderTabs() {
+        if (!el.tabs) return;
+        el.tabs.innerHTML = '';
+        for (const a of AXES) {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'ax-tab' + (a.id === activeAxis ? ' is-active' : '');
+            b.style.setProperty('--ax', a.color);
+            b.innerHTML = `<b>${a.id}</b><span>${a.label}</span>` + (loadedAxes[a.id] ? '' : '<i title="이 영상엔 이 축 스크립트가 없습니다">·</i>');
+            b.addEventListener('click', () => { activeAxis = a.id; renderTabs(); renderStroke(); });
+            el.tabs.appendChild(b);
         }
-        stroke.outMin = lo;
-        stroke.outMax = hi;
-        stroke.gain   = parseInt(intensitySlider.value, 10) / 100;
-        stroke.expand = !!expandToggle.checked;
-        intensity = stroke.gain;           // 하위호환 경로에서도 같은 값을 쓰도록
-        renderStroke();
-        saveStroke();
     }
 
     function renderStroke() {
         if (!strokeUIReady) return;
-        outMinValue.textContent   = stroke.outMin;
-        outMaxValue.textContent   = stroke.outMax;
-        if (vFill) {                         // 두 손잡이 사이를 채운다 (아래가 0)
-            vFill.style.bottom = stroke.outMin + '%';
-            vFill.style.height = (stroke.outMax - stroke.outMin) + '%';
+        const c = strokeCfg[activeAxis], ax = loadedAxes[activeAxis] || null, meta = AXES.find(a => a.id === activeAxis);
+        document.documentElement.style.setProperty('--ax', meta.color);
+        const { lo, hi, center } = FS.shapeCenter(c);
+        el.vFill.style.bottom = pct(lo); el.vFill.style.height = pct(hi - lo);
+        el.tMin.style.bottom = pct(lo);  el.tMax.style.bottom = pct(hi);
+        el.hwMin.textContent = lo; el.hwMax.textContent = hi;
+        el.vcFill.style.bottom = pct(lo); el.vcFill.style.height = pct(hi - lo);
+        el.tC.style.bottom = pct(center); el.centerVal.textContent = Math.round(center);
+
+        const g = FS.effectiveGain(ax, c);
+        el.auto.checked = !!c.auto;
+        el.gain.max = c.auto ? Math.max(300, Math.round(g * 100)) : 300;    // 자동값이 300 을 넘으면 눈금을 늘린다
+        el.gain.value = Math.round(g * 100);
+        el.gainVal.textContent = Math.round(g * 100) + '%' + (c.auto ? ' 자동' : '');
+        el.gainRow.classList.toggle('is-off', !!c.auto); el.gain.disabled = !!c.auto;
+
+        el.vizLimit.style.bottom = pct(lo); el.vizLimit.style.height = pct(hi - lo);
+        el.vizCenter.style.bottom = pct(center);
+        if (!ax) {
+            el.vizActual.style.height = '0%'; el.vizSrc.style.height = '0%'; el.vizSrcLbl.textContent = '';
+            el.vizText.textContent = `${meta.id} ${meta.label} — 이 영상엔 스크립트 없음 · 설정은 저장됩니다`;
+            el.hint.textContent = '';
+        } else {
+            const a = FS.shapeAxis(ax.lo, ax, c), b = FS.shapeAxis(ax.hi, ax, c);
+            const olo = Math.min(a, b), ohi = Math.max(a, b);
+            el.vizActual.style.bottom = pct(olo); el.vizActual.style.height = pct(Math.max(ohi - olo, 1));
+            el.vizSrc.style.bottom = pct(ax.lo); el.vizSrc.style.height = pct(ax.hi - ax.lo);
+            el.vizSrcLbl.style.bottom = pct((ax.lo + ax.hi) / 2); el.vizSrcLbl.textContent = `원본 ${ax.lo}~${ax.hi}`;
+            const ratio = ax.span ? (ohi - olo) / ax.span : 0;
+            el.vizText.textContent = `실제 ${olo}~${ohi} · 중심 ${Math.round(center)} · 원본 대비 ${ratio.toFixed(2)}배`;
+            const want = ax.span * g;
+            el.hint.textContent = c.auto && ax.span < FS.MIN_EXPAND_SPAN
+                ? '원본 진폭이 너무 좁아 자동 맞춤이 증폭하지 않습니다 (100% 유지).'
+                : (ohi - olo) < want - 1 ? '가동범위에 걸려 일부가 잘립니다 — 범위를 넓히거나 중심을 옮기세요.' : '';
         }
-        if (vThumbMin) vThumbMin.style.bottom = stroke.outMin + '%';
-        if (vThumbMax) vThumbMax.style.bottom = stroke.outMax + '%';
-        const gpct = Math.round(stroke.gain * 100);
-        intensityValue.textContent = (gpct > 0 ? '+' : '') + gpct + '%';
-
-        // 자동확장이 꺼지면 강도는 의미가 없다 → 함께 비활성
-        const on = !!stroke.expand;
-        if (gainRow) gainRow.classList.toggle('is-off', !on);
-        intensitySlider.disabled = !on;
-
-        renderViz();
+        renderSummary(); saveStroke();
     }
-
-    /* 세로 이중 손잡이 — 값은 숨겨둔 range 입력에 넣어 기존 pullFromUI 흐름을 그대로 쓴다. */
-    if (vRange && vThumbMin && vThumbMax) {
-        let dragging = null;
-        const valueAt = (clientY) => {
-            const r = vRange.getBoundingClientRect();
-            return Math.max(0, Math.min(100, Math.round(((r.bottom - clientY) / r.height) * 100)));
-        };
-        // 여기서 상대 손잡이에 걸어 막지 않는다. 그렇게 하면 값이 제자리에 머물러
-        // 커서만 따로 노는 데다, 겹친 상태에서는 영영 못 빠져나온다.
-        // 간격 유지는 pullFromUI가 (상대를 밀어내는 방식으로) 책임진다.
-        const apply = (which, v) => {
-            if (which === 'min') { outMinSlider.value = v; pullFromUI('min'); }
-            else                 { outMaxSlider.value = v; pullFromUI('max'); }
-        };
-        const onMove = (e) => {
-            if (!dragging) return;
-            e.preventDefault();
-            apply(dragging, valueAt(e.touches ? e.touches[0].clientY : e.clientY));
-        };
-        [vThumbMin, vThumbMax].forEach(function (el) {
-            const start = (e) => { dragging = el.getAttribute('data-which'); e.preventDefault(); };
-            el.addEventListener('mousedown', start);
-            el.addEventListener('touchstart', start, { passive: false });
-        });
-        vRange.addEventListener('mousedown', (e) => {          // 트랙 클릭 → 가까운 손잡이 이동
-            if (e.target === vThumbMin || e.target === vThumbMax) return;
-            const v = valueAt(e.clientY);
-            dragging = Math.abs(v - stroke.outMin) <= Math.abs(v - stroke.outMax) ? 'min' : 'max';
-            apply(dragging, v);
-        });
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('touchmove', onMove, { passive: false });
-        document.addEventListener('mouseup', () => { dragging = null; });
-        document.addEventListener('touchend', () => { dragging = null; });
-    }
-
-    // 실제 움직임 범위 미리보기.
-    // ⚠ 여기서 공식을 다시 구현하지 않는다. 엔진이 쓰는 shapeStroke를 그대로 호출해야
-    //    공식이 바뀌어도 미리보기가 어긋나지 않는다.
-    let strokeAxis = null;              // 로드된 L0 축 (진폭 lo/hi/span 보유)
-    const pct = (v) => Math.max(0, Math.min(100, v)) + '%';
-
-    function renderViz() {
-        if (!vizLimit || !window.PulseFunscript) return;
-        const FSx = window.PulseFunscript;
-
-        // 세로 막대 — 아래가 0(얕음), 위가 100(깊음)이라 bottom/height로 배치한다
-        vizLimit.style.bottom = pct(stroke.outMin);
-        vizLimit.style.height = pct(stroke.outMax - stroke.outMin);
-
-        if (!strokeAxis) {                       // 스크립트 로드 전
-            vizActual.style.bottom = vizActual.style.height = '0%';
-            if (vizSrc) vizSrc.style.height = '0%';
-            if (vizSrcLbl) vizSrcLbl.textContent = '';
-            if (vizText) vizText.textContent = '스크립트를 불러오면 실제 범위가 표시됩니다.';
-            return;
-        }
-
-        // 원본의 최저·최고를 통과시키면 그게 곧 도달 가능한 양 끝이다.
-        // (확장 ON/OFF, 안전 임계 미달까지 shapeStroke가 알아서 반영)
-        const a = FSx.shapeStroke(strokeAxis.lo, strokeAxis, stroke, stroke.gain);
-        const b = FSx.shapeStroke(strokeAxis.hi, strokeAxis, stroke, stroke.gain);
-        const lo = Math.max(0, Math.min(99, Math.min(a, b)));
-        const hi = Math.max(0, Math.min(99, Math.max(a, b)));
-
-        vizActual.style.bottom = pct(lo);
-        vizActual.style.height = pct(hi - lo);
-
-        // 원본 진폭 (비교용) — 트랙 옆 별도 열이라 막대와 겹치지 않는다
-        if (vizSrc) {
-            vizSrc.style.bottom = pct(strokeAxis.lo);
-            vizSrc.style.height = pct(strokeAxis.span);
-        }
-        if (vizSrcLbl) {
-            vizSrcLbl.textContent  = `원본 ${strokeAxis.lo}~${strokeAxis.hi}`;
-            vizSrcLbl.style.bottom = pct(strokeAxis.lo + strokeAxis.span / 2);   // 구간 중앙에
-        }
-
-        const ratio = strokeAxis.span > 0 ? (hi - lo) / strokeAxis.span : 0;
-        const blocked = stroke.expand && strokeAxis.span < FSx.MIN_EXPAND_SPAN;
-
-
-        if (vizText) {
-            const mid = ((lo + hi) / 2).toFixed(0);
-            vizText.textContent = `실제 ${lo}~${hi} · 중심 ${mid} · 원본 대비 ${ratio.toFixed(2)}배`
-                + (blocked ? '  ⚠ 원본 진폭이 좁아 확장 안 함' : '');
+    function renderSummary() {
+        if (!el.summary) return;
+        el.summary.innerHTML = '';
+        for (const a of AXES) {
+            const c = strokeCfg[a.id], ax = loadedAxes[a.id] || null;
+            const d = document.createElement('div');
+            d.className = 'ax-sum' + (a.id === activeAxis ? ' is-active' : '');
+            d.style.setProperty('--ax', a.color);
+            const { lo, hi, center } = FS.shapeCenter(c);
+            const txt = ax ? `실제 ${Math.min(FS.shapeAxis(ax.lo,ax,c),FS.shapeAxis(ax.hi,ax,c))}~${Math.max(FS.shapeAxis(ax.lo,ax,c),FS.shapeAxis(ax.hi,ax,c))}` : '스크립트 없음';
+            d.innerHTML = `<b>${a.id}</b> 범위 ${lo}~${hi} · 중심 ${Math.round(center)} · ${Math.round(FS.effectiveGain(ax,c)*100)}%${c.auto ? ' 자동' : ''} · <span>${txt}</span>`;
+            d.addEventListener('click', () => { activeAxis = a.id; renderTabs(); renderStroke(); });
+            el.summary.appendChild(d);
         }
     }
 
-    const strokeUIReady = !!(outMinSlider && outMaxSlider && intensitySlider && expandToggle);
-
-    function pushToUI() {
-        if (!strokeUIReady) return;
-        outMinSlider.value    = stroke.outMin;
-        outMaxSlider.value    = stroke.outMax;
-        if (window.PulseFunscript && window.PulseFunscript.gainRange) {
-            const gr = window.PulseFunscript.gainRange();     // 관리자 설정 범위
-            intensitySlider.min = String(gr.min);
-            intensitySlider.max = String(gr.max);
-            stroke.gain = Math.max(gr.min, Math.min(gr.max, stroke.gain * 100)) / 100;
-        }
-        intensitySlider.value = Math.round(stroke.gain * 100);
-        expandToggle.checked  = stroke.expand;
-        intensity = stroke.gain;
-        renderStroke();
-    }
-    pushToUI();
-
+    // ── 세로 드래그 (가동범위 두 손잡이 · 중심 한 손잡이) ──
     if (strokeUIReady) {
-        outMinSlider.addEventListener('input', () => pullFromUI('min'));
-        outMaxSlider.addEventListener('input', () => pullFromUI('max'));
-        intensitySlider.addEventListener('input', () => pullFromUI('gain'));
-        expandToggle.addEventListener('change', () => pullFromUI('expand'));
-    }
+        const valueAt = (track, clientY) => { const r = track.getBoundingClientRect(); return clamp(Math.round(((r.bottom - clientY) / r.height) * 100), 0, 100); };
+        let drag = null;
+        function applyDrag(kind, v) {
+            const c = strokeCfg[activeAxis];
+            // 민 쪽이 커서를 따라가고 상대를 밀어낸다 — 맞추면 겹쳐서 다시 못 잡는다
+            if (kind === 'min')         { const lo = Math.min(v, 100 - MIN_SPAN); c.hwMin = lo; if (c.hwMax - lo < MIN_SPAN) c.hwMax = lo + MIN_SPAN; }
+            else if (kind === 'max')    { const hi = Math.max(v, MIN_SPAN); c.hwMax = hi; if (hi - c.hwMin < MIN_SPAN) c.hwMin = hi - MIN_SPAN; }
+            else if (kind === 'center') { c.centerFrac = (c.hwMax > c.hwMin) ? clamp((v - c.hwMin) / (c.hwMax - c.hwMin), 0, 1) : 0.5; }
+            renderStroke();
+        }
+        const startDrag = (kind) => (e) => { drag = kind; e.preventDefault(); };
+        el.tMin.addEventListener('mousedown', startDrag('min'));  el.tMin.addEventListener('touchstart', startDrag('min'), { passive: false });
+        el.tMax.addEventListener('mousedown', startDrag('max'));  el.tMax.addEventListener('touchstart', startDrag('max'), { passive: false });
+        el.tC.addEventListener('mousedown', startDrag('center')); el.tC.addEventListener('touchstart', startDrag('center'), { passive: false });
+        el.vRange.addEventListener('mousedown', (e) => {          // 트랙 클릭 → 가까운 손잡이
+            if (e.target === el.tMin || e.target === el.tMax) return;
+            const v = valueAt(el.vRange, e.clientY), c = strokeCfg[activeAxis];
+            drag = Math.abs(v - c.hwMin) <= Math.abs(v - c.hwMax) ? 'min' : 'max'; applyDrag(drag, v);
+        });
+        el.vCenter.addEventListener('mousedown', (e) => { if (e.target === el.tC) return; drag = 'center'; applyDrag('center', valueAt(el.vCenter, e.clientY)); });
+        const onMove = (e) => {
+            if (!drag) return; e.preventDefault();
+            const y = e.touches ? e.touches[0].clientY : e.clientY;
+            applyDrag(drag, valueAt(drag === 'center' ? el.vCenter : el.vRange, y));
+        };
+        document.addEventListener('mousemove', onMove); document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('mouseup', () => drag = null); document.addEventListener('touchend', () => drag = null);
 
-    strokeReset && strokeReset.addEventListener('click', () => {
-        stroke = Object.assign({}, STROKE_DEFAULT);
-        pushToUI();
-        saveStroke();
-    });
+        el.gain.addEventListener('input', () => { strokeCfg[activeAxis].gain = parseInt(el.gain.value, 10) / 100; renderStroke(); });
+        el.auto.addEventListener('change', () => { strokeCfg[activeAxis].auto = el.auto.checked; renderStroke(); });
+        $s('ax-reset').addEventListener('click', () => { strokeCfg[activeAxis] = Object.assign({}, FS.SHAPE_DEFAULT); renderStroke(); });
+        $s('all-reset').addEventListener('click', () => { for (const a of AXES) strokeCfg[a.id] = Object.assign({}, FS.SHAPE_DEFAULT); renderStroke(); });
+
+        renderTabs(); renderStroke();
+    }
 
     if (!CFG.fsPath) {
         fsAxesLbl.textContent = '스크립트 없음';
@@ -357,32 +286,23 @@
         if (!present.length) { fsAxesLbl.textContent = '로드 실패'; return; }
         fsAxesLbl.textContent = present.join(' · ');
 
-        // 스크립트가 실제로 쓰는 폭을 보여준다 — "왜 조금만 움직이는지"가 여기서 드러난다
-        const L0 = axes.L0;
-        if (L0 && fsSpanLabel) {
-            fsSpanLabel.textContent = L0.span >= 10 ? '' : '원본 진폭이 너무 좁아 자동 확장은 적용되지 않습니다.';
-        } else if (fsSpanLabel) {
-            fsSpanLabel.textContent = 'L0 스트로크 축 없음';
-        }
-
-        strokeAxis = L0 || null;
-        // 원본 진폭·속도를 알게 된 시점이라 강도 상한을 여기서 다시 계산해야 한다
-        renderStroke();
+        // 축별 원본 진폭을 위젯에 넘긴다 — "왜 조금만 움직이는지"가 여기서 드러난다
+        loadedAxes = axes;
+        renderTabs(); renderStroke();
 
         engine = new FS.MultiAxisEngine({
             video,
             axes,
-            intensityGetter: () => intensity,
-            shapeGetter: () => stroke,
+            shapeGetter: (axisKey) => strokeCfg[axisKey] || null,   // 축별 설정 (v2)
             sendOnce: true,
             onCommand: (cmd, triggered) => {
                 Dev.send(cmd);
-                // 재생 중 현재 위치 표시 — L0만
-                if (!vizMarker) return;
+                // 재생 중 현재 위치 표시 — 지금 보고 있는 축만
+                if (!el.vizMarker) return;
                 for (const t of triggered) {
-                    if (t.axis !== 'L0') continue;
-                    vizMarker.style.bottom  = pct(t.pos);
-                    vizMarker.style.opacity = '1';
+                    if (t.axis !== activeAxis) continue;
+                    el.vizMarker.style.bottom  = pct(t.pos);
+                    el.vizMarker.style.opacity = '1';
                 }
             },
         });
@@ -390,8 +310,8 @@
     });
 
     video.addEventListener('seeking', () => { engine && engine.resync(); });
-    video.addEventListener('pause',   () => { Dev.send('L050I300'); if (vizMarker) vizMarker.style.opacity = '0.3'; });
-    video.addEventListener('ended',   () => { Dev.send('L050I500'); if (vizMarker) vizMarker.style.opacity = '0'; });
+    video.addEventListener('pause',   () => { Dev.send('L050I300'); if (el.vizMarker) el.vizMarker.style.opacity = '0.3'; });
+    video.addEventListener('ended',   () => { Dev.send('L050I500'); if (el.vizMarker) el.vizMarker.style.opacity = '0'; });
 
     // 시청 위치 트래킹 (5초마다, 그리고 종료/이탈 시)
     let saveTimer = setInterval(saveProgress, 5000);

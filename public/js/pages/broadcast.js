@@ -226,7 +226,7 @@
             axes: scriptAxes,
             sendOnce: true,
             // 성형은 하지 않는다 — 시청자마다 자기 강도·범위 설정이 따로 있다.
-            // (shape 없이 intensity 1이면 shapeStroke가 원본 값을 그대로 돌려준다)
+            // (shapeGetter 없으면 shapeAxis 가 원본 값을 그대로 돌려준다)
             onCommand: (cmd) => sendTcode(cmd),
         });
         scriptEngine.start();

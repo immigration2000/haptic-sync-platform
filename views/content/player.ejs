@@ -51,86 +51,74 @@
                 </div>
             </div>
             <div class="panel">
-                <div class="panel-title">스트로크 제어 (L0)</div>
+            <!-- ── 스트로크 제어 v2 — SR6 전 축, 축마다 같은 위젯 ──
+                 공식·설정 구조는 funscript.js shapeAxis 참조. 마크업 id 는 player.js 가 쓴다. -->
+            <div class="panel" id="stroke-panel">
+                <div class="panel-title">스트로크 제어</div>
 
-                <div style="display:flex; gap:18px; align-items:flex-start; justify-content:center;">
+                <div class="ax-tabs" id="ax-tabs"></div>
 
-                    <!-- 실제 움직임 범위 미리보기 -->
-                    <div style="display:flex; gap:6px; height:200px;">
-                        <div style="display:flex;flex-direction:column;justify-content:space-between;
-                                    width:34px;text-align:right;font-size:10px;color:var(--tx-3);">
-                            <span>100<br><span style="font-size:9px;">깊음</span></span>
-                            <span>50</span>
-                            <span><span style="font-size:9px;">얕음</span><br>0</span>
+                <div class="ax-widget">
+                    <div class="ax-row">
+                        <!-- ① 미리보기 -->
+                        <div class="viz">
+                            <div class="viz-scale"><span>100<br><small>깊음</small></span><span>50</span><span><small>얕음</small><br>0</span></div>
+                            <div class="viz-bar">
+                                <div id="viz-limit" class="viz-limit"></div>
+                                <div id="viz-actual" class="viz-actual"></div>
+                                <div id="viz-center" class="viz-center"></div>
+                                <div id="viz-marker" class="viz-marker"></div>
+                            </div>
+                            <div class="viz-src-col">
+                                <div id="viz-src" class="viz-src"></div>
+                                <div id="viz-src-lbl" class="viz-src-lbl"></div>
+                            </div>
                         </div>
-                        <div style="position:relative;width:42px;background:var(--bg-3);
-                                    border-radius:var(--rad-sm);overflow:hidden;">
-                            <div id="viz-limit" style="position:absolute;left:0;right:0;
-                                    background:rgba(123,45,255,0.18);
-                                    border-top:1px solid var(--c-purple);border-bottom:1px solid var(--c-purple);"></div>
-                            <div id="viz-actual" style="position:absolute;left:8px;right:8px;min-height:3px;
-                                    background:var(--gradient-main);border-radius:var(--rad-pill);"></div>
-                            <div id="viz-marker" style="position:absolute;left:0;right:0;height:2px;
-                                    background:var(--c-green);opacity:0;transition:bottom .08s linear;"></div>
+                        <!-- ② 하드웨어 가동 범위 (두 손잡이, 최소 간격 10) -->
+                        <div class="vcol">
+                            <div class="ctl-box" aria-hidden="true"></div>
+                            <span class="v-cap" title="하드웨어가 실제로 오갈 최소·최대. 바꾸면 중심도 같이 이동합니다.">가동범위</span>
+                            <div id="v-range" class="v-range" style="flex:1;position:relative;z-index:1;">
+                                <div class="v-track"></div><div class="v-fill" id="v-fill"></div>
+                                <div class="v-thumb" id="v-thumb-max" data-which="max"></div>
+                                <div class="v-thumb" id="v-thumb-min" data-which="min"></div>
+                            </div>
+                            <span class="v-val mono"><span class="v-num" id="hw-min">0</span><span class="v-sep">~</span><span class="v-num v-num-r" id="hw-max">100</span></span>
                         </div>
-                        <div style="position:relative;width:78px;">
-                            <div id="viz-src" style="position:absolute;left:0;width:3px;min-height:2px;
-                                    background:var(--tx-3);border-radius:2px;"></div>
-                            <div id="viz-src-lbl" style="position:absolute;left:8px;font-size:10px;
-                                    color:var(--tx-3);white-space:nowrap;transform:translateY(50%);"></div>
+                        <!-- ③ 스크립트 중심 (가동범위 안에서만) -->
+                        <div class="vcol">
+                            <div class="ctl-box" aria-hidden="true"></div>
+                            <span class="v-cap" title="스크립트 움직임의 중심. 가동범위 안에서만 움직입니다.">중심</span>
+                            <div id="v-center" class="v-range v-center" style="flex:1;position:relative;z-index:1;">
+                                <div class="v-track"></div><div class="v-fill" id="vc-fill"></div>
+                                <div class="v-thumb v-thumb-c" id="v-thumb-c"></div>
+                            </div>
+                            <span class="v-val mono"><span class="v-num v-num-c" id="center-val">50</span></span>
                         </div>
                     </div>
 
-                    <!-- 기기 이동 한계 — 세로 이중 손잡이 -->
-                    <!-- 슬라이더 + 아래 글씨를 합쳐 미리보기 막대와 같은 높이(200px)로 맞춘다.
-                         슬라이더는 flex:1 로 남는 높이를 채우므로 글꼴이 바뀌어도 총 높이가 유지된다. -->
-                    <!-- 바깥 높이(200px)는 그대로 두고 위아래 여백만 줘서 슬라이더만 짧아지게 한다.
-                         (박스는 절대 배치라 이 여백에 영향받지 않는다) -->
-                    <div style="position:relative;display:flex;flex-direction:column;align-items:center;
-                                height:200px;padding:8px 0;box-sizing:border-box;">
-                        <!-- 강도 바와 같은 라운드 박스. 배경 레이어로 깔아 레이아웃에 영향을 주지 않는다
-                             (padding/border 를 주면 슬라이더가 밀려 눈금과 어긋난다) -->
-                        <div class="ctl-box" aria-hidden="true"></div>
-                        <span class="v-cap" title="움직임의 중심과 허용 범위. 두 손잡이의 가운데가 중심이 됩니다.">중심</span>
-                        <div id="vlimit" class="v-range" style="flex:1;position:relative;z-index:1;">
-                            <div class="v-track"></div>
-                            <div class="v-fill" id="v-fill"></div>
-                            <div class="v-thumb" id="v-thumb-max" data-which="max"></div>
-                            <div class="v-thumb" id="v-thumb-min" data-which="min"></div>
-                        </div>
-                        <!-- 숫자 칸을 3ch 고정 폭으로 두어 0→1→100 으로 자릿수가 변해도
-                             묶음이 옆으로 늘어나지 않게 한다 -->
-                        <span class="v-val mono">
-                            <span class="v-num" id="out-min-value">0</span><span class="v-sep">~</span><span class="v-num v-num-r" id="out-max-value">100</span>
-                        </span>
+                    <div id="viz-text" class="mono viz-text"></div>
+
+                    <label class="sw-row" style="margin-top:12px;cursor:pointer;justify-content:flex-start;gap:10px;">
+                        <div class="sw-text" style="flex:none;"><strong>강도 자동 맞춤</strong> <span class="text-faint" style="font-size:10px;">— 켜면 가동범위에 꽉 차게 자동 계산, 슬라이더 잠김</span></div>
+                        <input type="checkbox" class="sw" id="auto-toggle">
+                    </label>
+
+                    <div class="stroke-ctl" id="gain-row">
+                        <span class="stroke-ctl-lbl">강도</span>
+                        <input type="range" id="gain" min="0" max="300" step="5" value="100">
+                        <span id="gain-val" class="mono stroke-ctl-val">100%</span>
                     </div>
+                    <div class="gain-ticks mono"><span>0%</span><span>100% 원본</span><span>300% (수동 상한 · 자동은 초과 가능)</span></div>
+
+                    <p class="text-faint" style="font-size:11px;margin-top:8px;">
+                        <span id="ax-hint"></span>
+                        <button type="button" id="ax-reset" class="text-faint reset-btn">이 축 기본값으로</button>
+                        <button type="button" id="all-reset" class="text-faint reset-btn">전체 기본값으로</button>
+                    </p>
                 </div>
 
-                <div id="viz-text" class="mono"
-                     style="font-size:11px;color:var(--tx-2);margin-top:12px;text-align:center;"></div>
-
-                <!-- 체크박스를 글씨 바로 옆에 붙인다 (양끝 정렬이 아니라) -->
-                <label class="sw-row" style="margin-top:12px;cursor:pointer;justify-content:flex-start;gap:10px;">
-                    <div class="sw-text" style="flex:none;"><strong>스크립트 진폭 자동 확장</strong></div>
-                    <input type="checkbox" class="sw" id="expand-toggle" checked>
-                </label>
-
-                <div class="stroke-ctl" id="gain-row">
-                    <span class="stroke-ctl-lbl">강도</span>
-                    <input type="range" id="intensity-slider" min="-80" max="80" step="5" value="0">
-                    <span id="intensity-value" class="mono stroke-ctl-val">0%</span>
-                </div>
-
-                <p class="text-faint" style="font-size:11px;margin-top:8px;">
-                    <span id="fs-span-label"></span>
-                    <button type="button" id="stroke-reset" class="text-faint"
-                            style="background:none;border:none;padding:0;margin-top:4px;text-decoration:underline;
-                                   cursor:pointer;font-size:11px;display:block;">기본값으로</button>
-                </p>
-
-                <!-- 값 보관용 (조작은 위 세로 슬라이더가 한다) -->
-                <input type="range" id="out-min-slider" min="0" max="100" step="1" value="0" style="display:none;">
-                <input type="range" id="out-max-slider" min="0" max="100" step="1" value="100" style="display:none;">
+                <div class="ax-summary mono" id="ax-summary"></div>
             </div>
             <div class="panel">
                 <div class="panel-title">FUNSCRIPT</div>
@@ -176,4 +164,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=span10"></script>
+<script src="/js/pages/player.js?v=strokev2"></script>
