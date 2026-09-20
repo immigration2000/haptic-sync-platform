@@ -132,13 +132,16 @@
     btnCtrlManual.addEventListener('click', () => setCtrlSrc('manual'));
 
     const logEl = $('tcode-log');
-    // 한 줄에 여러 토큰이 올 수 있다 (다축 병합) — 토큰마다 색을 입힌다
+    // 한 줄에 여러 토큰이 올 수 있다 (다축 병합) — 토큰마다 색을 입힌다.
+    // ⚠ innerHTML 을 쓰므로 정규식에 안 맞는 토큰은 반드시 이스케이프한다.
+    //   지금은 본인 슬라이더 출력만 들어오지만, 원격 수신 줄을 여기로 흘리는 순간 XSS 가 된다.
+    const escHtml = (x) => String(x).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     function pushLog(cmdLine) {
         const t = ((Date.now() - (startMs || Date.now())) / 1000).toFixed(2).padStart(6, ' ');
         const colors = { L0: '#FF2D5E', R0: '#7B2DFF', R2: '#5EFFB0' };
         const parts = String(cmdLine).split(/\s+/).map((tok) => {
             const m = tok.match(/^([LR]\d)(\d\d)I(\d+)$/);
-            if (!m) return `<span>${tok}</span>`;
+            if (!m) return `<span>${escHtml(tok)}</span>`;
             return `<span style="color: ${colors[m[1]] || '#fff'}; font-weight: 700;">${m[1]}</span>` +
                    `<span style="color: #5EFFB0;">${m[2]}</span>` +
                    `<span style="color: #B395FF;">I${m[3]}</span>`;
