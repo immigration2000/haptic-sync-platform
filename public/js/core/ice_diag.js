@@ -7,9 +7,12 @@
  *   → 실패 지점이 시그널링인지 NAT(릴레이 필요)인지 원격에서 가릴 수가 없었다.
  *
  * 무엇을 보여주는가:
- *   1) ICE 상태 (경로 탐색 중 / 연결됨 / 실패)
+ *   1) ICE 상태 (경로 탐색 중 / 연결됨 / 실패) + 상대 SDP 도착 여부
  *   2) 내가 수집한 후보 종류 — srflx 가 하나도 없으면 STUN 자체가 막힌 것
- *   3) 연결되면 실제로 선택된 후보쌍 (로컬망 ↔ 로컬망 / 공인IP / 릴레이)
+ *   3) **상대 후보 종류와 후보쌍 성적** — SDP 는 왔는데 상대 후보가 0이면 trickle 후보가
+ *      중간에 날아간 것(시그널링), 후보는 왔는데 쌍이 전부 실패면 경로 문제(릴레이 필요)
+ *   4) 연결되면 실제로 선택된 후보쌍 (로컬망 ↔ 로컬망 / 공인IP / 릴레이)
+ *   콘솔에서 `PulseIceDiag.report()` 로 아무 때나 현재 상태를 뽑을 수 있다.
  *
  * 후보 종류 읽는 법:
  *   host   로컬망 직결 (같은 와이파이)
@@ -26,6 +29,8 @@
         failed: '실패', disconnected: '끊김', closed: '닫힘',
     };
     const CAND_TXT = { host: '로컬망', srflx: '공인IP', prflx: '공인IP(추정)', relay: '릴레이' };
+
+    let last = null;                      // 마지막으로 붙은 peer — report() 가 쓴다
 
     function candName(c) {
         if (!c) return '?';
@@ -45,14 +50,46 @@
         return el;
     }
 
-    /** 지금까지 수집된 내 후보 종류 (중복 제거) */
-    async function localTypes(pc) {
-        const seen = new Set();
+    /**
+     * 현재 후보·후보쌍 현황.
+     *
+     * ⚠ **상대 후보가 0개인지**가 갈림길이다 — SDP(상대응답 ✓)는 왔는데 상대 후보가 0이면
+     *   trickle 후보가 중간에 날아간 것(시그널링 문제)이고, 후보는 왔는데 쌍이 전부
+     *   실패면 경로 문제(릴레이 필요)다. 이 둘을 섞으면 엉뚱한 곳을 판다.
+     */
+    async function snapshot(pc) {
+        const local = new Set(), remote = new Set();
+        const pairs = { total: 0, succeeded: 0, failed: 0, waiting: 0 };
         try {
             const stats = await pc.getStats();
-            stats.forEach((r) => { if (r.type === 'local-candidate' && r.candidateType) seen.add(candName(r)); });
+            stats.forEach((r) => {
+                if (r.type === 'local-candidate'  && r.candidateType) local.add(candName(r));
+                if (r.type === 'remote-candidate' && r.candidateType) remote.add(candName(r));
+                if (r.type === 'candidate-pair') {
+                    pairs.total++;
+                    if (r.state === 'succeeded') pairs.succeeded++;
+                    else if (r.state === 'failed') pairs.failed++;
+                    else pairs.waiting++;                       // frozen · waiting · in-progress
+                }
+            });
         } catch (_) {}
-        return Array.from(seen);
+        return { local: Array.from(local), remote: Array.from(remote), pairs };
+    }
+
+    /** 실패했을 때 콘솔에 붙일 상세 (IP 는 안 찍는다 — 종류·프로토콜·포트만) */
+    async function dump(pc) {
+        const rows = [];
+        try {
+            const stats = await pc.getStats();
+            stats.forEach((r) => {
+                if (r.type === 'local-candidate' || r.type === 'remote-candidate') {
+                    rows.push(`${r.type === 'local-candidate' ? 'L' : 'R'} ${r.candidateType}/${r.protocol}:${r.port}`);
+                } else if (r.type === 'candidate-pair') {
+                    rows.push(`PAIR ${r.state}${r.nominated ? ' (nominated)' : ''}`);
+                }
+            });
+        } catch (_) {}
+        return rows;
     }
 
     /** 실제로 선택된 후보쌍 — 없으면 null */
@@ -96,10 +133,13 @@
         //   · 내 후보에 '공인IP' 가 끝내 안 뜨면 → STUN 자체가 막힌 것
         poll = setInterval(async () => {
             if (settled || !pc()) return;
-            const types = await localTypes(pc());
+            const s = await snapshot(pc());
             const st = pc().iceConnectionState;
             const rd = pc().remoteDescription ? '상대응답 ✓' : '상대응답 ✗';
-            put('ICE ' + (STATE_TXT[st] || st) + ' · ' + rd + ' · 내 후보 [' + (types.join(', ') || '수집 중') + ']');
+            put('ICE ' + (STATE_TXT[st] || st) + ' · ' + rd
+                + ' · 내 후보 [' + (s.local.join(', ') || '수집 중') + ']'
+                + ' · 상대 후보 [' + (s.remote.join(', ') || '없음') + ']'
+                + ' · 쌍 ' + s.pairs.total + '(성공 ' + s.pairs.succeeded + '/실패 ' + s.pairs.failed + '/대기 ' + s.pairs.waiting + ')');
         }, 2000);
 
         const stop = () => { if (poll) { clearInterval(poll); poll = null; } };
@@ -110,6 +150,7 @@
             if (ice === 'failed') {
                 settled = true; stop();
                 put('ICE 실패 — 직결 경로를 못 찾았습니다 (릴레이 필요)', 'var(--c-pink)');
+                if (pc()) dump(pc()).then((rows) => console.warn('[ICE] 실패 상세\n' + rows.join('\n')));
             }
             if (ice === 'disconnected') put('ICE 끊김 — 재연결 시도 중', 'var(--c-yellow)');
         });
@@ -129,8 +170,22 @@
         });
 
         peer.on('close', () => { stop(); });
+        last = { peer, pc };
         return { stop };
     }
 
-    window.PulseIceDiag = { attach };
+    // 사람이 콘솔에서 아무 때나 현재 상태를 뽑을 수 있게 — `PulseIceDiag.report()`
+    async function report() {
+        if (!last || !last.pc()) return '(붙은 peer 없음)';
+        const s = await snapshot(last.pc());
+        const rows = await dump(last.pc());
+        const out = 'state=' + last.pc().iceConnectionState
+            + ' remoteDesc=' + (last.pc().remoteDescription ? 'Y' : 'N')
+            + '\n내 후보 [' + s.local.join(', ') + '] 상대 후보 [' + s.remote.join(', ') + ']'
+            + '\n쌍 ' + JSON.stringify(s.pairs) + '\n' + rows.join('\n');
+        console.log('[ICE] report\n' + out);
+        return out;
+    }
+
+    window.PulseIceDiag = { attach, report };
 })();
