@@ -34,6 +34,8 @@ anchor.parentNode = body;
 
 const ctx = {
     console: { log() {}, warn() {} },
+    // 사용자 뷰 문구는 경과 시간에 따라 달라진다 → 시간을 우리가 쥔다
+    Date: { now: () => ctx.__now },
     setInterval: (fn) => { ctx.__poll = fn; return 1; }, clearInterval() { ctx.__poll = null; },
     document: {
         getElementById: (id) => els.get(id) || null,
@@ -47,6 +49,7 @@ vm.createContext(ctx);
 vm.runInContext(SRC, ctx);
 const Diag = ctx.window.PulseIceDiag;
 
+ctx.__now = 1000000;
 let pass = 0, fail = 0;
 const ok = (n, c, e = '') => { c ? pass++ : fail++; console.log(`  ${c ? '✅' : '❌'} ${n}${e ? ' — ' + e : ''}`); };
 
@@ -66,7 +69,7 @@ const statsOf = (rows) => ({ forEach: (f) => rows.forEach(f) });
 console.log('\n1. 실패가 화면에 드러난다');
 {
     const p = fakePeer(statsOf([]));
-    Diag.attach(p, { after: anchor, id: 'ice-diag' });
+    Diag.attach(p, { after: anchor, id: 'ice-diag', verbose: true });
     const line = els.get('ice-diag');
     ok('진단 줄이 생긴다', !!line);
     await p.emit('iceStateChange', 'failed', 'complete');
@@ -83,7 +86,7 @@ console.log('\n2. 연결되면 선택된 경로를 보여준다');
         { id: 'P1', type: 'candidate-pair', state: 'succeeded', nominated: true, localCandidateId: 'L1', remoteCandidateId: 'R1' },
     ];
     const p = fakePeer(statsOf(rows));
-    Diag.attach(p, { after: anchor, id: 'ice-diag' });
+    Diag.attach(p, { after: anchor, id: 'ice-diag', verbose: true });
     const line = els.get('ice-diag');
     await p.emit('connect');
     ok('연결 표기', /연결됨/.test(line.textContent), line.textContent);
@@ -94,7 +97,7 @@ console.log('\n2. 연결되면 선택된 경로를 보여준다');
 console.log('\n3. 선택된 쌍이 없으면 ? 로 둔다 (거짓말하지 않는다)');
 {
     const p = fakePeer(statsOf([{ id: 'L1', type: 'local-candidate', candidateType: 'srflx' }]));
-    Diag.attach(p, { after: anchor, id: 'ice-diag' });
+    Diag.attach(p, { after: anchor, id: 'ice-diag', verbose: true });
     const line = els.get('ice-diag');
     await p.emit('connect');
     ok('경로 ?', /경로 \?/.test(line.textContent), line.textContent);
@@ -104,7 +107,7 @@ console.log('\n3. 선택된 쌍이 없으면 ? 로 둔다 (거짓말하지 않�
 console.log('\n4. error 는 사유를 그대로 보여준다');
 {
     const p = fakePeer(statsOf([]));
-    Diag.attach(p, { after: anchor, id: 'ice-diag', label: '테스터' });
+    Diag.attach(p, { after: anchor, id: 'ice-diag', label: '테스터', verbose: true });
     const line = els.get('ice-diag');
     await p.emit('error', new Error('Ice connection failed.'));
     ok('사유 노출', /Ice connection failed/.test(line.textContent), line.textContent);
@@ -118,7 +121,7 @@ console.log('\n5. 통화 로직을 죽이지 않는다');
     p._pc = null;                                   // pc 가 없는 상황
     let threw = false;
     try {
-        Diag.attach(p, { after: anchor, id: 'ice-diag' });
+        Diag.attach(p, { after: anchor, id: 'ice-diag', verbose: true });
         await p.emit('connect');
         await p.emit('iceStateChange', 'failed', 'complete');
     } catch (_) { threw = true; }
@@ -127,7 +130,7 @@ console.log('\n5. 통화 로직을 죽이지 않는다');
 
     const p2 = fakePeer({ forEach() { throw new Error('boom'); } });
     let threw2 = false;
-    try { Diag.attach(p2, { after: anchor, id: 'ice-diag' }); await p2.emit('connect'); }
+    try { Diag.attach(p2, { after: anchor, id: 'ice-diag', verbose: true }); await p2.emit('connect'); }
     catch (_) { threw2 = true; }
     ok('getStats 가 터져도 삼킨다', !threw2);
 }
@@ -136,7 +139,7 @@ console.log('\n6. 연결 전 상태 — 시그널링 문제와 경로 문제를 
 {
     const rows = [{ id: 'L1', type: 'local-candidate', candidateType: 'srflx' }];
     const p = fakePeer(statsOf(rows));
-    Diag.attach(p, { after: anchor, id: 'ice-diag' });
+    Diag.attach(p, { after: anchor, id: 'ice-diag', verbose: true });
     const line = els.get('ice-diag');
 
     p._pc.iceConnectionState = 'new';
@@ -175,11 +178,66 @@ console.log('\n7. 시그널 계수기 — 누가 안 보내는지 / 누가 못 �
     const p = fakePeer(statsOf([]));
     p._pc.iceConnectionState = 'checking';
     p._pc.remoteDescription = { type: 'answer' };
-    Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c });
+    Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c, verbose: true });
     const line = els.get('ice-diag');
     await ctx.__poll();
     ok('진단 줄에 시그널 수치가 붙는다', /시그널 송신 \[offer 1 candidate 2 host\(\.local\) 1 srflx 1\] 수신 \[answer 1\]/.test(line.textContent), line.textContent);
     line.remove();
+}
+
+console.log('\n8. 일반 사용자 화면 — 개발자용 문구를 노출하지 않는다');
+{
+    const cand = (typ) => ({ type: 'candidate', candidate: { candidate: 'candidate:1 1 udp 1 1.2.3.4 1 typ ' + typ } });
+    const devWords = /ICE |sdp=|gather=|conn=|후보|쌍 |시그널|srflx|host/;
+
+    // ① 내 후보를 내보내는 중 = 일반적인 지연
+    {
+        const c = Diag.counter(); c.out({ type: 'offer' }); c.out(cand('host'));
+        const p = fakePeer(statsOf([]));
+        p._pc.iceConnectionState = 'checking'; p._pc.remoteDescription = { type: 'answer' };
+        Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c });     // verbose 기본 false
+        const line = els.get('ice-diag');
+        await ctx.__poll();
+        ok('개발자 문구가 안 보인다', !devWords.test(line.textContent), line.textContent);
+        ok('사람 말로만 안내', /연결 중/.test(line.textContent), line.textContent);
+        line.remove();
+    }
+
+    // ② 내 후보가 0개 = VPN 안내 (2026-09-27 실제 원인)
+    {
+        const c = Diag.counter(); c.out({ type: 'answer' });           // 후보는 0개
+        const p = fakePeer(statsOf([]));
+        p._pc.iceConnectionState = 'new'; p._pc.remoteDescription = { type: 'offer' };
+        Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c });
+        const line = els.get('ice-diag');
+        ctx.__now += 7000;                                             // 6초 넘게 경과
+        await ctx.__poll();
+        ok('후보를 못 만들면 VPN 을 지목한다', /VPN/.test(line.textContent), line.textContent);
+        await p.emit('iceStateChange', 'failed', 'complete');
+        ok('실패도 VPN 안내 (ICE 용어 없이)', /연결 실패 — VPN/.test(line.textContent) && !/릴레이 필요/.test(line.textContent), line.textContent);
+        line.remove();
+    }
+
+    // ③ 붙으면 줄을 치운다
+    {
+        const c = Diag.counter(); c.out(cand('host'));
+        const p = fakePeer(statsOf([]));
+        Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c });
+        await p.emit('connect');
+        ok('연결되면 사용자 화면에서 사라진다', !els.get('ice-diag'));
+    }
+
+    // ④ ?diag=1 처럼 verbose 를 주면 전부 보인다
+    {
+        const c = Diag.counter(); c.out({ type: 'offer' });
+        const p = fakePeer(statsOf([]));
+        p._pc.remoteDescription = { type: 'answer' };
+        Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c, verbose: true });
+        const line = els.get('ice-diag');
+        await ctx.__poll();
+        ok('verbose 면 상세 그대로', /gather=.*시그널 송신/.test(line.textContent), line.textContent);
+        line.remove();
+    }
 }
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);

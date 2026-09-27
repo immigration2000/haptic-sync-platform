@@ -290,7 +290,7 @@
         if (window.PulseIceDiag) {
             entry.sig = window.PulseIceDiag.counter();
             window.PulseIceDiag.attach(peer, { after: $('status-hint'), id: 'ice-diag-' + userId,
-                                               label: userName || '사용자', sig: entry.sig });
+                                               label: userName || '사용자', sig: entry.sig, verbose: true });
         }
         peer.on('signal', (d) => {
             if (entry.sig) entry.sig.out(d);

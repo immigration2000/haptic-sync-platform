@@ -14,6 +14,13 @@
  *   4) 연결되면 실제로 선택된 후보쌍 (로컬망 ↔ 로컬망 / 공인IP / 릴레이)
  *   콘솔에서 `PulseIceDiag.report()` 로 아무 때나 현재 상태를 뽑을 수 있다.
  *
+ * 누구에게 보여주는가 (2026-09-27 정리):
+ *   - `verbose: true`  운영자 화면(BJ 콘솔) · 또는 통화 URL 에 `?diag=1` → 위 전부를 그대로
+ *   - `verbose: false` 일반 사용자(통화 화면) → **짧은 사람 말**만. 상세는 콘솔 로그에만 남는다.
+ *     성공하면 줄을 아예 없앤다. 실패하면 사용자가 할 수 있는 조치를 알려준다.
+ *     ⚠ 그 조치 1순위는 **VPN 끄기** 다 — VPN 이 켜진 쪽은 자기 후보를 못 만들어
+ *       매칭은 되는데 영원히 안 붙는다 (2026-09-27 실사이트 원인).
+ *
  * 후보 종류 읽는 법:
  *   host   로컬망 직결 (같은 와이파이)
  *   srflx  공인 IP (STUN 으로 알아낸 내 바깥 주소)
@@ -94,13 +101,15 @@
     }
 
     /** 진단 줄을 붙일 엘리먼트를 만든다 (없으면 생성, 있으면 재사용) */
-    function ensureLine(after, id) {
+    function ensureLine(after, id, verbose) {
         let el = document.getElementById(id);
         if (el) return el;
         el = document.createElement('div');
         el.id = id;
-        el.className = 'mono';
-        el.style.cssText = 'font-size:11px; line-height:1.5; margin:6px 0; color:var(--tx-2); word-break:break-all;';
+        el.className = verbose ? 'mono' : '';
+        el.style.cssText = verbose
+            ? 'font-size:11px; line-height:1.5; margin:6px 0; color:var(--tx-2); word-break:break-all;'
+            : 'font-size:12px; line-height:1.5; margin:6px 0; color:var(--tx-2);';
         if (after && after.parentNode) after.parentNode.insertBefore(el, after.nextSibling);
         else document.body.appendChild(el);
         return el;
@@ -167,13 +176,23 @@
      * peer 에 진단을 붙인다.
      * @param {object} peer   simple-peer 인스턴스
      * @param {object} opts   { after: 줄을 꽂을 기준 엘리먼트, id: 줄 id, label: 앞에 붙일 이름,
-     *                          sig: counter() — 있으면 시그널 송·수신 개수도 같이 보여준다 }
+     *                          sig: counter() — 있으면 시그널 송·수신 개수도 같이 보여준다,
+     *                          verbose: true 면 개발자용 전체 표기, false(기본) 면 사용자용 짧은 문구 }
      */
     function attach(peer, opts) {
         opts = opts || {};
-        const el = ensureLine(opts.after, opts.id || 'ice-diag');
+        const verbose = !!opts.verbose;
+        const el = ensureLine(opts.after, opts.id || 'ice-diag', verbose);
         const tag = opts.label ? opts.label + ' · ' : '';
         let poll = null, settled = false;
+        const t0 = Date.now();
+
+        // 내가 내보낸 후보 개수 — 0 이면 내 브라우저가 후보를 못 만드는 것(VPN·보안 프로그램)
+        const myCands = () => {
+            const c = opts.sig && opts.sig.raw && opts.sig.raw.out;
+            return c ? ((c.candidate || 0) + (c.cand || 0)) : null;
+        };
+        const VPN_HINT = 'VPN·보안 프로그램이 켜져 있으면 연결되지 않습니다 — 끄고 다시 시도해주세요';
 
         const put = (text, color) => {
             el.textContent = tag + text;
@@ -215,12 +234,21 @@
             //   (VPN·정책으로 후보가 억제되는 경우 — 내 후보를 0개 내보내는 이유가 여기서 보인다)
             const states = 'sdp=' + pc().signalingState + ' gather=' + pc().iceGatheringState
                          + ' conn=' + pc().connectionState + ' local=' + (pc().localDescription ? 'Y' : 'N');
-            put('ICE ' + (STATE_TXT[st] || st) + ' · ' + states + ' · ' + rd
+            const full = 'ICE ' + (STATE_TXT[st] || st) + ' · ' + states + ' · ' + rd
                 + ' · 내 후보 [' + (s.local.join(', ') || '수집 중') + ']'
                 + ' · 상대 후보 [' + (s.remote.join(', ') || '없음') + ']'
                 + ' · 쌍 ' + s.pairs.total + '(성공 ' + s.pairs.succeeded + '/실패 ' + s.pairs.failed + '/대기 ' + s.pairs.waiting + ')'
                 + ' · 후보투입 ' + add.ok + '/거부 ' + add.bad + (add.err ? ' (' + add.err + ')' : '')
-                + (opts.sig ? ' · ' + opts.sig.text() : ''));
+                + (opts.sig ? ' · ' + opts.sig.text() : '');
+            if (verbose) { put(full); return; }
+
+            // 일반 사용자 — 짧게. 상세는 콘솔에만 남긴다.
+            console.log('[ICE]', full);
+            const sec = (Date.now() - t0) / 1000;
+            if (sec < 6) { put('연결 중…'); return; }
+            const mc = myCands();
+            if (mc === 0) put('연결 중… ' + VPN_HINT, 'var(--c-yellow)');
+            else put('연결 중… 잠시만 기다려주세요', 'var(--c-yellow)');
         }, 2000);
 
         const stop = () => { if (poll) { clearInterval(poll); poll = null; } };
@@ -230,17 +258,23 @@
             if (ice === 'connected' || ice === 'completed') return;   // 성공 표기는 connect 에서
             if (ice === 'failed') {
                 settled = true; stop();
-                put('ICE 실패 — 직결 경로를 못 찾았습니다 (릴레이 필요)', 'var(--c-pink)');
+                put(verbose ? 'ICE 실패 — 직결 경로를 못 찾았습니다 (릴레이 필요)'
+                            : (myCands() === 0 ? '연결 실패 — ' + VPN_HINT
+                                               : '연결 실패 — 네트워크 경로를 찾지 못했습니다. 다시 시도해주세요'),
+                    'var(--c-pink)');
                 if (opts.sig) console.warn('[ICE] ' + opts.sig.text());
                 if (pc()) dump(pc()).then((rows) => console.warn('[ICE] 실패 상세\n' + rows.join('\n')));
             }
-            if (ice === 'disconnected') put('ICE 끊김 — 재연결 시도 중', 'var(--c-yellow)');
+            if (ice === 'disconnected') {
+                put(verbose ? 'ICE 끊김 — 재연결 시도 중' : '연결이 끊겼습니다 — 다시 연결 중…', 'var(--c-yellow)');
+            }
         });
 
         peer.on('connect', async () => {
             settled = true; stop();
             const pair = pc() ? await selectedPair(pc()) : null;
             console.log('[ICE] connected via', pair);
+            if (!verbose) { try { el.remove(); } catch (_) { put(''); } return; }   // 붙었으면 사용자에겐 치운다
             put('연결됨 · 경로 ' + (pair || '?'), 'var(--c-green)');
         });
 
@@ -248,7 +282,9 @@
             stop();
             const msg = (e && e.message) || String(e);
             console.warn('[ICE] error', msg);
-            put('연결 실패 — ' + msg, 'var(--c-pink)');
+            put(verbose ? '연결 실패 — ' + msg
+                        : (myCands() === 0 ? '연결 실패 — ' + VPN_HINT : '연결 실패 — 다시 시도해주세요'),
+                'var(--c-pink)');
         });
 
         peer.on('close', () => { stop(); });

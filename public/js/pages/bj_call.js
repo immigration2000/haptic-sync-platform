@@ -98,9 +98,11 @@
     function startPeer(peerId, initiator) {
         peer = new SimplePeer({ initiator, trickle: true, stream: micStream || undefined });
         // 연결이 안 될 때 화면에 아무 표시가 없어서 원인을 못 봤다 (2026-09-27) — ICE 상태를 드러낸다
+        // 일반 사용자에겐 짧은 문구만. 상세는 URL 에 ?diag=1 을 붙였을 때만 (그리고 항상 콘솔 로그).
         if (window.PulseIceDiag) {
             sigCount = window.PulseIceDiag.counter();
-            window.PulseIceDiag.attach(peer, { after: stateEl, id: 'ice-diag', sig: sigCount });
+            const wantDiag = /[?&]diag=1(?:&|$)/.test(location.search);
+            window.PulseIceDiag.attach(peer, { after: stateEl, id: 'ice-diag', sig: sigCount, verbose: wantDiag });
         }
         peer.on('signal', (data) => {
             if (sigCount) sigCount.out(data);
