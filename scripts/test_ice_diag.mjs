@@ -54,7 +54,8 @@ const ok = (n, c, e = '') => { c ? pass++ : fail++; console.log(`  ${c ? '✅' :
 function fakePeer(stats) {
     const hs = {};
     return {
-        _pc: { iceConnectionState: 'checking', getStats: async () => stats },
+        _pc: { iceConnectionState: 'checking', signalingState: 'stable', iceGatheringState: 'gathering',
+               connectionState: 'connecting', localDescription: { type: 'answer' }, getStats: async () => stats },
         on(ev, fn) { (hs[ev] = hs[ev] || []).push(fn); },
         emit(ev, ...a) { return Promise.all((hs[ev] || []).map((f) => f(...a))); },
     };
@@ -146,7 +147,8 @@ console.log('\n6. 연결 전 상태 — 시그널링 문제와 경로 문제를 
     p._pc.remoteDescription = { type: 'answer' };
     p._pc.iceConnectionState = 'checking';
     await ctx.__poll();
-    ok('상대응답 ✓ + 경로 탐색 중', /경로 탐색 중 · 상대응답 ✓/.test(line.textContent), line.textContent);
+    ok('상대응답 ✓ + 경로 탐색 중', /경로 탐색 중 .* 상대응답 ✓/.test(line.textContent), line.textContent);
+    ok('수집·시그널링 상태가 함께 보인다', /sdp=stable gather=gathering conn=connecting local=Y/.test(line.textContent), line.textContent);
     line.remove();
 }
 

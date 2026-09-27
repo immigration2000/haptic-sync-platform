@@ -211,7 +211,11 @@
             const s = await snapshot(pc());
             const st = pc().iceConnectionState;
             const rd = pc().remoteDescription ? '상대응답 ✓' : '상대응답 ✗';
-            put('ICE ' + (STATE_TXT[st] || st) + ' · ' + rd
+            // ⚠ gather 가 'new' 로 멈춰 있으면 **브라우저가 후보 수집을 시작조차 안 한 것**이다.
+            //   (VPN·정책으로 후보가 억제되는 경우 — 내 후보를 0개 내보내는 이유가 여기서 보인다)
+            const states = 'sdp=' + pc().signalingState + ' gather=' + pc().iceGatheringState
+                         + ' conn=' + pc().connectionState + ' local=' + (pc().localDescription ? 'Y' : 'N');
+            put('ICE ' + (STATE_TXT[st] || st) + ' · ' + states + ' · ' + rd
                 + ' · 내 후보 [' + (s.local.join(', ') || '수집 중') + ']'
                 + ' · 상대 후보 [' + (s.remote.join(', ') || '없음') + ']'
                 + ' · 쌍 ' + s.pairs.total + '(성공 ' + s.pairs.succeeded + '/실패 ' + s.pairs.failed + '/대기 ' + s.pairs.waiting + ')'
