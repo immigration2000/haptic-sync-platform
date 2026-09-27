@@ -37,6 +37,36 @@
         return (CAND_TXT[c.candidateType] || c.candidateType || '?');
     }
 
+    /**
+     * 시그널 계수기 — offer/answer/candidate 를 **몇 개 보냈고 몇 개 받았는지** 센다.
+     *
+     * 왜 필요한가: 상대 SDP 는 왔는데 상대 후보가 0개인 상태를 만났다 (2026-09-27).
+     *   후보는 SDP 와 같은 통로(socket 'signal')로 오는데 SDP 만 오고 후보는 안 온다면
+     *   ① 상대가 애초에 안 보냈거나 ② 중간(서버 릴레이)에서 버려지는 것이다.
+     *   양쪽 화면의 '송신/수신' 숫자를 맞춰보면 어느 쪽인지 한 번에 갈린다.
+     */
+    function sigKind(d) {
+        if (!d) return '?';
+        if (d.type) return d.type;                       // offer · answer · pranswer · rollback
+        if (d.candidate !== undefined) return 'cand';
+        if (d.renegotiate) return 'renego';
+        if (d.transceiverRequest) return 'tr';
+        return '?';
+    }
+    function fmtCount(o) {
+        const ks = Object.keys(o);
+        return ks.length ? ks.map((k) => k + ' ' + o[k]).join(' ') : '0';
+    }
+    function counter() {
+        const c = { out: {}, in: {} };
+        return {
+            out(d) { const k = sigKind(d); c.out[k] = (c.out[k] || 0) + 1; },
+            in(d)  { const k = sigKind(d); c.in[k]  = (c.in[k]  || 0) + 1; },
+            text() { return '시그널 송신 [' + fmtCount(c.out) + '] 수신 [' + fmtCount(c.in) + ']'; },
+            raw: c,
+        };
+    }
+
     /** 진단 줄을 붙일 엘리먼트를 만든다 (없으면 생성, 있으면 재사용) */
     function ensureLine(after, id) {
         let el = document.getElementById(id);
@@ -110,7 +140,8 @@
     /**
      * peer 에 진단을 붙인다.
      * @param {object} peer   simple-peer 인스턴스
-     * @param {object} opts   { after: 이 엘리먼트 뒤에 줄을 꽂는다, id: 줄 id, label: 앞에 붙일 이름 }
+     * @param {object} opts   { after: 줄을 꽂을 기준 엘리먼트, id: 줄 id, label: 앞에 붙일 이름,
+     *                          sig: counter() — 있으면 시그널 송·수신 개수도 같이 보여준다 }
      */
     function attach(peer, opts) {
         opts = opts || {};
@@ -139,7 +170,8 @@
             put('ICE ' + (STATE_TXT[st] || st) + ' · ' + rd
                 + ' · 내 후보 [' + (s.local.join(', ') || '수집 중') + ']'
                 + ' · 상대 후보 [' + (s.remote.join(', ') || '없음') + ']'
-                + ' · 쌍 ' + s.pairs.total + '(성공 ' + s.pairs.succeeded + '/실패 ' + s.pairs.failed + '/대기 ' + s.pairs.waiting + ')');
+                + ' · 쌍 ' + s.pairs.total + '(성공 ' + s.pairs.succeeded + '/실패 ' + s.pairs.failed + '/대기 ' + s.pairs.waiting + ')'
+                + (opts.sig ? ' · ' + opts.sig.text() : ''));
         }, 2000);
 
         const stop = () => { if (poll) { clearInterval(poll); poll = null; } };
@@ -150,6 +182,7 @@
             if (ice === 'failed') {
                 settled = true; stop();
                 put('ICE 실패 — 직결 경로를 못 찾았습니다 (릴레이 필요)', 'var(--c-pink)');
+                if (opts.sig) console.warn('[ICE] ' + opts.sig.text());
                 if (pc()) dump(pc()).then((rows) => console.warn('[ICE] 실패 상세\n' + rows.join('\n')));
             }
             if (ice === 'disconnected') put('ICE 끊김 — 재연결 시도 중', 'var(--c-yellow)');
@@ -170,7 +203,7 @@
         });
 
         peer.on('close', () => { stop(); });
-        last = { peer, pc };
+        last = { peer, pc, sig: opts.sig || null };
         return { stop };
     }
 
@@ -181,11 +214,12 @@
         const rows = await dump(last.pc());
         const out = 'state=' + last.pc().iceConnectionState
             + ' remoteDesc=' + (last.pc().remoteDescription ? 'Y' : 'N')
+            + (last.sig ? '\n' + last.sig.text() : '')
             + '\n내 후보 [' + s.local.join(', ') + '] 상대 후보 [' + s.remote.join(', ') + ']'
             + '\n쌍 ' + JSON.stringify(s.pairs) + '\n' + rows.join('\n');
         console.log('[ICE] report\n' + out);
         return out;
     }
 
-    window.PulseIceDiag = { attach, report };
+    window.PulseIceDiag = { attach, report, counter };
 })();

@@ -150,5 +150,29 @@ console.log('\n6. 연결 전 상태 — 시그널링 문제와 경로 문제를 
     line.remove();
 }
 
+console.log('\n7. 시그널 계수기 — 누가 안 보내는지 / 누가 못 받는지');
+{
+    const c = Diag.counter();
+    c.out({ type: 'offer' });
+    c.out({ candidate: { candidate: 'a' } });
+    c.out({ candidate: { candidate: 'b' } });
+    c.in({ type: 'answer' });
+    ok('offer/candidate 를 종류별로 센다', /송신 \[offer 1 cand 2\]/.test(c.text()), c.text());
+    ok('수신은 answer 1 · 후보 0', /수신 \[answer 1\]/.test(c.text()), c.text());
+
+    const c2 = Diag.counter();
+    ok('아무것도 없으면 0', /송신 \[0\] 수신 \[0\]/.test(c2.text()), c2.text());
+
+    // 화면 줄에도 함께 나온다
+    const p = fakePeer(statsOf([]));
+    p._pc.iceConnectionState = 'checking';
+    p._pc.remoteDescription = { type: 'answer' };
+    Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c });
+    const line = els.get('ice-diag');
+    await ctx.__poll();
+    ok('진단 줄에 시그널 수치가 붙는다', /시그널 송신 \[offer 1 cand 2\] 수신 \[answer 1\]/.test(line.textContent), line.textContent);
+    line.remove();
+}
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

@@ -262,7 +262,12 @@
         startPeer(peerId, peerName, initiator, kind || 'call', context || {});
         renderUserList(kind);
     });
-    socket.on('signal', ({ from, data }) => { const e = peers.get(from); if (e && e.peer) e.peer.signal(data); });
+    socket.on('signal', ({ from, data }) => {
+        const e = peers.get(from);
+        if (!e) return;
+        if (e.sig) e.sig.in(data);
+        if (e.peer) e.peer.signal(data);
+    });
     socket.on('peer-hangup', () => {
         for (const e of peers.values()) { try { e.peer.destroy(); } catch(_){} }
         peers.clear();
@@ -283,9 +288,14 @@
         }
         // 연결이 안 될 때 화면에 아무 표시가 없어서 원인을 못 봤다 (2026-09-27) — ICE 상태를 드러낸다
         if (window.PulseIceDiag) {
-            window.PulseIceDiag.attach(peer, { after: $('status-hint'), id: 'ice-diag-' + userId, label: userName || '사용자' });
+            entry.sig = window.PulseIceDiag.counter();
+            window.PulseIceDiag.attach(peer, { after: $('status-hint'), id: 'ice-diag-' + userId,
+                                               label: userName || '사용자', sig: entry.sig });
         }
-        peer.on('signal', (d) => socket.emit('signal', { to: userId, data: d }));
+        peer.on('signal', (d) => {
+            if (entry.sig) entry.sig.out(d);
+            socket.emit('signal', { to: userId, data: d });
+        });
         peer.on('connect', () => {
             entry.dataReady = true;
             renderUserList(kind);
