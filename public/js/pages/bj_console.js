@@ -281,6 +281,10 @@
         if (camStream) {
             try { for (const t of camStream.getVideoTracks()) peer.addTrack(t, camStream); } catch (_) {}
         }
+        // 연결이 안 될 때 화면에 아무 표시가 없어서 원인을 못 봤다 (2026-09-27) — ICE 상태를 드러낸다
+        if (window.PulseIceDiag) {
+            window.PulseIceDiag.attach(peer, { after: $('status-hint'), id: 'ice-diag-' + userId, label: userName || '사용자' });
+        }
         peer.on('signal', (d) => socket.emit('signal', { to: userId, data: d }));
         peer.on('connect', () => {
             entry.dataReady = true;
@@ -327,7 +331,11 @@
         peer.on('track', (track, stream) => {          // 재협상으로 나중에 추가된 카메라 트랙
             if (track.kind === 'video') showUserCam(stream);
         });
-        peer.on('close', () => { peers.delete(userId); renderUserList(); cowatchPanel.classList.add('hidden'); hideUserCam(); if (peers.size === 0) deactivateSessionCtrl(); });
+        peer.on('close', () => {
+            peers.delete(userId); renderUserList(); cowatchPanel.classList.add('hidden'); hideUserCam();
+            const d = document.getElementById('ice-diag-' + userId); if (d) d.remove();   // 진단 줄이 쌓이지 않게
+            if (peers.size === 0) deactivateSessionCtrl();
+        });
         peer.on('error', (e) => console.warn('peer err', e));
 
         // cowatch 모드면 영상 표시

@@ -93,6 +93,8 @@
 
     function startPeer(peerId, initiator) {
         peer = new SimplePeer({ initiator, trickle: true, stream: micStream || undefined });
+        // 연결이 안 될 때 화면에 아무 표시가 없어서 원인을 못 봤다 (2026-09-27) — ICE 상태를 드러낸다
+        if (window.PulseIceDiag) window.PulseIceDiag.attach(peer, { after: stateEl, id: 'ice-diag' });
         peer.on('signal', (data) => socket.emit('signal', { to: peerId, data }));
         peer.on('connect', () => {
             if (btnCam) btnCam.disabled = false;
