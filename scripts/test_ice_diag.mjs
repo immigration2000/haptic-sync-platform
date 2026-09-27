@@ -152,12 +152,18 @@ console.log('\n6. 연결 전 상태 — 시그널링 문제와 경로 문제를 
 
 console.log('\n7. 시그널 계수기 — 누가 안 보내는지 / 누가 못 받는지');
 {
+    // 실제 SDP 후보 줄 모양 그대로 쓴다 (주소는 5번째 토큰)
+    const mdns  = 'candidate:1 1 udp 2113937151 7f4a-cafe.local 54321 typ host generation 0';
+    const srflx = 'candidate:2 1 udp 1677729535 124.53.134.138 54321 typ srflx raddr 192.168.0.5 rport 54321';
+    const cand = (s) => ({ type: 'candidate', candidate: { candidate: s, sdpMLineIndex: 0, sdpMid: '0' } });
+
     const c = Diag.counter();
     c.out({ type: 'offer' });
-    c.out({ candidate: { candidate: 'a' } });
-    c.out({ candidate: { candidate: 'b' } });
+    c.out(cand(mdns));
+    c.out(cand(srflx));
     c.in({ type: 'answer' });
-    ok('offer/candidate 를 종류별로 센다', /송신 \[offer 1 cand 2\]/.test(c.text()), c.text());
+    ok('offer/candidate 를 종류별로 센다', /송신 \[offer 1 candidate 2/.test(c.text()), c.text());
+    ok('mDNS 와 실주소를 구분한다', /host\(\.local\) 1 srflx 1/.test(c.text()), c.text());
     ok('수신은 answer 1 · 후보 0', /수신 \[answer 1\]/.test(c.text()), c.text());
 
     const c2 = Diag.counter();
@@ -170,7 +176,7 @@ console.log('\n7. 시그널 계수기 — 누가 안 보내는지 / 누가 못 �
     Diag.attach(p, { after: anchor, id: 'ice-diag', sig: c });
     const line = els.get('ice-diag');
     await ctx.__poll();
-    ok('진단 줄에 시그널 수치가 붙는다', /시그널 송신 \[offer 1 cand 2\] 수신 \[answer 1\]/.test(line.textContent), line.textContent);
+    ok('진단 줄에 시그널 수치가 붙는다', /시그널 송신 \[offer 1 candidate 2 host\(\.local\) 1 srflx 1\] 수신 \[answer 1\]/.test(line.textContent), line.textContent);
     line.remove();
 }
 

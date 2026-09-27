@@ -57,12 +57,38 @@
         const ks = Object.keys(o);
         return ks.length ? ks.map((k) => k + ' ' + o[k]).join(' ') : '0';
     }
+    /**
+     * 후보 문자열의 주소 형태. mDNS(`xxxx.local`) 인지 실제 주소인지 가른다.
+     *
+     * ⚠ 크롬은 페이지에 마이크·카메라 권한이 없으면 로컬 IP 를 `<uuid>.local` 로 가린다.
+     *   상대가 그 이름을 멀티캐스트로 못 풀면 `addIceCandidate` 가 거부되고,
+     *   simple-peer 는 그걸 **조용히 무시**한다(`.local` 이면 warn 만). 그래서 후보를
+     *   20개 받고도 '상대 후보 없음' 이 된다. 이 구분이 없으면 원인을 못 본다.
+     */
+    function candShape(d) {
+        const s = d && d.candidate && d.candidate.candidate;
+        if (!s) return 'eoc';                                 // end-of-candidates
+        const typ = (s.match(/ typ (\w+)/) || [])[1] || '?';
+        const addr = s.split(' ')[4] || '';
+        return typ + (/\.local$/i.test(addr) ? '(.local)' : '');
+    }
+
     function counter() {
-        const c = { out: {}, in: {} };
+        const c = { out: {}, in: {}, shape: { out: {}, in: {} } };
+        const bump = (o, k) => { o[k] = (o[k] || 0) + 1; };
+        const note = (dir, d) => {
+            const k = sigKind(d);
+            bump(c[dir], k);
+            if (k === 'candidate' || k === 'cand') bump(c.shape[dir], candShape(d));
+        };
+        const shapeTxt = (o) => { const ks = Object.keys(o); return ks.length ? ' ' + ks.map((k) => k + ' ' + o[k]).join(' ') : ''; };
         return {
-            out(d) { const k = sigKind(d); c.out[k] = (c.out[k] || 0) + 1; },
-            in(d)  { const k = sigKind(d); c.in[k]  = (c.in[k]  || 0) + 1; },
-            text() { return '시그널 송신 [' + fmtCount(c.out) + '] 수신 [' + fmtCount(c.in) + ']'; },
+            out(d) { note('out', d); },
+            in(d)  { note('in', d); },
+            text() {
+                return '시그널 송신 [' + fmtCount(c.out) + shapeTxt(c.shape.out) + ']'
+                     + ' 수신 [' + fmtCount(c.in) + shapeTxt(c.shape.in) + ']';
+            },
             raw: c,
         };
     }
@@ -155,6 +181,24 @@
         };
         const pc = () => peer._pc || null;
 
+        // 후보 '투입' 결과를 가로채 센다.
+        // simple-peer 는 addIceCandidate 실패를 조용히 삼키므로(.local 이면 warn 만),
+        // 여기서 세지 않으면 "20개 받았는데 0개 들어감" 의 이유를 볼 수 없다. 던지는 건 그대로 던진다.
+        const add = { ok: 0, bad: 0, err: '' };
+        try {
+            const p = pc();
+            if (p && typeof p.addIceCandidate === 'function' && !p.__iceDiagPatched) {
+                const orig = p.addIceCandidate.bind(p);
+                p.addIceCandidate = function (c) {
+                    return orig(c).then((r) => { add.ok++; return r; },
+                                        (e) => { add.bad++; if (!add.err) add.err = (e && e.message) || String(e);
+                                                 console.warn('[ICE] 후보 투입 거부:', add.err, c && c.candidate);
+                                                 throw e; });
+                };
+                p.__iceDiagPatched = true;
+            }
+        } catch (_) {}
+
         put('ICE 준비');
         console.log('[ICE] attach', opts.label || '');
 
@@ -171,6 +215,7 @@
                 + ' · 내 후보 [' + (s.local.join(', ') || '수집 중') + ']'
                 + ' · 상대 후보 [' + (s.remote.join(', ') || '없음') + ']'
                 + ' · 쌍 ' + s.pairs.total + '(성공 ' + s.pairs.succeeded + '/실패 ' + s.pairs.failed + '/대기 ' + s.pairs.waiting + ')'
+                + ' · 후보투입 ' + add.ok + '/거부 ' + add.bad + (add.err ? ' (' + add.err + ')' : '')
                 + (opts.sig ? ' · ' + opts.sig.text() : ''));
         }, 2000);
 
