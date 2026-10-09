@@ -132,6 +132,59 @@
         sync();
     }
 
+    /**
+     * 재생 속도 · 볼륨 (2026-10-09)
+     *
+     * 영상은 자동재생 정책 때문에 `muted` 로 시작한다 → 볼륨을 올리면 음소거를 푼다.
+     * 음소거 상태로 자동재생 중인 영상을 **로드 시점에 스스로 음소거 해제하면** 브라우저가
+     * 재생을 멈출 수 있으므로, 해제는 사용자가 슬라이더를 움직였을 때만 한다.
+     *
+     * ⚠ 속도를 바꾸면 T-Code 이동시간(interp)도 그만큼 줄어야 한다 — 그건 엔진이
+     *   `video.playbackRate` 를 보고 처리한다 (funscript.js). 여기서 따로 손대지 않는다.
+     */
+    function setupRateVolume(v) {
+        const rateEl = document.getElementById('pl-rate');
+        const volEl  = document.getElementById('pl-vol');
+        const volVal = document.getElementById('pl-vol-val');
+        const mutedHint = document.getElementById('pl-muted-hint');
+        if (!v || !rateEl || !volEl) return;
+
+        const K_RATE = 'pulse_player_rate', K_VOL = 'pulse_player_vol';
+        const store = (k, val) => { try { localStorage.setItem(k, String(val)); } catch (_) {} };
+        const load  = (k, def) => { try { const s = localStorage.getItem(k); return s == null ? def : parseFloat(s); } catch (_) { return def; } };
+
+        // ── 속도
+        const rate0 = load(K_RATE, 1);
+        if (rate0 > 0 && [...rateEl.options].some(o => parseFloat(o.value) === rate0)) rateEl.value = String(rate0);
+        v.playbackRate = parseFloat(rateEl.value) || 1;
+        rateEl.addEventListener('change', () => {
+            const r = parseFloat(rateEl.value) || 1;
+            v.playbackRate = r;
+            store(K_RATE, r);
+        });
+
+        // ── 볼륨
+        const vol0 = load(K_VOL, 100);
+        volEl.value = String(Math.max(0, Math.min(100, isNaN(vol0) ? 100 : vol0)));
+        v.volume = volEl.value / 100;
+        const syncVol = () => {
+            if (volVal) volVal.textContent = Math.round(v.volume * 100) + '%';
+            if (document.activeElement !== volEl) volEl.value = String(Math.round(v.volume * 100));
+            if (mutedHint) mutedHint.classList.toggle('hidden', !v.muted);
+        };
+        volEl.addEventListener('input', () => {
+            v.volume = volEl.value / 100;
+            if (v.volume > 0 && v.muted) v.muted = false;      // 사용자 조작이므로 여기서 해제해도 안전
+            store(K_VOL, volEl.value);
+            syncVol();
+        });
+        ['volumechange', 'loadedmetadata'].forEach(ev => v.addEventListener(ev, syncVol));
+        // src 교체·되감기 후에도 속도가 1로 돌아가지 않게
+        v.addEventListener('loadedmetadata', () => { v.playbackRate = parseFloat(rateEl.value) || 1; });
+        syncVol();
+    }
+    setupRateVolume(video);
+
     // VR 재투영 시작 — 위의 const/함수 정의가 모두 끝난 뒤 호출 (TDZ 회피)
     if (CFG.type === 'vr') initVRReproject(video);
 

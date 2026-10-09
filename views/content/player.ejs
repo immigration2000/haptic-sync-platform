@@ -26,6 +26,27 @@
                        poster="<%= item.thumbnail_path || '' %>"></video>
             </div>
             <% } %>
+
+            <!-- 재생 속도 · 볼륨 — VR(자체 컨트롤바)과 일반(네이티브 컨트롤) 모두 여기 한 줄을 쓴다.
+                 일반 영상은 네이티브에 볼륨이 있지만 속도는 우클릭 메뉴에 숨어 있고,
+                 VR 재투영 화면은 캔버스를 보여주므로 둘 다 없었다. -->
+            <div class="flex items-center gap-3 mt-3" style="flex-wrap:wrap; font-size:12px; color:var(--tx-2);">
+                <label for="pl-rate" style="color:var(--tx-3);">속도</label>
+                <select id="pl-rate" class="form-select" style="width:auto; padding:4px 8px; font-size:12px;">
+                    <option value="0.5">0.5×</option>
+                    <option value="0.75">0.75×</option>
+                    <option value="1" selected>1× (원본)</option>
+                    <option value="1.25">1.25×</option>
+                    <option value="1.5">1.5×</option>
+                    <option value="2">2×</option>
+                </select>
+
+                <label for="pl-vol" style="color:var(--tx-3); margin-left:8px;">볼륨</label>
+                <input type="range" id="pl-vol" min="0" max="100" step="1" value="100" style="width:140px;">
+                <span id="pl-vol-val" class="mono" style="display:inline-block; width:38px; text-align:right;">100%</span>
+                <span id="pl-muted-hint" class="text-faint hidden" style="font-size:11px;">🔇 음소거 — 볼륨을 올리면 소리가 납니다</span>
+            </div>
+
             <div class="player-info">
                 <div class="flex items-center gap-3 mb-3">
                     <% if (item.type === 'vr') { %><span class="badge badge-vr">VR 원본 · 평면 재투영 보기</span><% } %>
@@ -176,4 +197,4 @@ window.__PLAYER__ = {
 };
 </script>
 <% if (item.type === 'vr') { %><script src="/js/core/vr_reproject.js?v=7"></script><% } %>
-<script src="/js/pages/player.js?v=span10"></script>
+<script src="/js/pages/player.js?v=ratevol"></script>

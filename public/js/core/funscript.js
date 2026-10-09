@@ -207,6 +207,9 @@
 
             const intensity = this.getIntensity();
             const shape = this.getShape ? this.getShape() : null;
+            // 배속 재생이면 키프레임 간격도 그만큼 짧게 지나간다 → 이동시간(interp)을 같이 줄여야
+            // 기기가 뒤처지지 않는다. 2배속이면 절반. (클럭 심 등 playbackRate 가 없으면 1)
+            const rate = this.video.playbackRate > 0 ? this.video.playbackRate : 1;
             const triggered = [];   // 이번 tick에서 트리거된 축
 
             for (const k of Object.keys(this.axes)) {
@@ -221,7 +224,7 @@
                 while (ax.index < ax.actions.length - 1 && ms > ax.actions[ax.index].at) {
                     const cur  = ax.actions[ax.index];
                     const next = ax.actions[ax.index + 1];
-                    const interp = Math.max(1, next.at - cur.at);
+                    const interp = Math.max(1, Math.round((next.at - cur.at) / rate));
                     // 출력 성형 (L0만 — 회전축은 그대로)
                     const isStroke = (k === 'L0');
                     const scaled = isStroke
