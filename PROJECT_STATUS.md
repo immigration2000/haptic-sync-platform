@@ -411,6 +411,7 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
 | **포트 충돌 EADDRINUSE :5500** | PULSE는 **5501**이 정답 (5500은 IWeb) |
 | 손상 세션 파일(깨진 JSON 또는 cookie 필드 누락) → 해당 쿠키 사용자 500 | app.js에 세션 store get 래퍼 추가 — 손상 세션은 새 세션으로 대체 (2026-06-10) |
 | CSRF가 "적용"으로 기재됐으나 실제 `app.use(doubleCsrfProtection)` 누락 | 2026-06-10 배선 완료 (cookie-parser + csrf-csrf v3 generateToken, 전 폼 _csrf, fetch는 헤더, 멀티파트는 multer 후) |
+| 영상 배속 재생 시 기기가 뒤처짐 | `interp`(이동시간)는 스크립트 시간 간격이라 배속에선 그대로 쓰면 안 된다 → 엔진이 `video.playbackRate` 로 나눈다 (2026-10-09). `playbackRate` 없는 클럭(1:다수 방송 심)은 1배속 취급 |
 | CSRF _csrf 일괄삽입 정규식이 `<%= %>`(action 내) 폼에서 `%>`의 `>`를 태그 끝으로 오인 → hidden input이 태그 중간 삽입돼 폼 깨짐(403) | 2026-06-10 수정: bj_apps·dummy·reports·videos·reset 5폼 _csrf 위치 교정. (CSRF 배포 때부터 폰에도 깨진 채 나갔던 것 — 이번에 함께 배포) |
 | 화면을 스크롤해 영상이 가려지면 기기가 멈춘다 (제보) | **현재 정상 동작 확인(2026-08-27) — 단 인과는 미확정.** 영상을 화면 밖으로 내린 채 약 76초 계측: 엔진 발생 수 = 실제 전송 수, 유실·오류 0건, 기기 실제 동작. ⚠ **실패를 한 번도 재현하지 못했다.** `b4604fb`(타이머 예비 루프 + `visibilitychange` + 축별 최신 키프레임)가 이걸 고쳐다는 근거는 없다 — 그 배포 **이후에도 '수정 안 됨' 재제보가 있었다.** 스크롤 자체는 재생 루프와 무관하다(`IntersectionObserver`·`scroll` 리스너 없음). 재발 시 **연결 상태부터** 볼 것 — 계측 초반 `연결=false` 구간에서 같은 증상이 보였다 |
 
@@ -424,6 +425,7 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
 - [x] 요금 필드·tier 정리 / 영상별 태그 — 2026-07-28, §9-11
 - [ ] **1:N 방송 실연결 e2e** — 브라우저 탭 3개(방송자+시청자2)로 영상/음성방송·후원알림·기기제어 검증
       ※ **AWS와 무관** — WebRTC P2P mesh라 현 환경에서 검증 가능. AWS/SFU는 시청자 다수일 때 필요
+- [x] **플레이어 속도·볼륨 조절** — 2026-10-09. VR 재투영/일반 영상 공용 한 줄. `patches/2026-10-09.md`
 - [ ] (운영 전) CSP nonce 도입 — 인라인 스크립트 多로 현재 비활성
 - [ ] (운영 전) 실 성인인증·실 PG 연동 — `services/{age_verification,payment_gateway}.js` 스텁 존재,
       config `provider` 플래그만 바꾸면 붙는 구조. **별도 모듈로 구현 후 연결** 방침
