@@ -426,6 +426,10 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
 - [ ] **1:N 방송 실연결 e2e** — 브라우저 탭 3개(방송자+시청자2)로 영상/음성방송·후원알림·기기제어 검증
       ※ **AWS와 무관** — WebRTC P2P mesh라 현 환경에서 검증 가능. AWS/SFU는 시청자 다수일 때 필요
 - [x] **플레이어 속도·볼륨 조절** — 2026-10-09. VR 재투영/일반 영상 공용 한 줄. `patches/2026-10-09.md`
+- [x] 영상 다운로드 **UI** 차단 — 2026-10-10. `no_download.js` (다운로드 버튼·우클릭 저장). `patches/2026-10-10.md`
+- [ ] ⚠ **미디어 파일 URL 이 무인증으로 열려 있다** — `public/content/` 를 `express.static` 이 인증 이전에 서빙한다.
+      위 UI 차단은 쉬운 입구만 닫은 것. 실제 보호는 미디어를 `public/` 밖으로 옮겨 인증·구독 확인 라우트(Range 지원)로
+      서빙하거나 **서명 URL**(아래 AWS 항목과 동일 요구)을 붙여야 한다. `publicUrl()` 경유 원칙은 유지
 - [ ] (운영 전) CSP nonce 도입 — 인라인 스크립트 多로 현재 비활성
 - [ ] (운영 전) 실 성인인증·실 PG 연동 — `services/{age_verification,payment_gateway}.js` 스텁 존재,
       config `provider` 플래그만 바꾸면 붙는 구조. **별도 모듈로 구현 후 연결** 방침
