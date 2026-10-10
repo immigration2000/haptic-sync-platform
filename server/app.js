@@ -126,6 +126,10 @@ app.set('layout extractScripts', true);
 app.set('layout extractStyles', true);
 
 // ─── Static ─────────────────────────────────────────────
+// ⚠ 미디어 게이트가 **static 보다 먼저** 와야 한다. 콘텐츠 파일이 public/content 에 있어서
+//   express.static 이 인증 이전에 서빙하고 있었다 (2026-10-10). 통과한 요청은 아래 static 이
+//   그대로 서빙하므로 Range·ETag 동작은 바뀌지 않는다.
+app.use(require('./middleware/media_gate'));
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: 0, etag: true }));
 
 // ─── Public utility routes (CSRF 면제) ───────────────────

@@ -1,9 +1,13 @@
 <!-- HERO — 영상 배경 + 텍스트 오버레이 (원본 IWeb 패턴) -->
 <% if (featured) { %>
 <section class="nf-hero">
+    <%# 히어로 영상은 로그인·연령확인된 사용자에게만 — 비로그인 손님에게는 포스터만 보인다.
+        미디어 게이트(2026-10-10)가 파일을 403 으로 끊으므로 src 를 넣어도 재생되지 않고,
+        크롤러에게 2.7GB 콘텐츠를 흘릴 이유도 없다. %>
+    <% var heroOk = (typeof user !== 'undefined') && user && (user.age_verified || user.role === 'admin'); %>
     <video class="nf-hero-bg" autoplay muted loop playsinline
            poster="<%= featured.thumbnail_path %>"
-           src="<%= featured.video_path %>"></video>
+           <% if (heroOk) { %>src="<%= featured.video_path %>"<% } %>></video>
     <div class="container nf-hero-inner">
         <div class="nf-hero-tag"><%= featured.type === 'vr' ? 'VR · 360° / 3D · 다축 인터랙티브' : 'VOD · 인터랙티브 영상' %></div>
         <h1><%= featured.title %></h1>
