@@ -427,9 +427,11 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
       ※ **AWS와 무관** — WebRTC P2P mesh라 현 환경에서 검증 가능. AWS/SFU는 시청자 다수일 때 필요
 - [x] **플레이어 속도·볼륨 조절** — 2026-10-09. VR 재투영/일반 영상 공용 한 줄. `patches/2026-10-09.md`
 - [x] 영상 다운로드 **UI** 차단 — 2026-10-10. `no_download.js` (다운로드 버튼·우클릭 저장). `patches/2026-10-10.md`
-- [ ] ⚠ **미디어 파일 URL 이 무인증으로 열려 있다** — `public/content/` 를 `express.static` 이 인증 이전에 서빙한다.
-      위 UI 차단은 쉬운 입구만 닫은 것. 실제 보호는 미디어를 `public/` 밖으로 옮겨 인증·구독 확인 라우트(Range 지원)로
-      서빙하거나 **서명 URL**(아래 AWS 항목과 동일 요구)을 붙여야 한다. `publicUrl()` 경유 원칙은 유지
+- [x] **미디어 파일 인증 게이트** — 2026-10-10. `middleware/media_gate.js` 를 `express.static` **앞**에 두어
+      `/content` 아래 영상·funscript 는 로그인+연령확인 없이는 403. 확장자 기준 판정(새 업로드 경로 자동 보호),
+      퍼센트 인코딩·`..`·대문자 우회 차단. 통과 요청은 기존 static 이 서빙하므로 Range·ETag 불변. `patches/2026-10-10.md`
+- [ ] 미디어 **구독·구매 권한 검사 + 서명 URL** — 위 게이트는 "로그인 여부"까지만 본다. 로그인 사용자는 URL 로
+      받을 수 있고 링크 공유도 막지 못한다. 짧은 만료 서명 URL 이 필요(아래 AWS 항목과 동일 요구). `publicUrl()` 경유 유지
 - [ ] (운영 전) CSP nonce 도입 — 인라인 스크립트 多로 현재 비활성
 - [ ] (운영 전) 실 성인인증·실 PG 연동 — `services/{age_verification,payment_gateway}.js` 스텁 존재,
       config `provider` 플래그만 바꾸면 붙는 구조. **별도 모듈로 구현 후 연결** 방침
