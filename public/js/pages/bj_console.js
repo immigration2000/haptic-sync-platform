@@ -98,16 +98,23 @@
     // 캠 켜기 — 카메라 스트림을 모든 페어에 추가(없으면 시작) + 콘솔에 미리보기
     async function ensureCamera() {
         if (camStream) return camStream;
+        const CAM = window.PulseCamera;
+        if (!CAM) { const sh = $('status-hint'); if (sh) sh.textContent = '⚠ 카메라 모듈을 불러오지 못했습니다'; return null; }
+        CAM.diag(camDiagEl, '카메라 여는 중…');
         try {
-            camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            camStream = await CAM.open({ deviceId: devCameraSel ? devCameraSel.value : '' });
         } catch (e) {
-            const sh = $('status-hint'); if (sh) sh.textContent = '⚠ 카메라 권한이 필요합니다 (캠 모드)';
+            // 예전에는 '권한이 필요합니다' 한 줄이라 점유·가상캠·자동재생 차단을 구분할 수 없었다
+            CAM.diag(camDiagEl, '⚠ ' + (e.pulseReason || e.message), 'bad');
+            const sh = $('status-hint'); if (sh) sh.textContent = '⚠ ' + (e.pulseReason || e.message);
             return null;
         }
         try {
-            cowatchVideo.srcObject = camStream; cowatchVideo.muted = true; cowatchVideo.play().catch(()=>{});
             cowatchTitle.textContent = '내 캠 — 사용자에게 송출 중';
             cowatchPanel.classList.remove('hidden');
+            const warn = await CAM.attach(cowatchVideo, camStream);
+            CAM.diag(camDiagEl, (warn ? '⚠ ' + warn + ' · ' : '내 캠 송신 중 · ') + CAM.describe(camStream), warn ? 'warn' : 'ok');
+            CAM.fillSelect(devCameraSel);          // 권한 받은 뒤라 실제 카메라 이름이 보인다
         } catch (_) {}
         for (const { peer } of peers.values()) {
             try { for (const t of camStream.getVideoTracks()) peer.addTrack(t, camStream); } catch (_) {}
@@ -165,6 +172,8 @@
     // ── Device selectors
     const devInputSel  = $('dev-input');
     const devOutputSel = $('dev-output');
+    const devCameraSel = $('dev-camera');
+    const camDiagEl    = $('cam-diag');
     async function loadDevices() {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -211,6 +220,24 @@
         navigator.mediaDevices.addEventListener('devicechange', loadDevices);
     }
     loadDevices();
+
+    // 카메라 목록 — 캠 모드 중에 바꾸면 스트림을 새로 연다
+    if (window.PulseCamera && devCameraSel) {
+        const bad = window.PulseCamera.unsupportedReason();
+        if (bad) window.PulseCamera.diag(camDiagEl, '⚠ ' + bad, 'bad');
+        window.PulseCamera.fillSelect(devCameraSel, async () => {
+            if (!camStream) return;
+            for (const t of camStream.getVideoTracks()) t.stop();
+            const old = camStream; camStream = null;
+            const fresh = await ensureCamera();
+            if (!fresh) return;
+            // 이미 연결된 peer 들의 트랙을 교체한다 (재협상 없이)
+            const nt = fresh.getVideoTracks()[0], ot = old.getVideoTracks()[0];
+            for (const { peer } of peers.values()) {
+                try { peer.replaceTrack(ot, nt, old); } catch (_) {}
+            }
+        });
+    }
 
     // ── Mic / monitor
     const btnMic = $('btn-mic'), btnMonitor = $('btn-monitor');
@@ -410,10 +437,18 @@
     const userCamPanel = $('user-cam-panel'), userCamVideo = $('user-cam-video');
     function showUserCam(stream) {
         if (!userCamPanel || !userCamVideo) return;
-        userCamVideo.srcObject = stream;
-        userCamVideo.muted = true;                    // 음성은 Audio 요소가 담당 — 겹치면 되먹임
-        userCamVideo.play().catch(() => {});
         userCamPanel.classList.remove('hidden');
+        const CAM = window.PulseCamera;
+        if (CAM) {
+            // 상대 캠이 검은 화면일 때 트랙 상태·해상도를 드러낸다 (자동재생 차단도 여기서 잡힌다)
+            CAM.attach(userCamVideo, stream).then((warn) => {
+                CAM.diag(camDiagEl, (warn ? '⚠ ' + warn + ' · ' : '사용자 캠 수신 · ') + CAM.describe(stream), warn ? 'warn' : 'ok');
+            });
+        } else {
+            userCamVideo.srcObject = stream;
+            userCamVideo.muted = true;                // 음성은 Audio 요소가 담당 — 겹치면 되먹임
+            userCamVideo.play().catch(() => {});
+        }
         for (const t of stream.getVideoTracks()) {
             t.addEventListener('ended', hideUserCam, { once: true });
             t.addEventListener('mute',  hideUserCam, { once: true });
@@ -425,15 +460,13 @@
         userCamPanel.classList.add('hidden');
     }
 
+    // 비공개 라이브용 카메라 시작.
+    // ⚠ 예전에는 여기서 getUserMedia 를 따로 불러 **카메라 선택을 무시**했고(브라우저 기본값),
+    //   실패하면 console.warn 으로 끝났다. ensureCamera() 한 길로 모은다 — 선택·진단·재사용이 같이 온다.
     async function startBJCamera(peer) {
-        try {
-            const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            cowatchVideo.srcObject = camStream;
-            cowatchVideo.muted = true;
-            cowatchVideo.play().catch(() => {});
-            // 비디오 트랙을 peer에 추가
-            for (const t of camStream.getVideoTracks()) peer.addTrack(t, camStream);
-        } catch (e) { console.warn('카메라 권한 거부', e); }
+        const s = await ensureCamera();
+        if (!s) return;                                  // 실패 사유는 ensureCamera 가 화면에 적는다
+        try { for (const t of s.getVideoTracks()) peer.addTrack(t, s); } catch (e) { console.warn('addTrack', e); }
     }
 
     const userListEl = $('user-list');

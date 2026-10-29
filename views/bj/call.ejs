@@ -63,6 +63,16 @@
                     <button id="btn-hangup" class="btn btn-ghost" style="flex:1; background: rgba(255,80,80,0.1); border-color: rgba(255,80,80,0.4); color: #FFB8B8;">종료</button>
                 </div>
 
+                <!-- 카메라 고르기 + 진단 — 카메라가 여러 개면 브라우저 기본값이 가상캠/IR 캠일 수 있고,
+                     실패 사유(권한·점유·자동재생 차단)가 화면에 안 보여서 원인을 못 찾았다 (2026-10-30) -->
+                <div id="cam-row" class="mt-3 hidden">
+                    <label for="cam-select" class="form-label" style="font-size:11px;">📷 카메라 선택</label>
+                    <select id="cam-select" class="form-select" style="font-size:12px; padding:6px 8px;">
+                        <option value="">자동 (브라우저 기본)</option>
+                    </select>
+                    <div id="cam-diag" class="mono hidden" style="font-size:11px; line-height:1.5; margin-top:6px; color:var(--tx-2); word-break:break-all;"></div>
+                </div>
+
                 <!-- 스트리머 기기 제어 — 스트리머가 허용(ALLOW:1)해야 나타난다.
                      송신은 axis_sender 가 33ms 병합 + 변화율 제한으로 내보낸다. -->
                 <div id="ctl-panel" class="mt-5 hidden" style="border-top:1px solid var(--border-soft); padding-top:14px;">
@@ -136,6 +146,7 @@ window.__BJ_CALL__ = {
     서로 다른 기기 객체를 보게 된다 — 헤더는 '연결됨'인데 통화 화면은 '미연결'이 되고
     수신 명령이 기기로 가지 않는다 (2026-09-20 실기기 확인). %>
 <script src="/js/core/ice_diag.js?v=6"></script>
+<script src="/js/core/camera.js?v=1"></script>
 <script src="/js/core/bj_session.js"></script>
 <script src="/js/core/axis_sender.js?v=1"></script>
-<script src="/js/pages/bj_call.js?v=icediag3"></script>
+<script src="/js/pages/bj_call.js?v=cam1"></script>

@@ -26,6 +26,9 @@
     const btnMic    = $('btn-mic');
     const btnCam    = $('btn-cam');
     const myCam     = $('my-cam');
+    const camRow    = $('cam-row');
+    const camSelect = $('cam-select');
+    const camDiag   = $('cam-diag');
     const btnHangup = $('btn-hangup');
 
     const callView  = $('session-call-view');
@@ -288,13 +291,36 @@
     // 새로 뜨고 비디오 트랙 유무로 분기할 수 있다 (스트리머 캠을 받는 쪽과 같은 규칙).
     // 기본 OFF — 사용자가 직접 눌러야만 켜진다.
     let camStream = null, camOn = false;
+    const CAM = window.PulseCamera;
+
+    // 카메라 목록을 미리 채워 둔다. ⚠ 권한을 한 번도 안 줬으면 이름이 빈 값이라
+    //    '카메라 1/2' 로만 보인다 — 스트림을 연 뒤 다시 채우면 실제 이름이 나온다.
+    if (CAM && camRow) {
+        camRow.classList.remove('hidden');
+        const bad = CAM.unsupportedReason();
+        if (bad) CAM.diag(camDiag, '⚠ ' + bad, 'bad');
+        CAM.fillSelect(camSelect, () => { if (camOn) { setCam(false).then(() => setCam(true)); } });
+    }
+
     async function setCam(on) {
         if (!peer) return;
         if (on) {
-            try { camStream = await navigator.mediaDevices.getUserMedia({ video: true }); }
-            catch (_) { stateEl.textContent = '카메라 권한이 없습니다'; return; }
+            if (!CAM) { stateEl.textContent = '카메라 모듈을 불러오지 못했습니다'; return; }
+            CAM.diag(camDiag, '카메라 여는 중…');
+            try {
+                camStream = await CAM.open({ deviceId: camSelect ? camSelect.value : '' });
+            } catch (e) {
+                // 예전에는 '권한이 없습니다' 한 줄로 끝나 원인을 못 봤다 — 실제 사유를 적는다
+                CAM.diag(camDiag, '⚠ ' + (e.pulseReason || e.message), 'bad');
+                return;
+            }
             try { peer.addStream(camStream); } catch (e) { console.warn('addStream', e); }
-            if (myCam) { myCam.srcObject = camStream; myCam.classList.remove('hidden'); }
+            if (myCam) {
+                myCam.classList.remove('hidden');
+                const warn = await CAM.attach(myCam, camStream);
+                CAM.diag(camDiag, (warn ? '⚠ ' + warn + ' · ' : '송신 중 · ') + CAM.describe(camStream), warn ? 'warn' : 'ok');
+            }
+            CAM.fillSelect(camSelect);     // 권한을 받은 뒤라 이제 카메라 이름이 보인다
             camOn = true;
         } else {
             if (camStream) {
@@ -303,6 +329,7 @@
                 camStream = null;
             }
             if (myCam) { myCam.srcObject = null; myCam.classList.add('hidden'); }
+            if (CAM) CAM.diag(camDiag, '카메라 꺼짐');
             camOn = false;
         }
         if (btnCam) {

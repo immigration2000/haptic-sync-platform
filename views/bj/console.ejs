@@ -27,6 +27,13 @@
                     <label class="form-label">🔊 출력</label>
                     <select id="dev-output" class="form-select"><option value="">자동</option></select>
                 </div>
+                <!-- 카메라도 고를 수 있어야 한다 — 여러 개면 브라우저 기본값이 가상캠/IR 캠으로
+                     잡혀 검은 화면이 된다. 실패 사유도 아래 줄에 적는다 (2026-10-30) -->
+                <div class="form-row">
+                    <label class="form-label">📷 카메라</label>
+                    <select id="dev-camera" class="form-select"><option value="">자동 (브라우저 기본)</option></select>
+                </div>
+                <div id="cam-diag" class="mono hidden" style="font-size:11px; line-height:1.5; color:var(--tx-2); word-break:break-all;"></div>
                 <div class="flex gap-3 mt-4">
                     <button id="btn-mic" class="btn btn-secondary" disabled>🎤 마이크 활성화</button>
                     <button id="btn-monitor" class="btn btn-ghost">🔊 사용자 음성 ON</button>
@@ -157,5 +164,6 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/vendor/simple-peer.min.js"></script>
 <script src="/js/core/ice_diag.js?v=6"></script>
+<script src="/js/core/camera.js?v=1"></script>
 <script>window.__BJ_CONSOLE__ = { userId: <%= user.id %>, name: "<%= profile.stage_name %>" };</script>
-<script src="/js/pages/bj_console.js?v=icediag3"></script>
+<script src="/js/pages/bj_console.js?v=cam1"></script>
