@@ -22,7 +22,12 @@
         <!-- 우측: 통화 컨트롤 -->
         <aside class="session-side">
             <div class="card card-body">
-                <div class="panel-title">통화 세션</div>
+                <div class="flex items-center gap-2" style="justify-content:space-between;">
+                    <div class="panel-title" style="margin-bottom:0;">통화 세션</div>
+                    <button type="button" id="btn-settings" class="btn btn-ghost"
+                            title="카메라·마이크·소리 출력 장치 선택"
+                            style="padding:4px 10px; font-size:13px; line-height:1.4;">⚙ 설정</button>
+                </div>
                 <div id="call-state" class="text-dim mb-3">대기 중 — "통화 시작"을 누르세요</div>
                 <div id="call-stats" class="mono text-faint" style="font-size: 12px; display: grid; grid-template-columns: 78px 1fr; gap: 6px 10px;">
                     <span>모드</span><span id="call-mode">—</span>
@@ -63,14 +68,34 @@
                     <button id="btn-hangup" class="btn btn-ghost" style="flex:1; background: rgba(255,80,80,0.1); border-color: rgba(255,80,80,0.4); color: #FFB8B8;">종료</button>
                 </div>
 
-                <!-- 카메라 고르기 + 진단 — 카메라가 여러 개면 브라우저 기본값이 가상캠/IR 캠일 수 있고,
-                     실패 사유(권한·점유·자동재생 차단)가 화면에 안 보여서 원인을 못 찾았다 (2026-10-30) -->
-                <div id="cam-row" class="mt-3 hidden">
-                    <label for="cam-select" class="form-label" style="font-size:11px;">📷 카메라 선택</label>
-                    <select id="cam-select" class="form-select" style="font-size:12px; padding:6px 8px;">
-                        <option value="">자동 (브라우저 기본)</option>
-                    </select>
-                    <div id="cam-diag" class="mono hidden" style="font-size:11px; line-height:1.5; margin-top:6px; color:var(--tx-2); word-break:break-all;"></div>
+                <!-- 장치 설정 — ⚙ 버튼으로 연다.
+                     · 카메라가 여러 개면 브라우저 기본값이 가상캠(OBS)·IR 캠으로 잡혀 검은 화면이 된다
+                     · 실패 사유(권한·점유·자동재생 차단)가 화면에 안 보여서 원인을 못 찾았다 (2026-10-30)
+                     ⚠ 장치 이름은 권한을 한 번 준 뒤에야 보인다 — 그 전에는 '카메라 1/2' 로 뜬다 -->
+                <div id="settings-panel" class="mt-4 hidden"
+                     style="border-top:1px solid var(--border-soft); padding-top:14px;">
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <label for="cam-select" class="form-label" style="font-size:11px;">📷 카메라</label>
+                        <select id="cam-select" class="form-select" style="font-size:12px; padding:6px 8px;">
+                            <option value="">자동 (브라우저 기본)</option>
+                        </select>
+                    </div>
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <label for="mic-select" class="form-label" style="font-size:11px;">🎤 마이크</label>
+                        <select id="mic-select" class="form-select" style="font-size:12px; padding:6px 8px;">
+                            <option value="">자동 (브라우저 기본)</option>
+                        </select>
+                    </div>
+                    <div class="form-row" style="margin-bottom:0;">
+                        <label for="spk-select" class="form-label" style="font-size:11px;">🔊 소리 출력</label>
+                        <select id="spk-select" class="form-select" style="font-size:12px; padding:6px 8px;">
+                            <option value="">자동 (브라우저 기본)</option>
+                        </select>
+                    </div>
+                    <div id="cam-diag" class="mono hidden" style="font-size:11px; line-height:1.5; margin-top:10px; color:var(--tx-2); word-break:break-all;"></div>
+                    <p class="text-faint" style="font-size:10px; margin-top:8px;">
+                        장치 이름이 "카메라 1" 처럼 보이면 아직 권한을 안 준 상태입니다 — 한 번 켜면 실제 이름이 나옵니다.
+                    </p>
                 </div>
 
                 <!-- 스트리머 기기 제어 — 스트리머가 허용(ALLOW:1)해야 나타난다.
@@ -146,7 +171,7 @@ window.__BJ_CALL__ = {
     서로 다른 기기 객체를 보게 된다 — 헤더는 '연결됨'인데 통화 화면은 '미연결'이 되고
     수신 명령이 기기로 가지 않는다 (2026-09-20 실기기 확인). %>
 <script src="/js/core/ice_diag.js?v=6"></script>
-<script src="/js/core/camera.js?v=1"></script>
+<script src="/js/core/camera.js?v=2"></script>
 <script src="/js/core/bj_session.js"></script>
 <script src="/js/core/axis_sender.js?v=1"></script>
-<script src="/js/pages/bj_call.js?v=cam1"></script>
+<script src="/js/pages/bj_call.js?v=cam2"></script>

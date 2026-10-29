@@ -142,5 +142,64 @@ console.log('\n6. 영상 트랙이 없으면 거짓말하지 않는다');
     ok('null 도 안전', C.describe(null) === '영상 트랙 없음');
 }
 
+console.log('\n7. 설정 패널 — 마이크·스피커도 같은 방식으로 고른다 (2026-10-30)');
+{
+    const devices = [
+        { kind: 'audioinput',  deviceId: 'mic-a', label: '내장 마이크' },
+        { kind: 'audioinput',  deviceId: 'mic-b', label: 'USB 마이크' },
+        { kind: 'audiooutput', deviceId: 'spk-a', label: '스피커' },
+        { kind: 'videoinput',  deviceId: 'cam-a', label: '웹캠' },
+    ];
+    const store = { pulse_mic_device: 'mic-b' };
+    const C = makeCtx({ devices, store }).window.PulseCamera;
+
+    const micSel = mkSelect();
+    const list = await C.fillKindSelect(micSel, 'audioinput', 'pulse_mic_device');
+    ok('마이크만 담는다', list.length === 2, JSON.stringify(list.map((d) => d.label)));
+    ok('저장된 마이크 복원', micSel.value === 'mic-b', micSel.value);
+
+    const spkSel = mkSelect();
+    const sl = await C.fillKindSelect(spkSel, 'audiooutput', 'pulse_spk_device');
+    ok('스피커만 담는다', sl.length === 1 && sl[0].label === '스피커', JSON.stringify(sl));
+
+    micSel.value = 'mic-a'; micSel.fire('change');
+    ok('선택이 저장된다', store.pulse_mic_device === 'mic-a', JSON.stringify(store));
+
+    // 라벨이 비어 있을 때(권한 전) 종류 이름으로 채운다
+    const C2 = makeCtx({ devices: [{ kind: 'audioinput', deviceId: 'x', label: '' }] }).window.PulseCamera;
+    const s2 = mkSelect();
+    const l2 = await C2.fillKindSelect(s2, 'audioinput', 'k');
+    ok('권한 전 라벨은 "마이크 1" 로', l2[0].label === '마이크 1', l2[0].label);
+}
+
+console.log('\n8. 소리 출력 지정 — 지원 안 하면 그 사실을 돌려준다');
+{
+    const C = makeCtx().window.PulseCamera;
+    ok('setSinkId 없는 브라우저 → 안내 문구', /지원하지 않습니다/.test(await C.applySink({}, 'spk-a')), String(await C.applySink({}, 'spk-a')));
+    let got = null;
+    ok('지원하면 null (조용히 성공)', (await C.applySink({ setSinkId: async (id) => { got = id; } }, 'spk-a')) === null);
+    ok('지정한 장치로 호출된다', got === 'spk-a', String(got));
+    ok('실패하면 사유를 돌려준다', /바꿀 수 없습니다/.test(await C.applySink({ setSinkId: async () => { throw Object.assign(new Error('x'), { name: 'NotAllowedError' }); } }, 'z')));
+    ok('요소가 없으면 조용히 통과', (await C.applySink(null, 'z')) === null);
+}
+
+console.log('\n9. 트랙 교체 — 스트림 객체 정체성을 유지한다');
+{
+    const C = makeCtx().window.PulseCamera;
+    const mkTrack = (id) => ({ id, stopped: false, stop() { this.stopped = true; } });
+    const t1 = mkTrack('t1'), t2 = mkTrack('t2');
+    const tracks = [t1];
+    const stream = { id: 'S1', removeTrack(t) { const i = tracks.indexOf(t); if (i >= 0) tracks.splice(i, 1); }, addTrack(t) { tracks.push(t); } };
+
+    C.swapTrack(stream, t1, t2);
+    ok('옛 트랙을 정지한다', t1.stopped === true);
+    ok('옛 트랙이 빠지고 새 트랙이 들어간다', tracks.length === 1 && tracks[0] === t2, JSON.stringify(tracks.map((t) => t.id)));
+    ok('스트림 객체는 그대로 (두 번째 교체가 실패하지 않게)', stream.id === 'S1');
+
+    let threw = false;
+    try { C.swapTrack(null, t1, t2); C.swapTrack(stream, null, t2); } catch (_) { threw = true; }
+    ok('인자가 없어도 던지지 않는다', !threw);
+}
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

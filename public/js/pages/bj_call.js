@@ -26,8 +26,11 @@
     const btnMic    = $('btn-mic');
     const btnCam    = $('btn-cam');
     const myCam     = $('my-cam');
-    const camRow    = $('cam-row');
+    const btnSettings = $('btn-settings');
+    const setPanel  = $('settings-panel');
     const camSelect = $('cam-select');
+    const micSelect = $('mic-select');
+    const spkSelect = $('spk-select');
     const camDiag   = $('cam-diag');
     const btnHangup = $('btn-hangup');
 
@@ -54,9 +57,16 @@
 
     btnStart.addEventListener('click', async () => {
         try {
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO });
+            // 설정에서 고른 마이크를 쓴다 (없으면 자동). 실패 사유는 설정 패널에 적는다.
+            micStream = CAM
+                ? await CAM.openMic({ deviceId: micSelect ? micSelect.value : '', constraints: AUDIO })
+                : await navigator.mediaDevices.getUserMedia({ audio: AUDIO });
             for (const t of micStream.getAudioTracks()) t.enabled = false;
-        } catch (e) { console.warn('mic denied', e); }
+            if (CAM) refillDevices();          // 권한 받은 뒤라 실제 장치 이름이 보인다
+        } catch (e) {
+            console.warn('mic denied', e);
+            if (CAM) CAM.diag(camDiag, '⚠ ' + (e.pulseReason || e.message || '마이크를 열지 못했습니다'), 'bad');
+        }
         socket = io();
         let attempted = false;
         socket.emit('user-enter');
@@ -132,6 +142,9 @@
                 streamerStream = stream; if (mode === 'cam') attachCam();
             } else {                                          // 음성(마이크)
                 const a = new Audio(); a.srcObject = stream; a.autoplay = true;
+                // 소리 출력 장치를 바꿀 수 있어야 하므로 요소를 들고 있는다 (예전엔 버려졌다)
+                inAudios.push(a);
+                if (spkSelect && spkSelect.value && CAM) CAM.applySink(a, spkSelect.value);
             }
         });
         peer.on('track', (track, stream) => {                 // 재협상으로 추가된 캠 트랙
@@ -291,15 +304,67 @@
     // 새로 뜨고 비디오 트랙 유무로 분기할 수 있다 (스트리머 캠을 받는 쪽과 같은 규칙).
     // 기본 OFF — 사용자가 직접 눌러야만 켜진다.
     let camStream = null, camOn = false;
+    const inAudios = [];                  // 수신 음성 요소들 — 소리 출력 장치 변경에 쓴다
     const CAM = window.PulseCamera;
 
-    // 카메라 목록을 미리 채워 둔다. ⚠ 권한을 한 번도 안 줬으면 이름이 빈 값이라
-    //    '카메라 1/2' 로만 보인다 — 스트림을 연 뒤 다시 채우면 실제 이름이 나온다.
-    if (CAM && camRow) {
-        camRow.classList.remove('hidden');
-        const bad = CAM.unsupportedReason();
-        if (bad) CAM.diag(camDiag, '⚠ ' + bad, 'bad');
+    // ── ⚙ 설정 — 카메라·마이크·소리 출력 선택 ──────────────────────────
+    // 연결 전에도 고를 수 있어야 한다(그래서 버튼은 항상 보인다).
+    // ⚠ 권한을 한 번도 안 줬으면 장치 이름이 빈 값이라 '카메라 1/2' 로만 보인다 —
+    //   스트림을 연 뒤 다시 채우면 실제 이름이 나온다.
+    const MIC_KEY = 'pulse_mic_device', SPK_KEY = 'pulse_spk_device';
+
+    function refillDevices() {
+        if (!CAM) return;
         CAM.fillSelect(camSelect, () => { if (camOn) { setCam(false).then(() => setCam(true)); } });
+        CAM.fillKindSelect(micSelect, 'audioinput',  MIC_KEY, switchMic);
+        CAM.fillKindSelect(spkSelect, 'audiooutput', SPK_KEY, switchSpeaker);
+    }
+
+    /** 마이크 교체 — 통화 중이면 트랙만 바꾼다(재협상 없이). 음소거 상태는 유지. */
+    async function switchMic(deviceId) {
+        if (!CAM) return;
+        if (!micStream) { CAM.diag(camDiag, '마이크 선택 저장됨 — 통화 시작 때 적용됩니다'); return; }
+        let fresh;
+        try { fresh = await CAM.openMic({ deviceId }); }
+        catch (e) { CAM.diag(camDiag, '⚠ ' + (e.pulseReason || e.message), 'bad'); return; }
+        const nt = fresh.getAudioTracks()[0], ot = micStream.getAudioTracks()[0];
+        if (!nt) { CAM.diag(camDiag, '⚠ 마이크 트랙을 얻지 못했습니다', 'bad'); return; }
+        nt.enabled = micOn;                               // 꺼둔 상태였으면 그대로 꺼둔다
+        if (peer && ot) { try { await peer.replaceTrack(ot, nt, micStream); } catch (e) { console.warn('replaceTrack', e); } }
+        // ⚠ micStream 을 새 객체로 바꾸면 다음 교체가 'never added' 로 실패한다 → 트랙만 갈아끼운다
+        CAM.swapTrack(micStream, ot, nt);
+        CAM.diag(camDiag, '마이크 변경됨 · ' + (nt.label || '마이크'));
+    }
+
+    /** 소리 출력 교체 — 받고 있는 오디오 요소 전부에 적용 */
+    async function switchSpeaker(deviceId) {
+        if (!CAM) return;
+        if (!inAudios.length) { CAM.diag(camDiag, '소리 출력 선택 저장됨 — 통화가 연결되면 적용됩니다'); return; }
+        let warn = null;
+        for (const a of inAudios) warn = (await CAM.applySink(a, deviceId)) || warn;
+        CAM.diag(camDiag, warn ? '⚠ ' + warn : '소리 출력 변경됨', warn ? 'warn' : 'ok');
+    }
+
+    if (btnSettings && setPanel) {
+        btnSettings.addEventListener('click', () => {
+            const show = setPanel.classList.contains('hidden');
+            setPanel.classList.toggle('hidden', !show);
+            btnSettings.classList.toggle('btn-primary', show);
+            btnSettings.classList.toggle('btn-ghost', !show);
+            if (show) refillDevices();                    // 열 때마다 최신 목록으로 (장치 꽂았을 수 있다)
+        });
+    }
+    if (CAM) {
+        const bad = CAM.unsupportedReason();
+        if (bad) {
+            CAM.diag(camDiag, '⚠ ' + bad, 'bad');
+            if (setPanel) setPanel.classList.remove('hidden');   // 원인이 바로 보이게 펼쳐 둔다
+        }
+        refillDevices();
+        // 장치가 꽂히거나 빠지면 목록을 갱신한다
+        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+            navigator.mediaDevices.addEventListener('devicechange', refillDevices);
+        }
     }
 
     async function setCam(on) {

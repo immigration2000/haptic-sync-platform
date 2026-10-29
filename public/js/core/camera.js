@@ -9,6 +9,9 @@
  *     · http(LAN) 주소면 `navigator.mediaDevices` 자체가 없다 → TypeError
  *   그래서 ① 어느 카메라를 쓸지 고를 수 있게 하고 ② 실패 사유를 화면에 적는다.
  *
+ * 카메라뿐 아니라 마이크·스피커 선택도 같은 방식이 필요해서(2026-10-30 설정 버튼),
+ * 목록 채우기는 `kind` 를 받는 일반 함수로 두고 카메라용은 그 위에 얇게 올렸다.
+ *
  * 쓰는 쪽: 1:1 통화 화면(사용자) · BJ 콘솔(스트리머). 둘이 같은 로직을 공유한다.
  */
 (function () {
@@ -55,33 +58,96 @@
     function saved() { try { return localStorage.getItem(KEY) || ''; } catch (_) { return ''; } }
     function save(id) { try { localStorage.setItem(KEY, id || ''); } catch (_) {} }
 
-    /** 카메라 목록. ⚠ 권한 전에는 label 이 빈 문자열이다 → 스트림을 한 번 연 뒤 다시 채워야 이름이 보인다. */
-    async function listVideoInputs() {
+    const KIND_NAME = { videoinput: '카메라', audioinput: '마이크', audiooutput: '스피커' };
+
+    /**
+     * 장치 목록. ⚠ 권한 전에는 label 이 빈 문자열이다 →
+     * 스트림을 한 번 연 뒤 다시 채워야 실제 장치 이름이 보인다.
+     */
+    async function listDevices(kind) {
         if (unsupportedReason() || !navigator.mediaDevices.enumerateDevices) return [];
         try {
             const all = await navigator.mediaDevices.enumerateDevices();
-            return all.filter((d) => d.kind === 'videoinput')
-                      .map((d, i) => ({ deviceId: d.deviceId, label: d.label || ('카메라 ' + (i + 1)) }));
+            return all.filter((d) => d.kind === kind)
+                      .map((d, i) => ({ deviceId: d.deviceId, label: d.label || ((KIND_NAME[kind] || '장치') + ' ' + (i + 1)) }));
         } catch (_) { return []; }
     }
+    const listVideoInputs = () => listDevices('videoinput');
 
-    /** <select> 를 채운다. 저장된 선택을 복원하고, 바뀌면 저장한다. */
-    async function fillSelect(sel, onChange) {
+    /**
+     * <select> 를 채운다. 저장된 선택을 복원하고, 바뀌면 저장한다.
+     * ⚠ 저장값이 그 PC 에 없으면 **무시하고 '자동'** 으로 둔다 — 선택은 localStorage 라
+     *   다른 PC 에서는 존재하지 않는 deviceId 일 수 있다.
+     */
+    async function fillKindSelect(sel, kind, key, onChange) {
         if (!sel) return [];
-        const list = await listVideoInputs();
-        const cur = sel.value || saved();
+        const list = await listDevices(kind);
+        let cur = sel.value;
+        if (!cur) { try { cur = localStorage.getItem(key) || ''; } catch (_) { cur = ''; } }
         sel.innerHTML = '<option value="">자동 (브라우저 기본)</option>';
         for (const d of list) {
             const o = document.createElement('option');
             o.value = d.deviceId; o.textContent = d.label;
             sel.appendChild(o);
         }
-        if (cur && list.some((d) => d.deviceId === cur)) sel.value = cur;
-        if (!sel.dataset.pulseCamBound) {
-            sel.dataset.pulseCamBound = '1';
-            sel.addEventListener('change', () => { save(sel.value); if (onChange) onChange(sel.value); });
+        sel.value = (cur && list.some((d) => d.deviceId === cur)) ? cur : '';
+        if (!sel.dataset.pulseDevBound) {
+            sel.dataset.pulseDevBound = '1';
+            sel.addEventListener('change', () => {
+                try { localStorage.setItem(key, sel.value || ''); } catch (_) {}
+                if (onChange) onChange(sel.value);
+            });
         }
         return list;
+    }
+
+    /** 카메라 전용 — 저장 키를 고정해 둔 얇은 래퍼 */
+    const fillSelect = (sel, onChange) => fillKindSelect(sel, 'videoinput', KEY, onChange);
+
+    /** 마이크 열기. 실패 사유 번역은 카메라와 공유한다. */
+    async function openMic(opts) {
+        opts = opts || {};
+        const bad = unsupportedReason();
+        if (bad) { const e = new Error(bad); e.pulseReason = bad; throw e; }
+        const base = Object.assign({ echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, opts.constraints || {});
+        const want = opts.deviceId || '';
+        try {
+            const audio = want ? Object.assign({ deviceId: { exact: want } }, base) : base;
+            return await navigator.mediaDevices.getUserMedia({ audio });
+        } catch (err) {
+            if (want && /OverconstrainedError|NotFoundError/.test(err && err.name)) {
+                try { return await navigator.mediaDevices.getUserMedia({ audio: base }); }
+                catch (e2) { const e = new Error(explain(e2)); e.pulseReason = explain(e2); e.cause = e2; throw e; }
+            }
+            const e = new Error(explain(err)); e.pulseReason = explain(err); e.cause = err; throw e;
+        }
+    }
+
+    /**
+     * 스트림의 **객체 정체성을 유지**하면서 트랙을 갈아끼운다.
+     *
+     * ⚠ 왜 이렇게 하나: simple-peer 는 추가된 스트림을 `(stream.id, track.id)` 로 기억한다.
+     *   장치를 바꿀 때 `micStream = newStream` 처럼 **스트림 객체를 교체하면**, 다음 번
+     *   `replaceTrack(old, new, micStream)` 이 "never added" 로 **조용히 실패**한다
+     *   (두 번째 장치 변경이 상대에게 반영되지 않는다). 그래서 스트림은 그대로 두고
+     *   트랙만 빼고 넣는다.
+     */
+    function swapTrack(stream, oldTrack, newTrack) {
+        if (!stream) return;
+        try { if (oldTrack) { oldTrack.stop(); stream.removeTrack(oldTrack); } } catch (_) {}
+        try { if (newTrack) stream.addTrack(newTrack); } catch (_) {}
+    }
+
+    /**
+     * 소리 출력 장치 지정. 브라우저가 setSinkId 를 지원하지 않으면(파이어폭스·사파리)
+     * **그 사실을 돌려준다** — 조용히 무시하면 "바꿨는데 안 바뀐다" 가 된다.
+     * @returns {Promise<string|null>} 안내 문구 또는 null
+     */
+    async function applySink(el, deviceId) {
+        if (!el) return null;
+        if (typeof el.setSinkId !== 'function') return '이 브라우저는 소리 출력 장치 선택을 지원하지 않습니다';
+        try { await el.setSinkId(deviceId || ''); return null; }
+        catch (e) { return '소리 출력 장치를 바꿀 수 없습니다 (' + ((e && e.name) || e) + ')'; }
     }
 
     /**
@@ -163,5 +229,6 @@
         return out;
     }
 
-    window.PulseCamera = { listVideoInputs, fillSelect, open, describe, attach, diag, report, explain, unsupportedReason, savedDeviceId: saved };
+    window.PulseCamera = { listVideoInputs, listDevices, fillSelect, fillKindSelect, open, openMic, applySink, swapTrack,
+                           describe, attach, diag, report, explain, unsupportedReason, savedDeviceId: saved };
 })();

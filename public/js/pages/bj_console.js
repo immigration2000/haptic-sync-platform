@@ -206,8 +206,11 @@
                 try { return Promise.resolve(peer.replaceTrack(oldT, newT, micStream)).catch(() => {}); }
                 catch (_) { return Promise.resolve(); }
             }));
-            for (const t of micStream.getTracks()) t.stop();
-            micStream = newStream;
+            // ⚠ micStream 을 새 객체로 바꾸면 **두 번째 변경**부터 replaceTrack 이
+            //   'never added' 로 조용히 실패한다 (simple-peer 는 stream.id 로 기억한다).
+            //   스트림은 그대로 두고 트랙만 갈아끼운다 — 통화 화면과 같은 방식.
+            if (window.PulseCamera) window.PulseCamera.swapTrack(micStream, oldT, newT);
+            else { try { oldT.stop(); micStream.removeTrack(oldT); micStream.addTrack(newT); } catch (_) {} }
         } catch(_) {}
     });
     devOutputSel.addEventListener('change', async (e) => {
