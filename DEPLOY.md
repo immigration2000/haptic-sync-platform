@@ -12,7 +12,8 @@
 ## 0. 한 줄 요약
 - 작업 폴더(PC): `D:\Leeminsoo\Project\Website\IWeb\IRealverse-main\pulse`
 - 서버: 폰 Termux에서 `node server/app.js`, **포트 5501**
-- 외부 주소(고정·영구): **https://syncra.uk** (Cloudflare named tunnel)
+- 외부 주소(고정·영구): **https://realhage.com** (Cloudflare named tunnel)
+  - 옛 주소 `https://syncra.uk` 도 **같은 터널로 계속 동작** (2026-11-08 전환, 병행 운영 중)
 - 출입 게이트 + 로그인 모두 **`1111` / `2222`**
 
 ---
@@ -39,15 +40,18 @@ ssh -o StrictHostKeyChecking=no -p 8022 u0_a870@192.168.219.108 'bash ~/pulse/re
 
 ---
 
-## 3. 외부 터널 (Cloudflare named tunnel → syncra.uk)
+## 3. 외부 터널 (Cloudflare named tunnel → realhage.com · syncra.uk)
 ```bash
 # 터널만 죽었을 때 (서버는 안 건드림)
 ssh -o StrictHostKeyChecking=no -p 8022 u0_a870@192.168.219.108 'bash ~/pulse/restart_named.sh'
 ```
 - 터널 이름 `syncra`, id `54a9f992-1739-414b-9fe6-b437688ecf42`.
-- 설정 `~/.cloudflared/config.yml` (ingress: syncra.uk·www.syncra.uk → http://localhost:5501).
+- 설정 `~/.cloudflared/config.yml` (ingress: realhage.com·www / syncra.uk·www → http://localhost:5501).
+  ⚠ 새 호스트명을 붙일 때 `cloudflared tunnel route dns` 는 **`cert.pem` 이 발급된 존에만** 레코드를 만든다.
+    다른 존(realhage.com)에 쓰면 `realhage.com.syncra.uk` 같은 하위도메인이 생긴다 —
+    대시보드에서 해당 존에 CNAME `<터널ID>.cfargotunnel.com` (프록시 켬)을 직접 넣을 것.
 - 자격증명 `~/.cloudflared/<id>.json`, 계정 인증서 `~/.cloudflared/cert.pem`.
-- 로그 `~/pulse/named.log`. 주소는 **재부팅에도 syncra.uk 영구 불변**.
+- 로그 `~/pulse/named.log`. 주소는 **재부팅에도 영구 불변**.
 - ⚠ **trycloudflare(`restart_cf.sh`)·ngrok(`restart_ngrok.sh`)는 폐기** — 쓰지 말 것. (ngrok=월 1GB 대역폭 한계, trycloudflare=주소 가변)
 
 ---
@@ -82,7 +86,7 @@ pkill -f "server/app.js"  # ✅ PULSE 서버만 (restart_pulse.sh)
 | 포트 | 용도 |
 |---|---|
 | 5500 | (옛) IWeb 데모 |
-| **5501** | **PULSE** → syncra.uk |
+| **5501** | **PULSE** → realhage.com (+ syncra.uk) |
 | 4174 | 타 프로젝트 테스트 서버(relay-server) — **건드리지 말 것** |
 | 5502 | 로컬(PC) 테스트 전용 |
 
@@ -130,17 +134,17 @@ tar -C "D:/Leeminsoo/Project/Website/IWeb/IRealverse-main/pulse" -cf - \
 ## 7. 검증 명령 (PC에서)
 게이트가 있으니 모든 외부 요청에 `-u 1111:2222` 필요.
 ```bash
-curl -s https://syncra.uk/health                              # 게이트 우회, {"ok":true} 기대
-curl -s -o /dev/null -w "%{http_code}\n" https://syncra.uk/   # 무인증 → 401
-curl -s -u 1111:2222 -o /dev/null -w "%{http_code}\n" https://syncra.uk/   # → 200
+curl -s https://realhage.com/health                           # 게이트 우회, {"ok":true} 기대
+curl -s -o /dev/null -w "%{http_code}\n" https://realhage.com/   # 무인증 → 401
+curl -s -u <게이트계정> -o /dev/null -w "%{http_code}\n" https://realhage.com/   # → 200
 ```
 로그인 e2e(CSRF 필요):
 ```bash
 JAR=./cj.txt; rm -f $JAR; G="1111:2222"
-T=$(curl -s -u "$G" -c $JAR https://syncra.uk/auth/login | grep -oE 'name="_csrf" value="[^"]+"' | head -1 | sed 's/.*value="//;s/"$//')
+T=$(curl -s -u "$G" -c $JAR https://realhage.com/auth/login | grep -oE 'name="_csrf" value="[^"]+"' | head -1 | sed 's/.*value="//;s/"$//')
 curl -s -u "$G" -b $JAR -c $JAR -o /dev/null -w "login %{http_code}\n" \
   --data-urlencode "_csrf=$T" --data-urlencode "email=1111" --data-urlencode "password=2222" --data-urlencode "next=/" \
-  https://syncra.uk/auth/login   # → 302 성공
+  https://realhage.com/auth/login   # → 302 성공
 ```
 
 ---

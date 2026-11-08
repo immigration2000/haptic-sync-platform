@@ -16,7 +16,7 @@ pulse/HANDOFF.md 와 pulse/PROJECT_STATUS.md 먼저 읽고 맥락 파악해줘.
 
 ## 1. 한 줄 요약
 스트리머↔사용자 양방향 인터랙티브 성인 디바이스 플랫폼 (투자 시연 + 실서비스 수준).
-서비스 주소 **https://syncra.uk** · 레포 `immigration2000/haptic-sync-platform`(private).
+서비스 주소 **https://realhage.com** (옛 주소 `syncra.uk` 도 병행 동작) · 레포 `immigration2000/haptic-sync-platform`(private).
 
 **서비스 3축** — 태그로 서로 연결(교차 유입):
 | 축 | 내용 |
@@ -65,11 +65,15 @@ PC(Claude Code)와 노트북(Codex)이 번갈아 작업한다.
 | **PULSE (신규)** | **5501** | 작업 대상 |
 | IWeb (옛 데모) | 5500 | 건드리지 말 것 |
 
-**외부 URL(고정·영구):** https://syncra.uk  (+ www.syncra.uk)
+**외부 URL(고정·영구):** https://realhage.com  (+ www.realhage.com)
+옛 주소 https://syncra.uk (+www) 도 **같은 터널**로 계속 동작한다 — 2026-11-08 전환, 당분간 병행.
 (폰 **cloudflared named tunnel**이 5501→이 URL. **재부팅/재시작에도 주소 영구 불변.** 무제한 대역폭. 로그 `~/pulse/named.log`)
-- 터널 id `54a9f992-1739-414b-9fe6-b437688ecf42`, 이름 `syncra`. 설정 `~/.cloudflared/config.yml`(ingress: syncra.uk·www→localhost:5501), 자격증명 `~/.cloudflared/<id>.json`, 계정인증서 `~/.cloudflared/cert.pem`.
+- 터널 id `54a9f992-1739-414b-9fe6-b437688ecf42`, 이름 `syncra`. 설정 `~/.cloudflared/config.yml`(ingress: realhage.com·www / syncra.uk·www → localhost:5501), 자격증명 `~/.cloudflared/<id>.json`, 계정인증서 `~/.cloudflared/cert.pem`.
 - 터널만 죽으면 재시작: `bash ~/pulse/restart_named.sh` (wake-lock + 옛 cloudflared 정리 + `cloudflared tunnel run syncra`).
-- 도메인 `syncra.uk`는 Cloudflare Registrar 등록(zone 자동 활성). DNS는 `cloudflared tunnel route dns syncra <host>`로 CNAME 자동 생성.
+- 도메인 `syncra.uk`는 Cloudflare Registrar 등록(zone 자동 활성). `realhage.com` 은 **후이즈 등록 + 네임서버만 Cloudflare**(2026-11-08).
+- ⚠ `cloudflared tunnel route dns syncra <host>` 는 **`cert.pem` 이 발급된 존(syncra.uk)에만** 레코드를 만든다.
+  다른 존에 쓰면 `realhage.com.syncra.uk` 처럼 하위도메인이 생기므로, 새 존에는 대시보드에서
+  CNAME `54a9f992-1739-414b-9fe6-b437688ecf42.cfargotunnel.com` (**프록시 켬**)을 직접 넣는다.
 - **⚠ 폐기**: trycloudflare(주소 가변)·ngrok(무료 월 ~1GB 대역폭이라 영상에 ERR_NGROK_725). `restart_cf.sh`/`restart_ngrok.sh`/ngrok 바이너리는 잔재 — 쓰지 말 것.
 
 **폰 접속:** `ssh -o StrictHostKeyChecking=no -p 8022 u0_a870@192.168.219.108`
