@@ -42,6 +42,11 @@
     height: 24px;
     flex: none;
     display: block;
+    /* ⚠ <img> 로 불러온 SVG 안에서는 currentColor 가 먹지 않는다(문서가 분리된다).
+       mask 로 모양만 쓰고 색은 배경으로 칠한다 → 테마색이 바뀌어도 따라간다. */
+    background: var(--c-red);
+    -webkit-mask: url('/brand/mark-white.svg') center / contain no-repeat;
+            mask: url('/brand/mark-white.svg') center / contain no-repeat;
 }
 .brand::after { content: '.'; color: var(--c-purple); }
 .nav {
