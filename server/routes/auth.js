@@ -96,8 +96,8 @@ router.post('/register', async (req, res) => {
     const verifyUrl = `${req.protocol}://${req.get('host')}/auth/verify/${token}`;
     await mailer.send({
         to: email,
-        subject: '[PULSE] 이메일 인증',
-        text: `PULSE 가입을 환영합니다!\n\n아래 링크를 24시간 안에 클릭해서 이메일을 확인해주세요:\n${verifyUrl}\n\n이 메일을 요청하지 않으셨다면 무시하세요.`,
+        subject: '[REALHAGE] 이메일 인증',
+        text: `REALHAGE 가입을 환영합니다!\n\n아래 링크를 24시간 안에 클릭해서 이메일을 확인해주세요:\n${verifyUrl}\n\n이 메일을 요청하지 않으셨다면 무시하세요.`,
     });
 
     req.session.userId = newId;
@@ -138,7 +138,7 @@ router.post('/forgot', async (req, res) => {
         const url = `${req.protocol}://${req.get('host')}/auth/reset/${token}`;
         await mailer.send({
             to: email,
-            subject: '[PULSE] 비밀번호 재설정',
+            subject: '[REALHAGE] 비밀번호 재설정',
             text: `비밀번호 재설정 링크 (1시간 유효):\n${url}\n\n요청하지 않으셨다면 이 메일을 무시하세요.`,
         });
     }

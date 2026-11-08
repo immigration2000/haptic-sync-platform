@@ -4,9 +4,32 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-    <title><%= typeof title !== 'undefined' ? title + ' · PULSE' : 'PULSE' %></title>
+    <title><%= typeof title !== 'undefined' ? title + ' · REALHAGE' : 'REALHAGE — 리얼하게' %></title>
+
+    <%# 브랜드 아이콘 — 원본 로고에서 뽑은 세트 (public/brand/) %>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/brand/icon-192.png" type="image/png" sizes="192x192">
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+    <link rel="manifest" href="/brand/site.webmanifest">
+    <meta name="theme-color" content="#14141A">
+
+    <%# 링크 미리보기 (카톡·메신저·SNS)
+        og:image 는 상대경로면 대부분의 크롤러가 못 읽는다 → 요청 호스트로 절대 URL 을 만든다.
+        도메인을 코드에 박지 않으려는 것 — 2026-11-08 도메인 교체 때 코드 수정이 0줄이었던 이유다. %>
+    <%
+       var _host  = (typeof req !== 'undefined' && req && req.get) ? req.get('host') : 'realhage.com';
+       var _proto = /^(localhost|127\.|192\.168\.|10\.)/.test(_host) ? 'http' : 'https';
+       var _base  = _proto + '://' + _host;
+    %>
+    <meta property="og:url" content="<%= _base + ((typeof req !== 'undefined' && req) ? req.originalUrl : '/') %>">
+    <meta property="og:site_name" content="REALHAGE">
+    <meta property="og:title" content="<%= typeof title !== 'undefined' ? title : 'REALHAGE — 리얼하게' %>">
+    <meta property="og:description" content="리얼하게 — 인터랙티브 VR 플랫폼">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="<%= _base %>/brand/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="/css/theme.css">
-    <link rel="stylesheet" href="/css/components.css?v=cardalign">
+    <link rel="stylesheet" href="/css/components.css?v=realhage">
     <link rel="stylesheet" href="/css/pulse_device.css">
     <link rel="stylesheet" href="/css/pages.css?v=stage3">
     <link rel="stylesheet" href="/css/bj_session.css">

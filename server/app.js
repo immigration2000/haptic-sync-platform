@@ -204,7 +204,7 @@ app.get('/', (req, res) => {
         ...realBJs.map(b => ({ ...b, href: '/bj/call/' + b.id })),
     ];
     res.render('home', {
-        title: 'PULSE — Interactive Platform',
+        title: '리얼하게 — 인터랙티브 VR 플랫폼',
         vods, vrs, bjs: allBJs,
         featured: vrs[0] || vods[0] || null,
     });
@@ -222,7 +222,7 @@ app.use('/feed',      require('./routes/feed'));
 
 // 정적 페이지
 app.get('/pricing', (req, res) => res.render('pricing', { title: '요금제' }));
-app.get('/about',   (req, res) => res.render('about',   { title: 'PULSE 소개' }));
+app.get('/about',   (req, res) => res.render('about',   { title: 'REALHAGE 소개' }));
 app.get('/legal',   (req, res) => res.render('legal',   { title: '법적 안내' }));
 
 // ─── 404 ────────────────────────────────────────────────
