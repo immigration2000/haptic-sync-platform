@@ -26,24 +26,28 @@
     gap: var(--sp-5);
 }
 .brand {
-    font-family: var(--font-mono);
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: var(--c-red);
-    /* 로고 마크 + 글자를 한 줄로 */
+    /* 워드마크는 **글자로** 찍는다 — 로고 원본이 작아 이미지로 키우면 흐려진다.
+       로고의 기울어진 굵은 산세리프 느낌을 폰트로 맞춘다. */
+    font-family: var(--font-sans);
+    font-size: 20px;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: -0.01em;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
 }
+.b-real { color: #FFFFFF; }
+.b-hage { color: #E01E24; }
 /* 마크는 흰색 투명 PNG — 어두운 헤더 위에 올라간다 */
 .brand-mark {
-    width: 24px;
-    height: 24px;
+    /* 가로로 긴 마크다 — 높이만 맞추고 가로는 비율대로 (찌그러뜨리지 않는다) */
+    height: 22px;
+    width: auto;
     flex: none;
     display: block;
+    margin-right: 7px;   /* gap 대신 — gap 은 Real/Hage 사이까지 벌린다 */
 }
-.brand::after { content: '.'; color: var(--c-purple); }
+/* 옛 'PULSE.' 시절의 마침표 — 새 워드마크(RealHage)와 안 맞아 뺀다 */
 .nav {
     display: flex;
     gap: 4px;
