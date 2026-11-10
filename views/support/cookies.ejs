@@ -1,0 +1,43 @@
+<section class="container narrow">
+    <h1 class="page-title">🍪 쿠키 정리</h1>
+    <p class="text-dim mb-5">
+        로그인이 자꾸 풀리거나 화면이 이상하게 동작할 때, 이 사이트가 저장한 값만 지워
+        처음 상태로 되돌립니다.
+    </p>
+
+    <div class="card card-body mb-5">
+        <div class="panel-title">지워지는 것</div>
+        <ul class="text-dim" style="font-size:13px; line-height:1.9; padding-left:18px;">
+            <li><strong>로그인 세션</strong> (<span class="mono">pulse.sid</span>) — 로그아웃됩니다</li>
+            <li><strong>보안 토큰</strong> (<span class="mono">pulse-csrf</span>)</li>
+            <li>이 사이트가 남긴 그 밖의 쿠키</li>
+        </ul>
+
+        <label class="sw-row mt-4" style="cursor:pointer; justify-content:flex-start; gap:10px;">
+            <input type="checkbox" class="sw" id="opt-storage" form="f-cookies" name="storage" value="1">
+            <span class="sw-text" style="flex:none;">
+                <strong>장치·재생 설정까지 지우기</strong>
+                <span class="text-faint" style="font-size:11px; display:block;">
+                    선택한 카메라·마이크·스피커, 재생 속도·볼륨, 화면 배치 등. 켜지 않으면 그대로 둡니다.
+                </span>
+            </span>
+        </label>
+    </div>
+
+    <div class="card card-body mb-5">
+        <div class="panel-title">지워지지 않는 것</div>
+        <ul class="text-dim" style="font-size:13px; line-height:1.9; padding-left:18px;">
+            <li><strong>다른 사이트의 쿠키</strong> — 브라우저 보안상 우리 사이트에서 손댈 수 없습니다</li>
+            <li><strong>계정과 데이터</strong> — 구매·시청 기록은 서버에 그대로 있습니다. 다시 로그인하면 됩니다</li>
+            <li>보안 서비스(Cloudflare)가 심는 쿠키는 접속 즉시 다시 생길 수 있습니다</li>
+        </ul>
+    </div>
+
+    <form id="f-cookies" method="post" action="/support/cookies">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <button type="submit" class="btn btn-primary btn-lg btn-block">🍪 이 사이트 쿠키 정리하기</button>
+    </form>
+    <p class="text-faint mt-3" style="font-size:11px;">
+        정리 후 자동으로 로그아웃되며 첫 화면으로 이동합니다.
+    </p>
+</section>
