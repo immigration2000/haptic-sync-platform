@@ -435,6 +435,10 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
 - [ ] (운영 전) 로그인 페이지의 테스트 계정 안내 제거 — `views/auth/login.ejs`.
       시드 데모 계정 6개(공통 1234)가 노출돼 있다. 공개 전환 시 제거.
       ※ 관리자·마스터는 2026-11-11 에 뺐다 — 게이트만 지나면 권한이 전부 열리므로 다시 넣지 말 것
+- [ ] ⚠ **(운영 전) `trust proxy` + `BEHIND_PROXY=1`** — 지금은 꺼져 있어 Cloudflare 뒤에서
+      **rate limit 이 전원 공유**다(소켓 IP 가 늘 127.0.0.1). 인증 10회/분이 합산돼 정상 사용자가 막힐 수 있다.
+      켜면 세션 쿠키가 secure 가 되어 LAN HTTP 로그인이 깨지므로 테스트 경로를 https 로 옮긴 뒤 전환.
+      근거: `patches/2026-11-12.md`
 - [ ] (운영 전) CSP nonce 도입 — 인라인 스크립트 多로 현재 비활성
 - [ ] (운영 전) 실 성인인증·실 PG 연동 — `services/{age_verification,payment_gateway}.js` 스텁 존재,
       config `provider` 플래그만 바꾸면 붙는 구조. **별도 모듈로 구현 후 연결** 방침
