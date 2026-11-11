@@ -1,64 +1,77 @@
 <section class="container narrow">
     <h1 class="page-title">✅ 정리했습니다</h1>
-    <p class="text-dim mb-5">
-        이 사이트가 저장한 쿠키를 지웠습니다<% if (alsoStorage) { %>. 장치·재생 설정도 초기화됐습니다<% } %>.
-        로그아웃된 상태이니 다시 로그인해 주세요.
+    <p class="text-dim mb-4">
+        쿠키와 캐시를<% if (!keepSettings) { %>, 장치·재생 설정까지<% } %> 비웠습니다.
+        잠시 후 첫 화면을 <strong>새로</strong> 받아옵니다.
     </p>
-    <div id="clean-state" class="card card-body mb-5 mono" style="font-size:12px; color:var(--tx-2);">확인 중…</div>
-    <a href="/" class="btn btn-primary btn-block">첫 화면으로</a>
-    <a href="/auth/login" class="btn btn-ghost btn-block mt-3">로그인하러 가기</a>
+    <div id="clean-state" class="card card-body mb-4 mono" style="font-size:12px; color:var(--tx-2);">확인 중…</div>
+    <a href="/" id="go-now" class="btn btn-primary btn-block">지금 이동</a>
+    <p class="text-faint mt-3" style="font-size:11px;">
+        그래도 안 고쳐지면 브라우저를 완전히 닫았다 다시 열어보세요.
+    </p>
 </section>
 
 <script>
 (function () {
-    // ③ 서버가 못 지우는 것 정리 — HttpOnly 가 아닌 쿠키. 사파리처럼
-    //    Clear-Site-Data 를 안 쓰는 브라우저에서 이 단계가 실제로 일한다.
-    var ALSO_STORAGE = <%= alsoStorage ? 'true' : 'false' %>;
-    var before = document.cookie ? document.cookie.split(';').length : 0;
+    var KEEP = <%= keepSettings ? 'true' : 'false' %>;
+    var before = document.cookie ? document.cookie.split(';').filter(function (c) { return c.trim(); }).length : 0;
 
+    // ③ 서버가 못 지우는 것 정리 — HttpOnly 가 아닌 쿠키.
+    //    사파리처럼 Clear-Site-Data 를 안 쓰는 브라우저에서 이 단계가 실제로 일한다.
     function expire(name) {
-        var host = location.hostname;
-        var paths = ['/', location.pathname];
+        var host = location.hostname, paths = ['/', location.pathname];
         var domains = [undefined, host, '.' + host];
-        // 상위 도메인(예: .realhage.com)에 심긴 쿠키도 같은 이름으로 만료시켜야 사라진다
         var parts = host.split('.');
         if (parts.length > 2) domains.push('.' + parts.slice(-2).join('.'));
         paths.forEach(function (p) {
             domains.forEach(function (d) {
-                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=' + p +
-                                  (d ? '; domain=' + d : '');
+                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=' + p + (d ? '; domain=' + d : '');
             });
         });
     }
-
     (document.cookie ? document.cookie.split(';') : []).forEach(function (c) {
-        var n = c.split('=')[0].trim();
-        if (n) expire(n);
+        var n = c.split('=')[0].trim(); if (n) expire(n);
     });
 
-    if (ALSO_STORAGE) {
+    if (!KEEP) {
         try { localStorage.clear(); } catch (e) {}
         try { sessionStorage.clear(); } catch (e) {}
     }
 
+    // ④ 캐시 비우기 — Clear-Site-Data 를 못 쓰는 환경(사파리·LAN http) 대비.
+    //    Cache API 와 서비스워커는 직접 지울 수 있다.
+    var jobs = [];
+    if (window.caches && caches.keys) {
+        jobs.push(caches.keys().then(function (ks) {
+            return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+        }).catch(function () {}));
+    }
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+            return Promise.all(rs.map(function (r) { return r.unregister(); }));
+        }).catch(function () {}));
+    }
+
     var left = document.cookie ? document.cookie.split(';').filter(function (c) { return c.trim(); }).length : 0;
     var el = document.getElementById('clean-state');
-    // ⚠ 로그인 세션·보안 토큰은 HttpOnly 라 **이 스크립트에 애초에 안 보인다**.
-    //    그래서 '정리 전 0개' 같은 숫자는 오해를 부른다 — 누가 무엇을 지웠는지 나눠서 적는다.
-    var lines = ['서버가 만료시킴 : 로그인 세션(pulse.sid) · 보안 토큰(pulse-csrf)'];
-    lines.push('스크립트가 정리 : 일반 쿠키 ' + before + '개');
-    if (left === 0) {
-        lines.push('지금 남은 쿠키 : 0개 — 깨끗합니다');
-        el.style.color = 'var(--c-green)';
-    } else {
-        lines.push('지금 남은 쿠키 : ' + left + '개 — 보안 서비스(Cloudflare)가 바로 다시 심은 것일 수 있습니다. 정상입니다');
-        el.style.color = 'var(--c-yellow)';
-    }
+    var lines = [
+        '서버가 만료 : 로그인 세션 · 보안 토큰',
+        '브라우저 캐시 : 비움 (Ctrl+Shift+R 과 같은 효과)',
+        KEEP ? '장치·재생 설정 : 유지' : '장치·재생 설정 : 초기화',
+        '스크립트 정리 : 일반 쿠키 ' + before + '개 → 남은 ' + left + '개',
+    ];
     el.textContent = '';
-    lines.forEach(function (t) {
-        var d = document.createElement('div');
-        d.textContent = t;
-        el.appendChild(d);
+    lines.forEach(function (t) { var d = document.createElement('div'); d.textContent = t; el.appendChild(d); });
+    el.style.color = left === 0 ? 'var(--c-green)' : 'var(--c-yellow)';
+
+    // ⑤ 강제 새로고침 — 쿼리를 붙여 **캐시된 HTML 이 아닌** 새 응답을 받게 한다.
+    //    replace 라 뒤로가기로 이 페이지에 돌아오지 않는다.
+    var target = '/?fresh=' + Date.now();
+    document.getElementById('go-now').addEventListener('click', function (e) {
+        e.preventDefault(); location.replace(target);
+    });
+    Promise.all(jobs).then(function () {
+        setTimeout(function () { location.replace(target); }, 1800);
     });
 })();
 </script>

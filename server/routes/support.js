@@ -68,7 +68,11 @@ router.get('/cookies', (req, res) => {
 });
 
 router.post('/cookies', express.urlencoded({ extended: false }), (req, res) => {
-    const alsoStorage = req.body.storage === '1';     // 장치 설정 등 로컬 저장까지 지울지
+    // 기본은 '전부' 다. 이 버튼을 누르는 사람은 이미 뭔가 깨진 상태이고,
+    //   2026-11-12 제보처럼 **캐시에 남은 옛 JS** 가 범인인 경우가 많다
+    //   (카메라 송출 불가 → 사이트 데이터 삭제 + Ctrl+Shift+R 로만 정상화).
+    // 'keep=1' 이면 장치·재생 설정(localStorage)만 남긴다.
+    const keepSettings = req.body.keep === '1';
 
     const finish = () => {
         // ② 우리가 아는 쿠키를 명시적으로 만료. 설정이 다르면 브라우저가 다른 쿠키로 보므로
@@ -77,9 +81,14 @@ router.post('/cookies', express.urlencoded({ extended: false }), (req, res) => {
         res.clearCookie('pulse.sid', opts);
         res.clearCookie('pulse-csrf', opts);
 
-        // ① 표준 헤더 (HTTPS 전용). 'cookies' 는 이 출처의 쿠키 전부.
-        res.set('Clear-Site-Data', alsoStorage ? '"cookies", "storage"' : '"cookies"');
-        res.render('support/cookies_done', { title: '쿠키 정리 완료', alsoStorage });
+        // ① 표준 헤더 (HTTPS 전용).
+        //    'cache' 가 Ctrl+Shift+R 의 역할을 한다 — 한 번 비우는 것이라 더 확실하다.
+        //    'storage' 는 localStorage(장치 선택 등) · IndexedDB · Cache API.
+        const parts = keepSettings ? ['"cookies"', '"cache"'] : ['"cookies"', '"storage"', '"cache"'];
+        res.set('Clear-Site-Data', parts.join(', '));
+        // 이 응답 자체가 캐시에 남으면 안 된다
+        res.set('Cache-Control', 'no-store, max-age=0');
+        res.render('support/cookies_done', { title: '정리 완료', keepSettings });
     };
 
     if (req.session) req.session.destroy(() => finish());
