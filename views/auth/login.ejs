@@ -20,6 +20,24 @@
 
     <div class="auth-foot">
         <a href="/auth/forgot">비밀번호 찾기</a> · 계정이 없으신가요? <a href="/auth/register">회원가입</a><br>
-        <span class="text-faint mono" style="font-size:11px; margin-top: 8px; display:inline-block;">테스트: test@pulse.dev / 1234</span>
+        <%# 테스트 계정 안내 — ⚠ 운영 공개 전 **반드시 제거**. PROJECT_STATUS §8 에 등록해 뒀다.
+            실제 가입자·작업자 계정은 여기 적지 않는다(개인정보·권한). 시드 데모 계정만. %>
+        <details class="mono" style="margin-top:10px; text-align:left; font-size:11px;" open>
+            <summary class="text-faint" style="cursor:pointer;">테스트 계정 (비밀번호 공통 <strong>1234</strong>)</summary>
+            <table style="margin-top:8px; width:100%; border-collapse:collapse; color:var(--tx-2);">
+                <tr><td style="padding:2px 8px 2px 0; color:var(--tx-3);">일반</td>
+                    <td style="padding:2px 0;">test@pulse.dev</td><td class="text-faint">테스터</td></tr>
+                <tr><td style="padding:2px 8px 2px 0; color:var(--tx-3);">스트리머</td>
+                    <td style="padding:2px 0;">sophia@pulse.dev</td><td class="text-faint">소피아</td></tr>
+                <tr><td></td><td style="padding:2px 0;">aimee@pulse.dev</td><td class="text-faint">에이미</td></tr>
+                <tr><td></td><td style="padding:2px 0;">luna@pulse.dev</td><td class="text-faint">루나</td></tr>
+                <tr><td></td><td style="padding:2px 0;">jenny@pulse.dev</td><td class="text-faint">제니</td></tr>
+                <tr><td></td><td style="padding:2px 0;">aria@pulse.dev</td><td class="text-faint">아리아</td></tr>
+                <tr><td style="padding:2px 8px 2px 0; color:var(--c-pink);">관리자</td>
+                    <td style="padding:2px 0;">admin@pulse.dev</td><td class="text-faint">관리자</td></tr>
+                <tr><td style="padding:2px 8px 2px 0; color:var(--c-pink);">마스터</td>
+                    <td style="padding:2px 0;">1111</td><td class="text-faint">마스터 · 비번 <strong>2222</strong></td></tr>
+            </table>
+        </details>
     </div>
 </section>

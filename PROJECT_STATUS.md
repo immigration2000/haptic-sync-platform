@@ -432,6 +432,8 @@ out = clamp(outMin, outMax,  center + (pos - srcCenter) * (1 + gain))
       퍼센트 인코딩·`..`·대문자 우회 차단. 통과 요청은 기존 static 이 서빙하므로 Range·ETag 불변. `patches/2026-10-10.md`
 - [ ] 미디어 **구독·구매 권한 검사 + 서명 URL** — 위 게이트는 "로그인 여부"까지만 본다. 로그인 사용자는 URL 로
       받을 수 있고 링크 공유도 막지 못한다. 짧은 만료 서명 URL 이 필요(아래 AWS 항목과 동일 요구). `publicUrl()` 경유 유지
+- [ ] ⚠ **(운영 전) 로그인 페이지의 테스트 계정 안내 제거** — `views/auth/login.ejs`.
+      데모 계정 7개 + **관리자·마스터 계정**이 비밀번호와 함께 노출돼 있다. 공개 전환 시 최우선 제거
 - [ ] (운영 전) CSP nonce 도입 — 인라인 스크립트 多로 현재 비활성
 - [ ] (운영 전) 실 성인인증·실 PG 연동 — `services/{age_verification,payment_gateway}.js` 스텁 존재,
       config `provider` 플래그만 바꾸면 붙는 구조. **별도 모듈로 구현 후 연결** 방침
