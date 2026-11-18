@@ -53,6 +53,23 @@
                         <div class="pulse-pop-divider"></div>
                         <button id="pulse-btn-disconnect" class="pulse-btn-ghost">연결 해제</button>
                     </div>
+
+                    <%# 입력 기기 — 기기→브라우저(notify)를 받아 **출력 기기로 그대로 복사**한다.
+                        폰 1대에 남성용·여성용을 같이 붙여 서로 연동하는 구성 (2026-11-18). %>
+                    <div class="pulse-pop-section" id="pulse-pop-input">
+                        <div class="pulse-pop-divider"></div>
+                        <div class="pulse-pop-title">입력 기기 (연동)</div>
+                        <p class="pulse-pop-desc">두 번째 기기를 붙이면 그 기기가 보내는 신호를 출력 기기로 그대로 전달합니다.</p>
+                        <div class="pulse-pop-row"><span class="pulse-k">상태</span><span class="pulse-v" id="pulse-in-state">미연결</span></div>
+                        <div class="pulse-pop-row pulse-hidden" id="pulse-in-rxrow"><span class="pulse-k">수신</span><span class="pulse-v" id="pulse-in-rx">0</span></div>
+                        <label class="pulse-pop-row" style="cursor:pointer;">
+                            <span class="pulse-k">복사</span>
+                            <span class="pulse-v"><input type="checkbox" id="pulse-in-relay" checked> 출력으로 전달</span>
+                        </label>
+                        <button id="pulse-btn-connect-in" class="pulse-btn-secondary">📡 입력 기기 연결</button>
+                        <button id="pulse-btn-disconnect-in" class="pulse-btn-ghost pulse-hidden">입력 해제</button>
+                        <p class="pulse-pop-hint" id="pulse-in-hint"></p>
+                    </div>
                 </div>
             </div>
 

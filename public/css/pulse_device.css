@@ -84,6 +84,9 @@
 
 .pulse-pop-section { display: flex; flex-direction: column; gap: 12px; }
 .pulse-pop-section.pulse-hidden { display: none; }
+/* 유틸리티로도 쓴다 — 섹션 말고 버튼·행에도 붙이므로 요소를 안 가린다(2026-11-18).
+   위 규칙만 있을 때 .pulse-btn-ghost.pulse-hidden 이 그대로 보이는 버그가 있었다. */
+.pulse-hidden { display: none !important; }
 
 .pulse-pop-title {
     font-size: 15px;

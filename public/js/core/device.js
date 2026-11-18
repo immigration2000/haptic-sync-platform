@@ -51,7 +51,29 @@
         btChar: null,
     };
     const listeners = new Set();
-	
+
+    // ─── 입력(두 번째 BLE) 기기 ──────────────────────────────
+    // 출력 상태(state)와 **완전히 분리**해 둔다. 기존 코드 전부가 state 만 보고 동작하므로
+    // 여기를 건드리지 않는 한 기존 동작이 바뀌지 않는다.
+    const inState = {
+        connected: false,
+        device: null,
+        rxChar: null,
+        label: '',
+        rxCount: 0,        // 수신한 '줄' 수
+        lastLine: '',
+        lastError: '',
+        buf: '',           // 줄 조립 버퍼
+    };
+    let relayOn = true;
+    const inputListeners = new Set();
+
+    // 릴레이 최소 간격(ms). 입력 기기가 초당 수십~수백 줄을 쏟으면 BLE 쓰기 큐가 무한정 밀린다.
+    // 위치 프로토콜이라 **지나간 값은 의미가 없다** → 간격 안에서는 마지막 줄만 보낸다.
+    // (axis_sender 가 UI 입력에 쓰는 것과 같은 원칙)
+    const RELAY_MIN_MS = 20;
+    let relayLastAt = 0, relayPending = null, relayTimer = null, relayDropped = 0;
+
 	let bleWriteQueue = Promise.resolve();
 
     function notify() {
@@ -70,6 +92,19 @@
             portLabel:          state.portLabel,
             deviceInfo:         state.deviceInfo,   // 기기 응답 (있으면 통신 정상 = baud 맞음)
             lastError:          state.lastError,
+            input:              getInputStatus(),   // 입력 기기 요약 (헤더 UI가 같이 그린다)
+        };
+    }
+
+    function getInputStatus() {
+        return {
+            connected: inState.connected,
+            label:     inState.label,
+            rxCount:   inState.rxCount,
+            lastLine:  inState.lastLine,
+            lastError: inState.lastError,
+            relay:     relayOn,
+            dropped:   relayDropped,
         };
     }
 
@@ -239,6 +274,156 @@
         for (const c of drv().init) { await send(c); }
     }
 
+    // ─── 입력 BLE 기기 (기기 → 브라우저, notify) ──────────────
+    //
+    // 왜 따로 있나: 폰 1대에 **남성용·여성용 기기를 동시에** 붙이고, 한쪽이 보내는 신호를
+    //   다른 쪽으로 흘려주기 위한 것이다(2026-11-18 하드웨어 작업자 요청).
+    //   Web Bluetooth 는 한 페이지에서 여러 기기와 GATT 연결을 유지할 수 있으므로
+    //   출력 연결(state)은 그대로 두고 **두 번째 연결**을 만든다.
+
+    /** 서비스 안에서 rx(notify) 캐릭터리스틱 찾기. 드라이버에 UUID 가 있으면 그것, 없으면 자동 탐색. */
+    async function findRxChar(service, ble) {
+        if (ble.rxChar) {
+            return await service.getCharacteristic(ble.rxChar);
+        }
+        // UUID 를 모를 때 — 서비스의 캐릭터리스틱을 훑어 notify 되는 것을 쓴다.
+        // 작업자가 UUID 를 확정할 수 있게 **전체 목록을 콘솔에 찍는다.**
+        const list = await service.getCharacteristics();
+        const dump = list.map((c) => {
+            const p = c.properties || {};
+            const f = ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate']
+                .filter((k) => p[k]).join(',');
+            return `${c.uuid} [${f}]`;
+        });
+        console.log('[PulseDevice] 서비스 캐릭터리스틱 목록:\n  ' + dump.join('\n  '));
+        const rx = list.find((c) => c.properties && (c.properties.notify || c.properties.indicate));
+        if (!rx) throw new Error('이 기기에서 notify 되는 캐릭터리스틱을 찾지 못했습니다');
+        console.log('[PulseDevice] 입력 캐릭터리스틱 자동 선택: ' + rx.uuid);
+        return rx;
+    }
+
+    /**
+     * 수신 바이트 → 줄 단위로 자른다.
+     * ⚠ BLE notify 는 MTU(보통 20바이트) 단위로 쪼개져 온다. 한 줄이 여러 알림에 걸쳐 오거나
+     *   한 알림에 여러 줄이 들어올 수 있다 → **버퍼에 모아 \n 기준으로 자르는 것이 필수**다.
+     *   (줄바꿈이 끝내 안 오면 아무것도 내보내지 않는다. 버퍼만 상한으로 잘라 메모리를 지킨다)
+     */
+    function onRxValue(ev) {
+        let text = '';
+        try {
+            const v = ev.target.value;                    // DataView
+            text = new TextDecoder().decode(v);
+        } catch (_) { return; }
+
+        inState.buf += text;
+        if (inState.buf.length > 512) inState.buf = inState.buf.slice(-512);
+
+        let i;
+        while ((i = inState.buf.search(/[\r\n]/)) >= 0) {
+            const line = inState.buf.slice(0, i).trim();
+            inState.buf = inState.buf.slice(i + 1);
+            if (!line) continue;
+            inState.rxCount++;
+            inState.lastLine = line;
+            for (const cb of inputListeners) { try { cb(line); } catch (_) {} }
+            relay(line);
+            if (inState.rxCount <= 5) console.log('[PulseDevice] 입력 ← ' + line);
+        }
+        if (inState.rxCount % 10 === 0) notify();
+    }
+
+    /** 입력 → 출력 복사. 내용은 **그대로** 보내되, 간격만 지켜 큐가 밀리지 않게 한다. */
+    function relay(line) {
+        if (!relayOn || !state.connected) return;
+        const now = Date.now();
+        const wait = RELAY_MIN_MS - (now - relayLastAt);
+        if (wait <= 0) {
+            relayLastAt = now;
+            send(line);
+            return;
+        }
+        // 간격 안이면 **마지막 줄만** 남긴다 — 위치 명령이라 지나간 값은 버려도 된다
+        if (relayPending !== null) relayDropped++;
+        relayPending = line;
+        if (!relayTimer) {
+            relayTimer = setTimeout(() => {
+                relayTimer = null;
+                const l = relayPending; relayPending = null;
+                if (l !== null && relayOn && state.connected) { relayLastAt = Date.now(); send(l); }
+            }, wait);
+        }
+    }
+
+    async function connectBluetoothInput() {
+        if (!('bluetooth' in navigator)) {
+            throw new Error('Web Bluetooth 미지원 (Chrome Android, Chrome/Edge 데스크탑 필요)');
+        }
+        if (inState.connected) return;
+
+        const ble = drv().ble;
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [ble.service],
+        });
+
+        // ⚠ 출력과 **같은 기기**를 입력으로 붙이면 보낸 값이 그대로 되돌아와 무한 반복이 된다.
+        //   (물리 액추에이터라 실제로 위험하다) 요청 자체가 '2대 연결' 이므로 막는다.
+        if (state.btDevice && device.id && state.btDevice.id === device.id) {
+            throw new Error('출력 기기와 같은 기기입니다. 입력은 다른 기기를 선택하세요');
+        }
+
+        device.addEventListener('gattserverdisconnected', () => {
+            if (inState.device === device) resetInput('연결이 끊겼습니다');
+        });
+
+        const server  = await device.gatt.connect();
+        const service = await server.getPrimaryService(ble.service);
+        const rxChar  = await findRxChar(service, ble);
+
+        await rxChar.startNotifications();
+        rxChar.addEventListener('characteristicvaluechanged', onRxValue);
+
+        inState.device    = device;
+        inState.rxChar    = rxChar;
+        inState.connected = true;
+        inState.label     = `BLE · ${device.name || 'Unknown'}`;
+        inState.lastError = '';
+        inState.buf       = '';
+        notify();
+    }
+
+    function resetInput(err) {
+        if (relayTimer) { clearTimeout(relayTimer); relayTimer = null; }
+        relayPending = null;
+        inState.device = null;
+        inState.rxChar = null;
+        inState.connected = false;
+        inState.label = '';
+        inState.buf = '';
+        inState.lastError = err || '';
+        notify();
+    }
+
+    async function disconnectInput() {
+        try {
+            if (inState.rxChar) {
+                inState.rxChar.removeEventListener('characteristicvaluechanged', onRxValue);
+                await bounded(inState.rxChar.stopNotifications(), 500);
+            }
+            if (inState.device && inState.device.gatt && inState.device.gatt.connected) {
+                try { inState.device.gatt.disconnect(); } catch (_) {}
+            }
+        } finally {
+            resetInput('');
+        }
+    }
+
+    function setRelay(on) {
+        relayOn = !!on;
+        if (!relayOn && relayTimer) { clearTimeout(relayTimer); relayTimer = null; relayPending = null; }
+        notify();
+    }
+
     // 해제 경로 전용 시간 제한.
     // 전송에는 시간 제한을 두지 않지만(느린 기기를 끊지 않기 위해),
     // **정리는 반드시 끝나야 한다.** 멈춘 쓰기가 있으면 close()가 영영 안 끝나기 때문이다.
@@ -400,6 +585,13 @@
         disconnect,
         send,
         sendRemote,
+        // 입력 기기 (BLE notify → 출력으로 복사)
+        connectBluetoothInput,
+        disconnectInput,
+        setRelay,
+        getInputStatus,
+        get inputConnected() { return inState.connected; },
+        onInput(cb) { inputListeners.add(cb); return () => inputListeners.delete(cb); },
         get rejectedCount() { return rejectCount; },
         get isConnected() { return state.connected; },
         get kind()        { return state.kind; },

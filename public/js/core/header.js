@@ -17,6 +17,14 @@
     const portLbl = $('pulse-port');
     const sentLbl = $('pulse-sent');
     const hintLbl = $('pulse-pop-hint');
+    // 입력 기기 (두 번째 BLE — 받은 신호를 출력으로 복사)
+    const inState   = $('pulse-in-state');
+    const inRxRow   = $('pulse-in-rxrow');
+    const inRx      = $('pulse-in-rx');
+    const inRelay   = $('pulse-in-relay');
+    const btnInConn = $('pulse-btn-connect-in');
+    const btnInDisc = $('pulse-btn-disconnect-in');
+    const inHint    = $('pulse-in-hint');
 
     function setOpen(open) {
         popover.hidden = !open;
@@ -43,7 +51,43 @@
     btnBLE && btnBLE.addEventListener('click', () => tryConn('bluetooth'));
     btnDisc && btnDisc.addEventListener('click', () => window.PulseDevice.disconnect());
 
+    btnInConn && btnInConn.addEventListener('click', async () => {
+        inHint.textContent = '';
+        try {
+            await window.PulseDevice.connectBluetoothInput();
+        } catch (e) {
+            if (e && e.name === 'NotFoundError') return;      // 기기 선택 창을 닫은 것 — 오류 아님
+            inHint.textContent = (e && e.message) ? e.message : '연결 실패';
+        }
+    });
+    btnInDisc && btnInDisc.addEventListener('click', () => window.PulseDevice.disconnectInput());
+    inRelay && inRelay.addEventListener('change', () => window.PulseDevice.setRelay(inRelay.checked));
+
+    function renderInput(st) {
+        if (!inState) return;
+        const i = st.input || { connected: false, rxCount: 0, relay: true };
+        if (i.connected) {
+            inState.textContent = i.label || '연결됨';
+            inState.className = 'pulse-v pulse-ok';
+            inRxRow.classList.remove('pulse-hidden');
+            // 마지막 줄까지 보여준다 — 신호가 들어오는지 눈으로 확인하는 게 진단의 전부다
+            inRx.textContent = i.rxCount.toLocaleString() + '줄'
+                + (i.lastLine ? '  ← ' + String(i.lastLine).slice(0, 18) : '')
+                + (i.dropped ? '  (생략 ' + i.dropped + ')' : '');
+            btnInConn.classList.add('pulse-hidden');
+            btnInDisc.classList.remove('pulse-hidden');
+        } else {
+            inState.textContent = i.lastError || '미연결';
+            inState.className = 'pulse-v';
+            inRxRow.classList.add('pulse-hidden');
+            btnInConn.classList.remove('pulse-hidden');
+            btnInDisc.classList.add('pulse-hidden');
+        }
+        if (inRelay) inRelay.checked = !!i.relay;
+    }
+
     function render(status) {
+        renderInput(status);
         if (status.connected) {
             btn.classList.add('connected');
             label.textContent = '연결됨';

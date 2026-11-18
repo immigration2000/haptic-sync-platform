@@ -12,7 +12,11 @@
  *   {
  *     id, name,
  *     serialBaud,                       // USB 시리얼 통신속도
- *     ble: { service, txChar, write },  // BLE 서비스/쓰기 캐릭터리스틱 UUID, write: 'withoutResponse'|'withResponse'
+ *     ble: { service, txChar, rxChar, write },
+ *                                       // txChar: 브라우저→기기 (write)
+ *                                       // rxChar: 기기→브라우저 (notify). **생략 가능** —
+ *                                       //   비우면 서비스 안에서 notify 되는 캐릭터리스틱을 자동 탐색
+ *                                       // write: 'withoutResponse'|'withResponse'
  *     init: [캐노니컬 명령...],          // 연결 직후 전송
  *     stop, idle,                       // 정지 명령 / 안전위치 명령 (캐노니컬)
  *     encode(cmd) -> Uint8Array,        // 캐노니컬 → 기기 바이트
@@ -56,6 +60,10 @@
         ble: {
 			service: '2d10a187-a483-4a60-8ca2-59b7d1704146', txChar: '216f3732-6f41-4fde-98fa-e3033a2ace80',	// ESP32
 		//	service: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', txChar: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',	// NUS; Nordic UART Service		
+            // 입력(기기→브라우저) 캐릭터리스틱. ESP32 쪽 UUID 를 아직 못 받아 비워 둔다 →
+            // 연결 시 notify 가능한 것을 자동 탐색한다(콘솔에 전체 목록을 찍는다).
+            // 확정되면 여기 적는 쪽이 빠르고 확실하다. NUS 라면 6e400003-b5a3-f393-e0a9-e50e24dcca9e.
+            rxChar:  null,
             write:   'withoutResponse',
         },
         init: ['D1', 'L050I500'],
