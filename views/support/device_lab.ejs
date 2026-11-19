@@ -1,0 +1,240 @@
+<%# 기기 진단 창 — 실기기 테스트용 개발자 화면 (2026-11-19)
+    · 이 창에서 직접 기기를 붙여 쓸 수도 있고,
+    · 다른 탭(플레이어·통화 등)에서 일어나는 입출력을 BroadcastChannel 로 받아 구경만 할 수도 있다.
+    ⚠ 새 창은 별도 자바스크립트 컨텍스트라 **기기 연결 자체는 공유되지 않는다**(브라우저 제약). %>
+<section class="container" style="max-width:1100px;">
+    <div class="flex items-center gap-3 mb-3" style="justify-content:space-between; flex-wrap:wrap;">
+        <h1 class="page-title" style="margin:0;">🔬 기기 진단</h1>
+        <span class="text-faint mono" style="font-size:11px;">입력·출력·생략·거부·오류를 한 줄기로 표시</span>
+    </div>
+
+    <!-- 상태 -->
+    <div class="flex gap-3 mb-4" style="flex-wrap:wrap;">
+        <div class="card card-body" style="flex:1; min-width:280px;">
+            <div class="panel-title">출력 기기 (브라우저 → 기기)</div>
+            <div class="mono" style="font-size:12px; display:grid; grid-template-columns:70px 1fr; gap:4px 10px;">
+                <span class="text-faint">상태</span><span id="o-state">미연결</span>
+                <span class="text-faint">기기</span><span id="o-label">—</span>
+                <span class="text-faint">송신</span><span id="o-sent">0</span>
+                <span class="text-faint">응답</span><span id="o-info">—</span>
+                <span class="text-faint">오류</span><span id="o-err">—</span>
+            </div>
+            <div class="flex gap-2 mt-3" style="flex-wrap:wrap;">
+                <button id="b-ble" class="btn btn-secondary btn-sm">📡 BLE 연결</button>
+                <button id="b-usb" class="btn btn-secondary btn-sm">🔌 USB 연결</button>
+                <button id="b-out-dc" class="btn btn-ghost btn-sm">해제</button>
+            </div>
+        </div>
+
+        <div class="card card-body" style="flex:1; min-width:280px;">
+            <div class="panel-title">입력 기기 (기기 → 브라우저)</div>
+            <div class="mono" style="font-size:12px; display:grid; grid-template-columns:70px 1fr; gap:4px 10px;">
+                <span class="text-faint">상태</span><span id="i-state">미연결</span>
+                <span class="text-faint">기기</span><span id="i-label">—</span>
+                <span class="text-faint">수신</span><span id="i-rx">0</span>
+                <span class="text-faint">생략</span><span id="i-drop">0</span>
+                <span class="text-faint">마지막</span><span id="i-last">—</span>
+            </div>
+            <div class="flex gap-2 mt-3" style="flex-wrap:wrap; align-items:center;">
+                <button id="b-in" class="btn btn-secondary btn-sm">📡 입력 연결</button>
+                <button id="b-in-dc" class="btn btn-ghost btn-sm">해제</button>
+                <label style="font-size:12px; cursor:pointer;">
+                    <input type="checkbox" id="b-relay" checked> 출력으로 복사
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- 수동 전송 -->
+    <div class="card card-body mb-4">
+        <div class="flex gap-2" style="flex-wrap:wrap; align-items:center;">
+            <input id="m-cmd" class="form-input mono" style="flex:1; min-width:220px; font-size:12px;"
+                   placeholder="L050I500  (출력 기기로 직접 전송)" value="L050I500">
+            <button id="b-send" class="btn btn-primary btn-sm">전송</button>
+            <button id="b-send-remote" class="btn btn-secondary btn-sm" title="원격 검증기를 거쳐 전송 — 거부되는지 확인용">검증 거쳐 전송</button>
+            <span class="text-faint" style="font-size:11px;">※ '검증 거쳐 전송'은 원격(통화·방송) 경로와 같은 규칙입니다</span>
+        </div>
+    </div>
+
+    <!-- 로그 -->
+    <div class="card card-body">
+        <div class="flex items-center gap-2 mb-3" style="justify-content:space-between; flex-wrap:wrap;">
+            <div class="flex gap-2" style="flex-wrap:wrap;" id="filters">
+                <label class="mono" style="font-size:11px;"><input type="checkbox" data-f="in" checked> 수신</label>
+                <label class="mono" style="font-size:11px;"><input type="checkbox" data-f="out" checked> 송신</label>
+                <label class="mono" style="font-size:11px;"><input type="checkbox" data-f="relay" checked> 복사</label>
+                <label class="mono" style="font-size:11px;"><input type="checkbox" data-f="drop" checked> 생략</label>
+                <label class="mono" style="font-size:11px;"><input type="checkbox" data-f="reject" checked> 거부</label>
+                <label class="mono" style="font-size:11px;"><input type="checkbox" data-f="err" checked> 오류</label>
+                <label class="mono" style="font-size:11px;"><input type="checkbox" data-f="info" checked> 정보</label>
+            </div>
+            <div class="flex gap-2">
+                <button id="b-pause" class="btn btn-ghost btn-sm">⏸ 멈춤</button>
+                <button id="b-clear" class="btn btn-ghost btn-sm">지우기</button>
+                <button id="b-copy" class="btn btn-secondary btn-sm">복사</button>
+                <button id="b-save" class="btn btn-secondary btn-sm">파일로 저장</button>
+            </div>
+        </div>
+        <div id="log" class="mono" style="height:min(52vh,520px); overflow:auto; background:#000;
+             border-radius:8px; padding:10px; font-size:11.5px; line-height:1.65;"></div>
+        <p class="text-faint mt-2" style="font-size:11px;">
+            다른 탭(플레이어·통화 등)에서 일어나는 입출력도 여기로 들어옵니다 —
+            <strong>이 창을 연 시점 이후</strong>의 것만 보입니다.
+            기기 연결 자체는 탭마다 따로입니다(브라우저 제약).
+        </p>
+    </div>
+</section>
+
+<script>
+(function () {
+    var D = window.PulseDevice;
+    var $ = function (id) { return document.getElementById(id); };
+    var logEl = $('log');
+    var paused = false, rows = [];
+    var MAX_ROWS = 800;
+
+    var COLOR = {
+        in:     '#5EFFB0',   // 기기 → 브라우저
+        out:    '#7DB7FF',   // 브라우저 → 기기
+        relay:  '#B395FF',   // 입력에서 복사되어 나간 것
+        drop:   '#FFC46B',   // 보내지 않고 버린 것
+        reject: '#FF6B8A',   // 검증에서 거부
+        err:    '#FF4B4B',
+        info:   '#8A8A99',
+    };
+    var LABEL = { in:'수신', out:'송신', relay:'복사', drop:'생략', reject:'거부', err:'오류', info:'정보' };
+
+    function shown(dir) {
+        var cb = document.querySelector('#filters input[data-f="' + dir + '"]');
+        return !cb || cb.checked;
+    }
+    function hhmmss(ts) {
+        var d = new Date(ts);
+        return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2)
+             + '.' + ('00'+d.getMilliseconds()).slice(-3);
+    }
+    function addRow(ev, fromOther) {
+        rows.push(ev);
+        if (rows.length > MAX_ROWS) rows.shift();
+        if (paused) return;
+        render(ev, fromOther);
+        while (logEl.children.length > MAX_ROWS) logEl.removeChild(logEl.firstChild);
+    }
+    function render(ev, fromOther) {
+        if (!shown(ev.dir)) return;
+        var atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 30;
+        var line = document.createElement('div');
+        var c = COLOR[ev.dir] || '#ccc';
+        // textContent 로만 넣는다 — 기기에서 온 문자열을 그대로 HTML 로 두면 안 된다
+        var t = document.createElement('span'); t.style.color = '#55555f'; t.textContent = hhmmss(ev.ts) + ' ';
+        var k = document.createElement('span'); k.style.color = c; k.style.fontWeight = '700';
+        k.textContent = (LABEL[ev.dir] || ev.dir).padEnd(3, ' ') + ' ';
+        var b = document.createElement('span'); b.style.color = c; b.textContent = ev.text;
+        var m = document.createElement('span'); m.style.color = '#6b6b78';
+        m.textContent = (ev.meta ? '   // ' + ev.meta : '') + (fromOther ? '   [다른 탭]' : '');
+        line.appendChild(t); line.appendChild(k); line.appendChild(b); line.appendChild(m);
+        logEl.appendChild(line);
+        if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+    }
+    function redraw() {
+        logEl.textContent = '';
+        rows.forEach(function (ev) { render(ev, ev._other); });
+    }
+
+    // ── 이 창에서 일어나는 일 ──
+    if (D && D.onLog) {
+        D.getLog().forEach(function (ev) { rows.push(ev); });
+        redraw();
+        D.onLog(function (ev) { addRow(ev, false); });
+    }
+    // ── 다른 탭에서 일어나는 일 ──
+    try {
+        if ('BroadcastChannel' in window) {
+            var ch = new BroadcastChannel('pulse_devlog');
+            ch.onmessage = function (e) {
+                var ev = e.data; if (!ev || !ev.dir) return;
+                // 같은 문서의 PulseDevice 가 보낸 것은 onLog 로 이미 받았다 — 중복 제거
+                if (D && ev.src && ev.src === D.ctxId) return;
+                ev._other = true; addRow(ev, true);
+            };
+        }
+    } catch (_) {}
+
+    // ── 상태 ──
+    function fmt(v) { return (v === '' || v == null) ? '—' : v; }
+    function renderStatus(st) {
+        $('o-state').textContent = st.connected ? '● 연결됨' : '미연결';
+        $('o-state').style.color = st.connected ? 'var(--c-green)' : 'var(--tx-2)';
+        $('o-label').textContent = fmt(st.portLabel);
+        $('o-sent').textContent  = (st.sentCount || 0).toLocaleString();
+        $('o-info').textContent  = fmt(st.deviceInfo);
+        $('o-err').textContent   = fmt(st.lastError);
+        var i = st.input || {};
+        $('i-state').textContent = i.connected ? '● 연결됨' : fmt(i.lastError) === '—' ? '미연결' : i.lastError;
+        $('i-state').style.color = i.connected ? 'var(--c-green)' : 'var(--tx-2)';
+        $('i-label').textContent = fmt(i.label);
+        $('i-rx').textContent    = (i.rxCount || 0).toLocaleString();
+        $('i-drop').textContent  = (i.dropped || 0).toLocaleString();
+        $('i-last').textContent  = fmt(i.lastLine);
+        $('b-relay').checked     = !!i.relay;
+    }
+    if (D) { renderStatus(D.getStatus()); D.onChange(renderStatus); }
+
+    // ── 버튼 ──
+    function guard(fn) {
+        return async function () {
+            try { await fn(); }
+            catch (e) {
+                if (e && e.name === 'NotFoundError') return;        // 선택 창을 닫은 것
+                if (D && D.devLog) D.devLog('err', (e && e.message) || String(e), '조작');
+            }
+        };
+    }
+    $('b-ble').addEventListener('click', guard(function () { return D.connectBluetooth(); }));
+    $('b-usb').addEventListener('click', guard(function () { return D.connectSerial(); }));
+    $('b-out-dc').addEventListener('click', guard(function () { return D.disconnect(); }));
+    $('b-in').addEventListener('click', guard(function () { return D.connectBluetoothInput(); }));
+    $('b-in-dc').addEventListener('click', guard(function () { return D.disconnectInput(); }));
+    $('b-relay').addEventListener('change', function () { D.setRelay($('b-relay').checked); });
+
+    $('b-send').addEventListener('click', function () {
+        var c = $('m-cmd').value.trim(); if (!c) return;
+        if (!D.send(c)) D.devLog('err', c, '전송 실패 — 출력 미연결?');
+    });
+    $('b-send-remote').addEventListener('click', function () {
+        var c = $('m-cmd').value.trim(); if (!c) return;
+        var n = D.sendRemote(c);
+        D.devLog('info', c, n ? ('검증 통과 — 토큰 ' + n + '개') : '검증기에서 거부됨');
+    });
+
+    $('b-pause').addEventListener('click', function () {
+        paused = !paused;
+        $('b-pause').textContent = paused ? '▶ 계속' : '⏸ 멈춤';
+        if (!paused) redraw();
+    });
+    $('b-clear').addEventListener('click', function () { rows = []; logEl.textContent = ''; if (D.clearLog) D.clearLog(); });
+    document.querySelectorAll('#filters input').forEach(function (cb) { cb.addEventListener('change', redraw); });
+
+    function asText() {
+        return rows.map(function (ev) {
+            return hhmmss(ev.ts) + '\t' + (LABEL[ev.dir] || ev.dir) + '\t' + ev.text
+                 + (ev.meta ? '\t// ' + ev.meta : '') + (ev._other ? '\t[다른 탭]' : '');
+        }).join('\n');
+    }
+    $('b-copy').addEventListener('click', async function () {
+        try { await navigator.clipboard.writeText(asText()); $('b-copy').textContent = '복사됨'; }
+        catch (e) { $('b-copy').textContent = '복사 실패'; }
+        setTimeout(function () { $('b-copy').textContent = '복사'; }, 1200);
+    });
+    $('b-save').addEventListener('click', function () {
+        var blob = new Blob([asText()], { type: 'text/plain;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'device-log-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.txt';
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    });
+
+    if (D && D.devLog) D.devLog('info', '진단 창 열림');
+})();
+</script>

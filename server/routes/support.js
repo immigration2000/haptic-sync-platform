@@ -95,6 +95,12 @@ router.post('/cookies', express.urlencoded({ extended: false }), (req, res) => {
     else finish();
 });
 
+// 기기 진단 창 — 실기기 테스트용 개발자 화면.
+// 로그인 요구 안 함: 작업자가 로그인 없이도 기기만 붙여 확인할 수 있어야 한다.
+router.get('/device-lab', (req, res) => {
+    res.render('support/device_lab', { title: '기기 진단' });
+});
+
 // FAQ / 디바이스 가이드
 router.get('/faq',          (req, res) => res.render('support/faq',    { title: 'FAQ' }));
 router.get('/device-guide', (req, res) => res.render('support/device', { title: '디바이스 연결 가이드' }));

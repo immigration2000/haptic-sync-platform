@@ -68,6 +68,36 @@
     let relayOn = true;
     const inputListeners = new Set();
 
+    // ─── 진단 로그 버스 ──────────────────────────────────────
+    // 기기 입출력에서 일어나는 **모든 일**을 한 줄기로 모은다 — 실기기 디버깅용(2026-11-19).
+    //   in     기기에서 받은 줄
+    //   out    기기로 보낸 줄 (앱 어디서 보냈든)
+    //   relay  입력 → 출력 복사로 나간 줄
+    //   drop   간격 제한으로 **보내지 않고 버린** 줄
+    //   reject 원격 명령 검증에서 **거부한** 줄
+    //   err    전송 실패
+    //   info   연결·해제·캐릭터리스틱 목록 등
+    // ⚠ 새 창은 **별도 자바스크립트 컨텍스트**라 이 버퍼를 공유하지 못한다.
+    //   그래서 BroadcastChannel 로도 뿌려 다른 탭의 진단 창이 실시간으로 볼 수 있게 한다.
+    //   (BroadcastChannel 은 보낸 쪽에는 되돌아오지 않으므로 메아리 걱정이 없다)
+    // 이 자바스크립트 컨텍스트(탭/창)의 식별자.
+    // ⚠ BroadcastChannel 은 **같은 문서 안의 다른 채널 객체에도** 전달된다 —
+    //   진단 창이 자기 이벤트를 '다른 탭' 으로 한 번 더 받아 중복으로 찍혔다. 그래서 꼬리표를 단다.
+    const CTX_ID = Math.random().toString(36).slice(2, 10);
+    const LOG_MAX = 500;
+    const logBuf = [];
+    const logListeners = new Set();
+    let logChannel = null;
+    try { if ('BroadcastChannel' in window) logChannel = new BroadcastChannel('pulse_devlog'); } catch (_) {}
+
+    function devLog(dir, text, meta) {
+        const ev = { ts: Date.now(), dir, text: String(text == null ? '' : text), meta: meta || '', src: CTX_ID };
+        logBuf.push(ev);
+        if (logBuf.length > LOG_MAX) logBuf.shift();
+        for (const cb of logListeners) { try { cb(ev); } catch (_) {} }
+        if (logChannel) { try { logChannel.postMessage(ev); } catch (_) {} }
+    }
+
     // 릴레이 최소 간격(ms). 입력 기기가 초당 수십~수백 줄을 쏟으면 BLE 쓰기 큐가 무한정 밀린다.
     // 위치 프로토콜이라 **지나간 값은 의미가 없다** → 간격 안에서는 마지막 줄만 보낸다.
     // (axis_sender 가 UI 입력에 쓰는 것과 같은 원칙)
@@ -154,6 +184,7 @@
     function noteWriteError(e) {
         writeErrCount++;
         state.lastError = (e && e.message) ? e.message : '전송 오류';
+        devLog('err', state.lastError, `${writeErrCount}건째`);
         if (writeErrCount === 1 || writeErrCount % 100 === 0) {
             console.warn(`[PulseDevice] 전송 실패 (${writeErrCount}건째):`, state.lastError);
         }
@@ -269,6 +300,7 @@
         state.connected = true;
         state.lastError = '';
         state.portLabel = `BLE · ${device.name || 'Unknown'}`;
+        devLog('info', `출력 기기 연결 — ${state.portLabel} / tx ${txChar.uuid}`);
         sessionStorage.setItem(KEY_INTENT, 'bluetooth');
         notify();
         for (const c of drv().init) { await send(c); }
@@ -296,6 +328,7 @@
             return `${c.uuid} [${f}]`;
         });
         console.log('[PulseDevice] 서비스 캐릭터리스틱 목록:\n  ' + dump.join('\n  '));
+        dump.forEach((d) => devLog('info', d, '캐릭터리스틱'));
         const rx = list.find((c) => c.properties && (c.properties.notify || c.properties.indicate));
         if (!rx) throw new Error('이 기기에서 notify 되는 캐릭터리스틱을 찾지 못했습니다');
         console.log('[PulseDevice] 입력 캐릭터리스틱 자동 선택: ' + rx.uuid);
@@ -326,6 +359,9 @@
             inState.rxCount++;
             inState.lastLine = line;
             for (const cb of inputListeners) { try { cb(line); } catch (_) {} }
+            devLog('in', line);
+            if (!relayOn) devLog('drop', line, '복사 꺼짐');
+            else if (!state.connected) devLog('drop', line, '출력 미연결');
             relay(line);
             if (inState.rxCount <= 5) console.log('[PulseDevice] 입력 ← ' + line);
         }
@@ -339,17 +375,17 @@
         const wait = RELAY_MIN_MS - (now - relayLastAt);
         if (wait <= 0) {
             relayLastAt = now;
-            send(line);
+            send(line, 'relay');
             return;
         }
         // 간격 안이면 **마지막 줄만** 남긴다 — 위치 명령이라 지나간 값은 버려도 된다
-        if (relayPending !== null) relayDropped++;
+        if (relayPending !== null) { relayDropped++; devLog('drop', relayPending, '간격 제한'); }
         relayPending = line;
         if (!relayTimer) {
             relayTimer = setTimeout(() => {
                 relayTimer = null;
                 const l = relayPending; relayPending = null;
-                if (l !== null && relayOn && state.connected) { relayLastAt = Date.now(); send(l); }
+                if (l !== null && relayOn && state.connected) { relayLastAt = Date.now(); send(l, 'relay'); }
             }, wait);
         }
     }
@@ -389,6 +425,7 @@
         inState.label     = `BLE · ${device.name || 'Unknown'}`;
         inState.lastError = '';
         inState.buf       = '';
+        devLog('info', `입력 기기 연결 — ${inState.label} / rx ${rxChar.uuid}`);
         notify();
     }
 
@@ -401,6 +438,7 @@
         inState.label = '';
         inState.buf = '';
         inState.lastError = err || '';
+        devLog('info', '입력 기기 해제' + (err ? ' — ' + err : ''));
         notify();
     }
 
@@ -505,11 +543,13 @@
     }
 
     // ─── 공통 send ───────────────────────────────────────────
-    function send(cmd) {
+    // src: 'relay' 면 입력 기기에서 복사된 것 — 진단 창에서 구분해 보여준다.
+    function send(cmd, src) {
 		if (!state.connected) return false;
 		if (!writeOnce(cmd)) return false;
 
 		state.sentCount++;
+		devLog(src === 'relay' ? 'relay' : 'out', cmd);
 		if (state.sentCount % 5 === 0) notify();
 		return true;
 	}
@@ -534,6 +574,7 @@
         // 하나라도 이상하면 줄 전체를 버린다. 조작된 명령의 일부만 실행되는 게 더 위험하다.
         if (toks.length > MAX_TOKENS || !toks.every(t => AXIS_CMD.test(t))) {
             rejectCount++;
+            devLog('reject', line.slice(0, 80), '원격 명령 검증 실패');
             if (rejectCount === 1 || rejectCount % 100 === 0) {
                 console.warn(`[PulseDevice] 원격 명령 거부 (${rejectCount}건째): ` + line.slice(0, 40));
             }
@@ -592,6 +633,12 @@
         getInputStatus,
         get inputConnected() { return inState.connected; },
         onInput(cb) { inputListeners.add(cb); return () => inputListeners.delete(cb); },
+        // 진단 로그 (개발자용 창이 쓴다)
+        onLog(cb) { logListeners.add(cb); return () => logListeners.delete(cb); },
+        getLog() { return logBuf.slice(); },
+        ctxId: CTX_ID,
+        clearLog() { logBuf.length = 0; },
+        devLog,                                   // 외부(페이지)에서도 한 줄기에 적을 수 있게
         get rejectedCount() { return rejectCount; },
         get isConnected() { return state.connected; },
         get kind()        { return state.kind; },
