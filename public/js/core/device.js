@@ -64,6 +64,7 @@
         lastLine: '',
         lastError: '',
         buf: '',           // 줄 조립 버퍼
+        lastRxAt: 0,       // 도착 간격 계측용
     };
     let relayOn = true;
     const inputListeners = new Set();
@@ -133,6 +134,47 @@
         }
     }
 
+    // ─── 간격 계측 ───────────────────────────────────────────
+    // 인계서(2026-11-19) §5 가 요구한 숫자 — 도착 간격의 평균·최대·p95.
+    // 작업자가 실기기를 한 번 돌리면 이 값이 나와야 한다. 콘솔로는 낼 방법이 없었다.
+    // ⚠ 정렬이 들어가므로 notify 경로에서 부르지 않는다. 진단 창이 1초에 한 번 getTiming() 을 부른다.
+    function mkStat(cap) {
+        const buf = [];
+        let i = 0;
+        return {
+            add(v) { if (buf.length < cap) buf.push(v); else { buf[i] = v; i = (i + 1) % cap; } },
+            reset() { buf.length = 0; i = 0; },
+            summary() {
+                if (!buf.length) return null;
+                const a = buf.slice().sort((x, y) => x - y);
+                let sum = 0;
+                for (let k = 0; k < a.length; k++) sum += a[k];
+                return {
+                    n:   a.length,
+                    avg: sum / a.length,
+                    max: a[a.length - 1],
+                    p95: a[Math.min(a.length - 1, Math.floor(a.length * 0.95))],
+                };
+            },
+        };
+    }
+    const STAT_CAP = 300;
+    const rxGap    = mkStat(STAT_CAP);   // 기기 → 브라우저 도착 간격
+    const relayGap = mkStat(STAT_CAP);   // 실제로 출력에 내보낸 간격
+    const writeMs  = mkStat(STAT_CAP);   // 쓰기 1건이 끝나는 데 걸린 시간 (큐 대기 포함)
+
+    /** 진단용 타이밍 요약. 간격에서 Hz 를 뽑아 같이 준다. */
+    function getTiming() {
+        const rx = rxGap.summary(), rl = relayGap.summary(), w = writeMs.summary();
+        const hz = (x) => (x && x.avg > 0) ? 1000 / x.avg : 0;
+        return {
+            rx:    rx ? { n: rx.n, avg: rx.avg, max: rx.max, p95: rx.p95, hz: hz(rx) } : null,
+            relay: rl ? { n: rl.n, avg: rl.avg, max: rl.max, p95: rl.p95, hz: hz(rl) } : null,
+            write: w  ? { n: w.n,  avg: w.avg,  max: w.max,  p95: w.p95 } : null,
+            pending: Object.keys(relayPend).length,
+        };
+    }
+
     // 릴레이 간격. 입력 기기가 초당 수십~수백 줄을 쏟으면 BLE 쓰기 큐가 무한정 밀린다.
     // 위치 프로토콜이라 **지나간 값은 의미가 없다** → 간격 안에서는 마지막 줄만 보낸다.
     // (axis_sender 가 UI 입력에 쓰는 것과 같은 원칙)
@@ -146,8 +188,39 @@
     // GATT 쓰기가 끝내 안 돌아오는 경우에 릴레이가 **영구히 멈추는 것**을 막는 안전장치다.
     // (예전에 write 를 기다리다 연결을 버리는 fail-closed 로 사고가 났다 — 아래 전송 주석 참고)
     const RELAY_STALL_MS = 300;
-    let relayLastAt = 0, relayPending = null, relayTimer = null, relayDropped = 0;
+    let relayLastAt = 0, relayTimer = null, relayDropped = 0;
     let relayPendingSince = 0;
+
+    // ⚠ 대기 줄은 **하나가 아니라 축별로** 들고 있어야 한다 (인계서 BLE-07).
+    //   입력이 축마다 별도 줄로 오는지, 한 줄에 전 축이 오는지는 **기기·펌웨어마다 다르다.**
+    //   '마지막 줄만' 남기면 축마다 따로 오는 기기에서 **다른 축의 최신값**이 버려져
+    //   그 축이 멈춘 것처럼 보인다. 지나간 값을 버리는 것과 전혀 다른 문제다.
+    //   아래 relayKey() 로 두 포맷을 **구분 없이** 옳게 처리한다.
+    let relayPend = {};                  // 축 키 → 최신 줄 (문자열 키라 삽입 순서가 유지된다)
+    const RELAY_PEND_MAX = 8;            // 축 수만큼만 쌓이는 게 정상. 넘으면 오래된 것부터 버린다
+
+    // T-Code 축 토큰: L0 R1 V0 A2 … (뒤에 숫자가 붙는다)
+    const AXIS_RE = /\b([LRVA][0-9])[0-9]/g;
+
+    /**
+     * 이 줄이 건드리는 축 목록 → 병합 키.
+     *   L0500I100 R1800I100   → 'L0+R1'  전체 상태. 같은 조합이 또 오면 교체 (기존 동작과 같다)
+     *   L0500I100 / R1800I100 → 'L0', 'R1'  서로 다른 축이라 **둘 다 보낸다**
+     *   L0500I100 / L0600I100 → 같은 'L0'  → 교체 (맞는 동작)
+     *   DSTOP, D1 …           → 축이 안 보인다. **제어 명령일 수 있으므로** 줄 자체를 키로 둔다
+     *                           (서로 다른 명령이 서로를 덮어쓰지 않게)
+     */
+    function relayKey(line) {
+        AXIS_RE.lastIndex = 0;
+        const seen = [];
+        let m;
+        while ((m = AXIS_RE.exec(line)) !== null) {
+            if (seen.indexOf(m[1]) < 0) seen.push(m[1]);
+        }
+        return seen.length ? seen.sort().join('+') : 'cmd:' + line;
+    }
+
+    function clearPend() { relayPend = {}; relayPendingSince = 0; }
 
 	let bleWriteQueue = Promise.resolve();
 	// 큐에 넣었지만 아직 끝나지 않은 쓰기 수. 릴레이 배압과 진단 창이 쓴다.
@@ -188,6 +261,7 @@
             relay:     relayOn,
             dropped:   relayDropped,
             queued:    writeInFlight,
+            pending:   Object.keys(relayPend).length,
         };
     }
 
@@ -207,9 +281,10 @@
 		// Serial — 기존 동작 유지
 		if (state.kind === 'serial' && state.writer) {
 			writeInFlight++;
+			const t0 = Date.now();
 			state.writer.write(data)
 				.then(() => { writeOkCount++; }, noteWriteError)
-				.then(() => { writeInFlight--; });
+				.then(() => { writeInFlight--; writeMs.add(Date.now() - t0); });
 			return true;
 		}
 
@@ -219,6 +294,7 @@
 			const wantNoResp = drv().ble.write !== 'withResponse';
 
 			writeInFlight++;
+			const t0 = Date.now();
 			bleWriteQueue = bleWriteQueue
 				.catch(() => {})
 				.then(() => {
@@ -228,7 +304,8 @@
 					return char.writeValue(data);
 				})
 				.then(() => { writeOkCount++; }, noteWriteError)
-				.then(() => { writeInFlight--; });
+				// 큐 대기까지 포함한 '한 건이 끝나는 데 걸린 시간' — 이게 실제 전송 주기의 한계다
+				.then(() => { writeInFlight--; writeMs.add(Date.now() - t0); });
 
 			return true;
 		}
@@ -327,6 +404,7 @@
         // 디바이스 끊김 감지
         device.addEventListener('gattserverdisconnected', () => {
             if (state.btDevice === device) {
+                devLog('info', `출력 기기 끊김 — ${state.portLabel || 'BLE'}`, 'GATT 연결 해제');
                 state.connected = false;
                 state.kind = null;
                 state.btChar = null;
@@ -358,6 +436,8 @@
         state.connected = true;
         state.lastError = '';
         state.portLabel = `BLE · ${device.name || 'Unknown'}`;
+        sendOffCount = 0;
+        writeMs.reset();
         devLog('info', `출력 기기 연결 — ${state.portLabel} / tx ${txChar.uuid}`);
         sessionStorage.setItem(KEY_INTENT, 'bluetooth');
         notify();
@@ -416,6 +496,9 @@
             if (!line) continue;
             inState.rxCount++;
             inState.lastLine = line;
+            const rxAt = Date.now();
+            if (inState.lastRxAt) rxGap.add(rxAt - inState.lastRxAt);
+            inState.lastRxAt = rxAt;
             for (const cb of inputListeners) { try { cb(line); } catch (_) {} }
             devLog('in', line);
             if (!relayOn) devLog('drop', line, '복사 꺼짐');
@@ -434,28 +517,59 @@
         return now - relayLastAt >= RELAY_MIN_MS;
     }
 
-    /** 대기 줄을 보관한다 — 간격 안의 여러 줄 중 **마지막 줄만** 남긴다. */
-    function holdRelay(line, why) {
-        if (relayPending !== null) { relayDropped++; devLog('drop', relayPending, why); }
-        else { relayPendingSince = Date.now(); }
-        relayPending = line;
-        if (!relayTimer) relayTimer = setTimeout(pumpRelay, 5);
+    /** 대기 줄에 넣는다 — **같은 축**의 옛 값만 버리고, 다른 축은 남긴다. */
+    function putPend(line, why) {
+        const key = relayKey(line);
+        if (Object.prototype.hasOwnProperty.call(relayPend, key)) {
+            relayDropped++;
+            devLog('drop', relayPend[key], why);
+        } else if (Object.keys(relayPend).length === 0) {
+            relayPendingSince = Date.now();
+        }
+        relayPend[key] = line;
+
+        // 상한 — 축 수를 넘게 쌓이면 뭔가 잘못된 것이다. 오래된 것부터 버린다.
+        let keys = Object.keys(relayPend);
+        while (keys.length > RELAY_PEND_MAX) {
+            relayDropped++;
+            devLog('drop', relayPend[keys[0]], '대기 상한');
+            delete relayPend[keys[0]];
+            keys = Object.keys(relayPend);
+        }
     }
 
-    /** 대기 줄을 내보낼 때가 됐는지 보고, 아직이면 다시 들여다본다. */
+    /**
+     * 대기 중인 축을 내보낸다 (들어온 순서대로).
+     * @param onlyOne 기기가 아직 앞 쓰기를 못 끝냈는데 안전장치(STALL)로 억지로 내보내는 경우.
+     *   이때 **전부** 쏟으면 막힌 큐에 한꺼번에 밀어넣어 배압이 무의미해진다 → 한 줄만 보낸다.
+     *   기기가 정상이면(writeInFlight 0) 축 전체를 같이 보내야 한다 — 축마다 따로 오는 입력에서
+     *   한 줄만 보내면 다른 축이 매번 한 박자씩 밀린다.
+     */
+    function flushPend(now, onlyOne) {
+        const keys = Object.keys(relayPend);
+        const lines = [];
+        const take = onlyOne ? Math.min(1, keys.length) : keys.length;
+        for (let i = 0; i < take; i++) { lines.push(relayPend[keys[i]]); delete relayPend[keys[i]]; }
+        if (Object.keys(relayPend).length) {
+            relayPendingSince = now;                 // 남은 축은 다음 차례에
+            if (!relayTimer) relayTimer = setTimeout(pumpRelay, 5);
+        } else {
+            clearPend();
+        }
+        if (relayLastAt) relayGap.add(now - relayLastAt);
+        relayLastAt = now;
+        for (let i = 0; i < lines.length; i++) send(lines[i], 'relay');
+    }
+
+    /** 내보낼 때가 됐는지 보고, 아직이면 다시 들여다본다. */
     function pumpRelay() {
         relayTimer = null;
-        if (relayPending === null) { relayPendingSince = 0; return; }
-        if (!relayOn || !state.connected) { relayPending = null; relayPendingSince = 0; return; }
+        if (Object.keys(relayPend).length === 0) { relayPendingSince = 0; return; }
+        if (!relayOn || !state.connected) { clearPend(); return; }
 
         const now = Date.now();
         if (!relayReady(now)) { relayTimer = setTimeout(pumpRelay, 5); return; }
-
-        const l = relayPending;
-        relayPending = null;
-        relayPendingSince = 0;
-        relayLastAt = now;
-        send(l, 'relay');
+        flushPend(now, writeInFlight > 0);
     }
 
     /** 입력 → 출력 복사. 내용은 **그대로** 보내되, 보내는 때만 조절한다. */
@@ -463,25 +577,21 @@
         if (!relayOn || !state.connected) return;
         const now = Date.now();
 
+        // 🔴 대기 타이머가 살아있는 채로 새 줄을 보내면 **지나간 줄이 뒤에 나간다**(위치 역전).
+        //   인계서 BLE-02. 타이머는 relayLastAt+20ms 에 발화하도록 예약되지만 메인 스레드가
+        //   밀리면 그 시점을 넘겨서 발화한다. 그 사이 새 줄이 즉시 송신되면 출력 기기가
+        //   새 위치로 갔다가 **옛 위치로 되돌아간다** — 이게 덜컥거림으로 보였다.
+        //   → 새 줄도 일단 대기 줄에 넣고, 보낼 수 있으면 **타이머를 끄고 한꺼번에** 내보낸다.
+        //     이러면 역전이 구조적으로 불가능하고, 다른 축도 버려지지 않는다.
+        putPend(line, relayReady(now) ? '새 값으로 대체'
+                    : (writeInFlight > 0 ? '기기 쓰기 대기' : '간격 제한'));
+
         if (relayReady(now)) {
-            // 🔴 대기 타이머가 살아있는 채로 새 줄을 보내면 **지나간 줄이 뒤에 나간다**(위치 역전).
-            //   인계서 BLE-02. 타이머는 relayLastAt+20ms 에 발화하도록 예약돼 있지만,
-            //   메인 스레드가 밀리면 그 시점을 넘겨서 발화한다. 그 사이 새 줄이 즉시 송신되면
-            //   출력 기기가 새 위치로 갔다가 **옛 위치로 되돌아간다** — 이게 덜컥거림으로 보였다.
-            //   → 즉시 송신 전에 대기 줄과 타이머를 반드시 정리한다.
             if (relayTimer) { clearTimeout(relayTimer); relayTimer = null; }
-            if (relayPending !== null) {
-                relayDropped++;
-                devLog('drop', relayPending, '새 값으로 대체');
-                relayPending = null;
-            }
-            relayPendingSince = 0;
-            relayLastAt = now;
-            send(line, 'relay');
+            flushPend(now, writeInFlight > 0);
             return;
         }
-
-        holdRelay(line, writeInFlight > 0 ? '기기 쓰기 대기' : '간격 제한');
+        if (!relayTimer) relayTimer = setTimeout(pumpRelay, 5);
     }
 
     async function connectBluetoothInput() {
@@ -523,10 +633,12 @@
         //   ("생략 1,000회"가 지금 것인지 어제 것인지 구분이 안 됐다 — 인계서 BLE-04)
         inState.rxCount   = 0;
         inState.lastLine  = '';
+        inState.lastRxAt  = 0;
         relayDropped      = 0;
         relayLastAt       = 0;
-        relayPendingSince = 0;
-        relayPending      = null;
+        clearPend();
+        rxGap.reset();
+        relayGap.reset();
         if (relayTimer) { clearTimeout(relayTimer); relayTimer = null; }
         devLog('info', `입력 기기 연결 — ${inState.label} / rx ${rxChar.uuid}`);
         notify();
@@ -534,8 +646,7 @@
 
     function resetInput(err) {
         if (relayTimer) { clearTimeout(relayTimer); relayTimer = null; }
-        relayPending = null;
-        relayPendingSince = 0;
+        clearPend();
         inState.device = null;
         inState.rxChar = null;
         inState.connected = false;
@@ -564,7 +675,7 @@
         relayOn = !!on;
         if (!relayOn && relayTimer) {
             clearTimeout(relayTimer); relayTimer = null;
-            relayPending = null; relayPendingSince = 0;
+            clearPend();
         }
         notify();
     }
@@ -634,6 +745,11 @@
             state.kind = null;
             state.connected = false;
             state.sentCount = 0;
+            writeOkCount = 0;
+            writeErrCount = 0;
+            sendOffCount = 0;
+            writeMs.reset();
+            devLog('info', '출력 기기 해제' + (leftOpen ? ' — 포트를 닫지 못했다' : ''));
             state.portLabel = '';
             // 해제 실패는 **반드시 드러나야 한다.** 예전에는 bounded()가 거부를 삼키고
             // finally가 무조건 상태를 지워서, 화면은 '해제됨'인데 포트는 열린 채 남았고
@@ -651,8 +767,17 @@
 
     // ─── 공통 send ───────────────────────────────────────────
     // src: 'relay' 면 입력 기기에서 복사된 것 — 진단 창에서 구분해 보여준다.
+    // §7 '스크롤 멈춤' 미해결 건 — 연결이 끊긴 뒤에도 엔진이 명령을 계속 만든다.
+    // 재발 시 이 줄이 있으면 "연결이 먼저 끊겼는가"를 로그만으로 판별할 수 있다.
+    let sendOffCount = 0;
     function send(cmd, src) {
-		if (!state.connected) return false;
+		if (!state.connected) {
+			sendOffCount++;
+			if (sendOffCount === 1 || sendOffCount % 100 === 0) {
+				devLog('drop', cmd, `출력 미연결 (${sendOffCount}건째)`);
+			}
+			return false;
+		}
 		if (!writeOnce(cmd)) return false;
 
 		state.sentCount++;
@@ -709,6 +834,17 @@
         }
     }
 
+    // 화면이 숨으면 브라우저가 타이머를 늦춘다 — 릴레이·재생 루프가 밀리는 원인이 된다.
+    // §7 '스크롤 멈춤' 재발 시 이 줄이 증상 시각과 겹치는지 보면 된다.
+    try {
+        if (typeof document !== 'undefined' && document.addEventListener) {
+            document.addEventListener('visibilitychange', () => {
+                devLog('info', document.hidden ? '화면 숨김 (탭 비활성)' : '화면 표시',
+                       '숨으면 브라우저가 타이머를 늦출 수 있다');
+            });
+        }
+    } catch (_) {}
+
     // 페이지 떠날 때 — 안전 위치로 부드럽게 이동 (의도는 유지)
     window.addEventListener('beforeunload', () => {
         try {
@@ -742,6 +878,7 @@
         onInput(cb) { inputListeners.add(cb); return () => inputListeners.delete(cb); },
         // 진단 로그 (개발자용 창이 쓴다)
         onLog(cb) { logListeners.add(cb); return () => logListeners.delete(cb); },
+        getTiming,                                // 도착 간격·전송 간격·쓰기 소요 (진단 창이 1초마다)
         getLog() { return logBuf.slice(); },
         ctxId: CTX_ID,
         clearLog() { logBuf.length = 0; },

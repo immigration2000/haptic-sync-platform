@@ -14,6 +14,8 @@
  *   4) BLE-04 — 통계는 이번 연결 기준으로 센다
  *   5) BLE-05 — 큐에 넣은 수와 **실제로 쓰기가 끝난 수**를 구분해 센다
  *   6) 구독자가 없으면 진단 로그를 **내보내지 않는다** (로그 자체가 끊김을 만들었다)
+ *   7) BLE-07 — 축마다 별도 줄로 오는 입력에서 **다른 축의 최신값을 버리지 않는다**
+ *             (한 줄에 전 축이 오는 입력은 기존대로 교체 — 두 포맷을 구분 없이 처리한다)
  */
 import fs from 'fs';
 import vm from 'vm';
@@ -131,24 +133,24 @@ console.log('\n1. 🔴 BLE-02 — 지나간 줄이 새 줄 뒤에 나가지 않�
     // 수정 전에는 여기서 B(옛 위치)가 C(새 위치) 뒤에 나갔다.
     const { D, outTx, inRx, ctx } = await setup({ timers: 'held' });
 
-    inRx.emit('A1\n');                       // 첫 줄 — 즉시 송신
+    inRx.emit('L0100I100\n');                // 첫 줄 — 즉시 송신
     await sleep(2);
-    inRx.emit('B2\n');                       // 20ms 안이라 대기 (타이머는 내 손에 잡혀 있다)
+    inRx.emit('L0200I100\n');                // 20ms 안이라 대기 (타이머는 내 손에 잡혀 있다)
     ok('간격 안의 줄은 대기 타이머에 걸린다', ctx._held.length >= 1, String(ctx._held.length));
 
     await sleep(25);                         // 간격이 지났다
-    inRx.emit('C3\n');                       // 즉시 송신 — 이때 대기 줄 B2 를 버려야 한다
+    inRx.emit('L0300I100\n');                // 즉시 송신 — 같은 축이므로 대기 줄을 교체해야 한다
     await sleep(5);
     const seq = outTx.writes.map((w) => w.trim());
-    ok('새 줄은 즉시 나갔다', seq.includes('C3'), JSON.stringify(seq));
+    ok('새 줄은 즉시 나갔다', seq.includes('L0300I100'), JSON.stringify(seq));
     // ★ 수정의 핵심 — 예전에는 타이머가 그대로 살아남아 B2 가 C3 뒤에 나갔다
     ok('🔴 즉시 송신 때 대기 타이머를 정리한다', ctx._held.length === 0, ctx._held.length + '개 남음');
 
     const fired = ctx._fireHeld();           // 늦게 발화할 타이머가 있었다면 지금 발화한다
     await sleep(5);
     const seq2 = outTx.writes.map((w) => w.trim());
-    ok('옛 줄(B2)은 끝까지 나가지 않는다', !seq2.includes('B2'), JSON.stringify(seq2));
-    ok('마지막으로 나간 값이 최신값이다', seq2[seq2.length - 1] === 'C3', JSON.stringify(seq2));
+    ok('옛 줄(L0200)은 끝까지 나가지 않는다', !seq2.includes('L0200I100'), JSON.stringify(seq2));
+    ok('마지막으로 나간 값이 최신값이다', seq2[seq2.length - 1] === 'L0300I100', JSON.stringify(seq2));
     ok('버린 줄은 생략으로 집계된다', D.getInputStatus().dropped >= 1, String(D.getInputStatus().dropped));
     ok('(발화를 기다리는 타이머가 없었다)', fired === 0, String(fired));
 }
@@ -160,7 +162,7 @@ console.log('\n2. 🔴 BLE-03 — 기기가 느려도 쓰기 큐가 쌓이지 �
     const { D, outTx, inRx } = await setup({ writeDelay: 60 });
     let maxQueued = 0;
     for (let i = 0; i < 60; i++) {
-        inRx.emit(`L${String(i).padStart(3, '0')}I100\n`);
+        inRx.emit(`L0${String(i).padStart(3, '0')}I100\n`);
         await sleep(3);
         const q = D.getStatus().queued;
         if (q > maxQueued) maxQueued = q;
@@ -171,7 +173,7 @@ console.log('\n2. 🔴 BLE-03 — 기기가 느려도 쓰기 큐가 쌓이지 �
        outTx.writes.length + '줄');
     ok('그래도 전송은 계속된다', outTx.writes.length >= 2, outTx.writes.length + '줄');
     const last = outTx.writes[outTx.writes.length - 1].trim();
-    ok('마지막으로 나간 값이 최신 쪽이다', last === 'L059I100' || last === 'L058I100', last);
+    ok('마지막으로 나간 값이 최신 쪽이다', /^L0(058|059)I100$/.test(last), last);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -184,7 +186,7 @@ console.log('\n3. 기기가 응답을 멈춰도 큐가 폭증하지 않고, 풀�
     const { D, outTx, inRx } = await setup({ hold: true });
     let maxQueued = 0;
     for (let i = 0; i < 40; i++) {
-        inRx.emit(`L${i}I100\n`);
+        inRx.emit(`L0${String(i).padStart(3, '0')}I100\n`);
         await sleep(20);
         const q = D.getStatus().queued;
         if (q > maxQueued) maxQueued = q;
@@ -205,7 +207,7 @@ console.log('\n3. 기기가 응답을 멈춰도 큐가 폭증하지 않고, 풀�
 console.log('\n4. BLE-04 — 통계는 이번 연결 기준으로 센다');
 {
     const { D, inRx, ctx } = await setup({ writeDelay: 60 });
-    for (let i = 0; i < 10; i++) { inRx.emit(`L${i}I100\n`); }
+    for (let i = 0; i < 10; i++) { inRx.emit(`L0${String(i).padStart(3, '0')}I100\n`); }
     await sleep(10);
     ok('첫 세션에 수신이 쌓였다', D.getInputStatus().rxCount === 10, String(D.getInputStatus().rxCount));
     ok('첫 세션에 생략도 쌓였다', D.getInputStatus().dropped > 0, String(D.getInputStatus().dropped));
@@ -278,6 +280,72 @@ console.log('\n6. 🔴 구독자가 없으면 진단 로그를 내보내지 않�
     await sleep(160);
     ok('구독 알림이 끊기면 발행도 멈춘다', posted.length === 0, posted.length + '건');
     ok('(그 전에는 보내고 있었다)', before >= 1, String(before));
+}
+
+// ─────────────────────────────────────────────────────────────
+console.log('\n7. 🔴 BLE-07 — 축마다 별도 줄로 와도 다른 축을 버리지 않는다');
+{
+    // 입력이 축마다 따로 줄을 보내는지, 한 줄에 전 축을 보내는지는 기기마다 다르다.
+    // '마지막 줄만' 남기면 전자에서 다른 축의 최신값이 버려져 그 축이 멈춘 것처럼 보인다.
+    const { outTx, inRx } = await setup();
+
+    inRx.emit('L0500I100\n');                      // 간격 기준점 (즉시 송신)
+    inRx.emit('R1800I100\n');                      // 20ms 안 — 다른 축
+    inRx.emit('L0600I100\n');                      // 20ms 안 — 또 다른 축
+    await sleep(60);
+    let seq = outTx.writes.map((w) => w.trim());
+    ok('다른 축 두 줄이 모두 나갔다', seq.includes('R1800I100') && seq.includes('L0600I100'),
+       JSON.stringify(seq));
+
+    // 같은 축이면 지나간 값은 버린다 (위치 프로토콜이라 그게 맞다)
+    outTx.writes.length = 0;
+    inRx.emit('L0100I100\n');
+    inRx.emit('L0200I100\n');
+    inRx.emit('L0300I100\n');
+    await sleep(60);
+    seq = outTx.writes.map((w) => w.trim());
+    ok('같은 축은 최신값만 나간다', !seq.includes('L0200I100'), JSON.stringify(seq));
+    ok('그 최신값은 나갔다', seq.includes('L0300I100'), JSON.stringify(seq));
+
+    // 한 줄에 전 축이 오는 입력은 **기존 동작 그대로** — 같은 조합이면 교체
+    outTx.writes.length = 0;
+    inRx.emit('L0500I100 R1800I100\n');
+    inRx.emit('L0600I100 R1900I100\n');
+    inRx.emit('L0700I100 R1700I100\n');
+    await sleep(60);
+    seq = outTx.writes.map((w) => w.trim());
+    ok('다축 한 줄은 최신 줄만 나간다 (기존 동작 유지)',
+       !seq.includes('L0600I100 R1900I100'), JSON.stringify(seq));
+    ok('그 최신 줄은 나갔다', seq.includes('L0700I100 R1700I100'), JSON.stringify(seq));
+
+    // 축이 없는 줄은 **제어 명령일 수 있으므로** 서로 덮어쓰지 않는다
+    outTx.writes.length = 0;
+    inRx.emit('L0500I100\n');
+    inRx.emit('DSTOP\n');
+    inRx.emit('D1\n');
+    await sleep(60);
+    seq = outTx.writes.map((w) => w.trim());
+    ok('서로 다른 제어 명령은 둘 다 나간다', seq.includes('DSTOP') && seq.includes('D1'),
+       JSON.stringify(seq));
+}
+
+// ─────────────────────────────────────────────────────────────
+console.log('\n8. 간격 계측 — 인계서 §5 가 요구한 숫자가 나온다');
+{
+    const { D, inRx } = await setup();
+    ok('아무것도 안 왔으면 null', D.getTiming().rx === null);
+
+    for (let i = 0; i < 12; i++) { inRx.emit(`L0${String(i).padStart(3, '0')}I100\n`); await sleep(15); }
+    const t = D.getTiming();
+    ok('수신 간격 표본이 쌓인다', t.rx && t.rx.n >= 10, JSON.stringify(t.rx));
+    ok('수신 Hz 가 실제와 비슷하다 (15ms → 약 67Hz)', t.rx.hz > 40 && t.rx.hz < 110,
+       Math.round(t.rx.hz) + 'Hz');
+    ok('p95 가 최대 이하', t.rx.p95 <= t.rx.max);
+    ok('전송 간격도 잰다', t.relay && t.relay.n >= 1, JSON.stringify(t.relay));
+    ok('쓰기 소요도 잰다', t.write && t.write.n >= 1, JSON.stringify(t.write));
+
+    await D.disconnectInput();
+    ok('해제 후에도 조회가 터지지 않는다', typeof D.getTiming() === 'object');
 }
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);

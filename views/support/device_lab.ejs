@@ -46,6 +46,22 @@
                 </label>
             </div>
         </div>
+
+        <div class="card card-body" style="flex:1; min-width:300px;">
+            <div class="panel-title">타이밍 (최근 300건)</div>
+            <div class="mono" style="font-size:12px; display:grid; grid-template-columns:46px 1fr 1fr 1fr; gap:4px 8px;">
+                <span></span><span class="text-faint">Hz</span><span class="text-faint">평균</span><span class="text-faint">최대 / p95</span>
+                <span class="text-faint">수신</span><span id="t-rx-hz">—</span><span id="t-rx-avg">—</span><span id="t-rx-max">—</span>
+                <span class="text-faint">전송</span><span id="t-rl-hz">—</span><span id="t-rl-avg">—</span><span id="t-rl-max">—</span>
+                <span class="text-faint">쓰기</span><span class="text-faint">—</span><span id="t-w-avg">—</span><span id="t-w-max">—</span>
+            </div>
+            <div class="text-faint mt-3" style="font-size:11px; line-height:1.5;">
+                <b>수신</b> 기기가 보내는 주기 · <b>전송</b> 실제로 출력에 나간 주기 ·
+                <b>쓰기</b> 한 건이 끝나는 데 걸린 시간(ms).<br>
+                쓰기 시간이 전송 주기의 <b>한계</b>입니다 — 수신 Hz 가 이것보다 빠르면 생략이 나는 게 정상입니다.
+                <span id="t-pend"></span>
+            </div>
+        </div>
     </div>
 
     <!-- 수동 전송 -->
@@ -201,6 +217,28 @@
         $('b-relay').checked     = !!i.relay;
     }
     if (D) { renderStatus(D.getStatus()); D.onChange(renderStatus); }
+
+    // ── 타이밍 ──
+    // ⚠ 정렬이 들어가는 계산이라 상태 변경(수신 10건마다)에 묶지 않고 1초에 한 번만 본다.
+    function num(v, unit) {
+        if (v == null) return '—';
+        return (v < 10 ? Math.round(v * 10) / 10 : Math.round(v)) + (unit || '');
+    }
+    function renderTiming() {
+        if (!D || !D.getTiming) return;
+        var t = D.getTiming();
+        var rx = t.rx, rl = t.relay, w = t.write;
+        $('t-rx-hz').textContent  = rx ? num(rx.hz, 'Hz') : '—';
+        $('t-rx-avg').textContent = rx ? num(rx.avg, 'ms') : '—';
+        $('t-rx-max').textContent = rx ? num(rx.max) + ' / ' + num(rx.p95, 'ms') : '—';
+        $('t-rl-hz').textContent  = rl ? num(rl.hz, 'Hz') : '—';
+        $('t-rl-avg').textContent = rl ? num(rl.avg, 'ms') : '—';
+        $('t-rl-max').textContent = rl ? num(rl.max) + ' / ' + num(rl.p95, 'ms') : '—';
+        $('t-w-avg').textContent  = w ? num(w.avg, 'ms') : '—';
+        $('t-w-max').textContent  = w ? num(w.max) + ' / ' + num(w.p95, 'ms') : '—';
+        $('t-pend').textContent   = t.pending ? ' 대기 중인 축 ' + t.pending + '개.' : '';
+    }
+    if (D) { renderTiming(); setInterval(renderTiming, 1000); }
 
     // ── 버튼 ──
     function guard(fn) {
