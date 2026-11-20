@@ -15,7 +15,10 @@
             <div class="mono" style="font-size:12px; display:grid; grid-template-columns:70px 1fr; gap:4px 10px;">
                 <span class="text-faint">상태</span><span id="o-state">미연결</span>
                 <span class="text-faint">기기</span><span id="o-label">—</span>
-                <span class="text-faint">송신</span><span id="o-sent">0</span>
+                <span class="text-faint">송신요청</span><span id="o-sent">0</span>
+                <span class="text-faint">쓰기완료</span><span id="o-ok">0</span>
+                <span class="text-faint">쓰기실패</span><span id="o-fail">0</span>
+                <span class="text-faint">쓰기대기</span><span id="o-q">0</span>
                 <span class="text-faint">응답</span><span id="o-info">—</span>
                 <span class="text-faint">오류</span><span id="o-err">—</span>
             </div>
@@ -148,15 +151,29 @@
         D.onLog(function (ev) { addRow(ev, false); });
     }
     // ── 다른 탭에서 일어나는 일 ──
+    // ⚠ device.js 는 **구독자가 있다고 알려올 때만** 내보낸다. 아무도 안 보는데 초당 수백 건을
+    //   뿌리면 그 자체가 메인 스레드를 먹어 릴레이가 끊겼다(2026-11-20). 그래서 이 창이
+    //   2초마다 "보고 있다"고 알린다 — 창을 닫으면 6초 안에 발행이 저절로 멈춘다.
     try {
         if ('BroadcastChannel' in window) {
             var ch = new BroadcastChannel('pulse_devlog');
             ch.onmessage = function (e) {
-                var ev = e.data; if (!ev || !ev.dir) return;
-                // 같은 문서의 PulseDevice 가 보낸 것은 onLog 로 이미 받았다 — 중복 제거
-                if (D && ev.src && ev.src === D.ctxId) return;
-                ev._other = true; addRow(ev, true);
+                var m = e.data; if (!m) return;
+                if (m.watch === 1) return;                       // 다른 진단 창의 구독 알림
+                var list = m.batch || [m];                       // 묶음 / 옛 단건 형식 모두 받는다
+                for (var k = 0; k < list.length; k++) {
+                    var ev = list[k];
+                    if (!ev || !ev.dir) continue;
+                    // 같은 문서의 PulseDevice 가 보낸 것은 onLog 로 이미 받았다 — 중복 제거
+                    if (D && ev.src && ev.src === D.ctxId) continue;
+                    ev._other = true; addRow(ev, true);
+                }
             };
+            var announce = function () {
+                try { ch.postMessage({ watch: 1, src: (D && D.ctxId) || '' }); } catch (_) {}
+            };
+            announce();
+            setInterval(announce, 2000);
         }
     } catch (_) {}
 
@@ -167,6 +184,11 @@
         $('o-state').style.color = st.connected ? 'var(--c-green)' : 'var(--tx-2)';
         $('o-label').textContent = fmt(st.portLabel);
         $('o-sent').textContent  = (st.sentCount || 0).toLocaleString();
+        $('o-ok').textContent    = (st.writeOk || 0).toLocaleString();
+        $('o-fail').textContent  = (st.writeErr || 0).toLocaleString();
+        // 쓰기대기가 계속 1 이상이면 **기기가 우리 전송 속도를 못 따라오는 것**이다.
+        $('o-q').textContent     = (st.queued || 0).toLocaleString();
+        $('o-q').style.color     = (st.queued || 0) > 2 ? 'var(--c-amber, #d97706)' : '';
         $('o-info').textContent  = fmt(st.deviceInfo);
         $('o-err').textContent   = fmt(st.lastError);
         var i = st.input || {};
