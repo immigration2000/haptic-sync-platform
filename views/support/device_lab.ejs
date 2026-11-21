@@ -64,6 +64,38 @@
         </div>
     </div>
 
+    <!-- 축 위치 -->
+    <style>
+        .ax-track { position:relative; height:13px; border-radius:7px; background:rgba(255,255,255,.07); }
+        .ax-fill  { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:7px; transition:none; }
+        .ax-fill.rx { background:rgba(56,189,248,.5); }
+        .ax-fill.tx { background:rgba(74,222,128,.5); }
+        .ax-tick  { position:absolute; top:-3px; width:2px; height:19px; margin-left:-1px; left:0;
+                    background:rgba(255,255,255,.75); }
+        .ax-row   { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+        .ax-lbl   { width:26px; font-size:11px; }
+        .ax-num   { width:52px; text-align:right; font-size:11px; }
+    </style>
+    <div class="card card-body mb-4">
+        <div class="flex" style="justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;">
+            <div class="panel-title" style="margin:0;">축 위치 — 수신 vs 송신</div>
+            <div class="text-faint mono" style="font-size:11px;" id="ax-lag">수신→복사 지연 —</div>
+        </div>
+        <div id="ax-list" class="mono" style="font-size:12px; margin-top:10px;">
+            <div class="text-faint" id="ax-empty" style="font-size:12px; padding:6px 0;">
+                아직 축 명령이 없습니다. 기기를 연결하거나 아래에서 <code>L050I500</code> 를 보내 보세요.
+            </div>
+        </div>
+        <div class="text-faint mt-3" style="font-size:11px; line-height:1.6;">
+            막대 = <b>지금 있어야 할 위치</b>(보간 <code>I</code> 반영) · 흰 눈금 = 마지막으로 받은/보낸 <b>목표값</b>.
+            아래 곡선은 최근 5초 —
+            <span style="color:#38bdf8">수신</span> 과 <span style="color:#4ade80">송신</span> 이 겹쳐 보이면 그대로 전달된 것이고,
+            벌어지거나 계단처럼 끊기면 그 구간이 유실·지연입니다.<br>
+            ⚠ 이건 <b>우리가 받고 보낸 값</b>입니다. 기기가 실제로 이 곡선대로 움직였는지는 별개 —
+            둘을 눈으로 맞춰 보라고 만든 화면입니다. 곡선은 매끄러운데 기기가 덜컥거리면 문제는 기기 쪽입니다.
+        </div>
+    </div>
+
     <!-- 수동 전송 -->
     <div class="card card-body mb-4">
         <div class="flex gap-2" style="flex-wrap:wrap; align-items:center;">
@@ -135,6 +167,7 @@
     function addRow(ev, fromOther) {
         rows.push(ev);
         if (rows.length > MAX_ROWS) rows.shift();
+        feedAxis(ev);                      // ⚠ 멈춤 위에 둔다 — 로그를 멈춰도 막대는 현재 상태를 보여야 한다
         if (paused) return;
         render(ev, fromOther);
         while (logEl.children.length > MAX_ROWS) logEl.removeChild(logEl.firstChild);
@@ -162,7 +195,7 @@
 
     // ── 이 창에서 일어나는 일 ──
     if (D && D.onLog) {
-        D.getLog().forEach(function (ev) { rows.push(ev); });
+        D.getLog().forEach(function (ev) { rows.push(ev); feedAxis(ev); });
         redraw();
         D.onLog(function (ev) { addRow(ev, false); });
     }
@@ -240,6 +273,152 @@
     }
     if (D) { renderTiming(); setInterval(renderTiming, 1000); }
 
+    // ── 축 위치 (수신 vs 송신) ──────────────────────────────
+    // 숫자만으로는 '어디로 어떻게' 움직이는지 안 보인다. 목표값·보간 위치·최근 궤적을 그린다.
+    // 로그 이벤트만 보고 그리므로 device.js 를 건드리지 않는다 — 다른 탭의 입출력도 그대로 들어온다.
+    //
+    // TCode 값은 '0.xxx' 소수다 (L0500 = 0.500 = 50%). 자릿수가 몇이든 digits/10^자릿수.
+    // I 는 그 위치까지 가는 데 쓸 시간(ms) → 그 사이를 선형 보간해 '지금 있어야 할 위치'를 만든다.
+    var AX_RE = /([A-Z])([0-9])([0-9]+)(?:([IS])([0-9]+))?/g;
+    var TRACE_MS = 5000;
+    var axes = {}, axOrder = [], rxRecent = [], lags = [];
+
+    function parseAxes(line) {
+        AX_RE.lastIndex = 0;
+        var out = [], m;
+        while ((m = AX_RE.exec(line)) !== null) {
+            var d = m[3];
+            if (d.length > 5) continue;
+            out.push({
+                ax: m[1] + m[2],
+                v:  parseInt(d, 10) / Math.pow(10, d.length),
+                ms: (m[4] === 'I') ? Math.min(9999, Math.max(1, parseInt(m[5], 10))) : 0
+            });
+        }
+        return out;
+    }
+
+    function curVal(s, now) {
+        if (!s) return null;
+        if (!s.ms) return s.v;
+        var k = (now - s.at) / s.ms;
+        if (k >= 1) return s.v;
+        if (k <= 0) return s.from;
+        return s.from + (s.v - s.from) * k;
+    }
+
+    function axEntry(ax) {
+        if (axes[ax]) return axes[ax];
+        var empty = $('ax-empty'); if (empty) empty.remove();
+        var row = document.createElement('div');
+        row.style.cssText = 'margin-bottom:12px;';
+        function side(name) {
+            return '<div class="ax-row">' +
+                     '<b style="width:26px;">' + (name === 'rx' ? ax : '') + '</b>' +
+                     '<span class="text-faint ax-lbl">' + (name === 'rx' ? '수신' : '송신') + '</span>' +
+                     '<div class="ax-track" style="flex:1;">' +
+                       '<span class="ax-fill ' + name + '"></span><span class="ax-tick ' + name + '"></span>' +
+                     '</div>' +
+                     '<span class="ax-num ' + name + '">—</span>' +
+                   '</div>';
+        }
+        row.innerHTML = side('rx') + side('tx') +
+            '<canvas class="ax-trace" width="600" height="42" ' +
+            'style="width:100%; height:42px; background:#000; border-radius:6px; margin-top:2px;"></canvas>';
+        $('ax-list').appendChild(row);
+        var e = {
+            rx: null, tx: null, trace: [],
+            fill: { rx: row.querySelector('.ax-fill.rx'), tx: row.querySelector('.ax-fill.tx') },
+            tick: { rx: row.querySelector('.ax-tick.rx'), tx: row.querySelector('.ax-tick.tx') },
+            num:  { rx: row.querySelector('.ax-num.rx'),  tx: row.querySelector('.ax-num.tx') },
+            cv: row.querySelector('.ax-trace')
+        };
+        axes[ax] = e; axOrder.push(ax);
+        return e;
+    }
+
+    function feedAxis(ev) {
+        if (!ev || (ev.dir !== 'in' && ev.dir !== 'out' && ev.dir !== 'relay')) return;
+        var list = parseAxes(ev.text);
+        var now = ev.ts || Date.now();
+        var k = (ev.dir === 'in') ? 'rx' : 'tx';
+        for (var i = 0; i < list.length; i++) {
+            var a = list[i], e = axEntry(a.ax), prev = e[k];
+            e[k] = { v: a.v, ms: a.ms, at: now, from: (prev != null) ? curVal(prev, now) : a.v };
+        }
+        // 수신 → 복사 지연: 복사는 수신 줄을 **그대로** 보내므로 같은 문자열을 거슬러 찾으면 된다
+        var txt = String(ev.text).trim();
+        if (ev.dir === 'in') {
+            rxRecent.push({ text: txt, ts: now });
+            if (rxRecent.length > 200) rxRecent.shift();
+        } else if (ev.dir === 'relay') {
+            for (var j = rxRecent.length - 1; j >= 0; j--) {
+                if (rxRecent[j].text === txt) {
+                    var d = now - rxRecent[j].ts;
+                    if (d >= 0 && d < 3000) { lags.push(d); if (lags.length > 100) lags.shift(); }
+                    break;
+                }
+            }
+        }
+    }
+
+    function drawTrace(e, now) {
+        var c = e.cv.getContext('2d'), w = e.cv.width, h = e.cv.height, tr = e.trace;
+        c.fillStyle = '#000'; c.fillRect(0, 0, w, h);
+        c.strokeStyle = 'rgba(255,255,255,.10)'; c.lineWidth = 1;
+        c.beginPath(); c.moveTo(0, h / 2); c.lineTo(w, h / 2); c.stroke();
+        // 수신을 굵게 **아래에** 깔고 송신을 가늘게 위에 그린다 —
+        // 그대로 전달되면 초록 선이 파란 띠 **안에** 들어앉아 "겹쳤다"가 한눈에 보이고,
+        // 어긋나면 파란 띠가 밖으로 비져나온다.
+        ['rx', 'tx'].forEach(function (k) {
+            c.beginPath(); c.strokeStyle = (k === 'rx') ? '#38bdf8' : '#4ade80';
+            c.lineWidth = (k === 'rx') ? 3.4 : 1.4;
+            var on = false;
+            for (var i = 0; i < tr.length; i++) {
+                var v = tr[i][k];
+                if (v == null) { on = false; continue; }
+                var x = w - (now - tr[i].t) / TRACE_MS * w;
+                var y = h - 3 - v * (h - 6);
+                if (!on) { c.moveTo(x, y); on = true; } else { c.lineTo(x, y); }
+            }
+            c.stroke();
+        });
+    }
+
+    function axTick() {
+        var now = Date.now();
+        for (var i = 0; i < axOrder.length; i++) {
+            var e = axes[axOrder[i]];
+            var v = { rx: curVal(e.rx, now), tx: curVal(e.tx, now) };
+            ['rx', 'tx'].forEach(function (k) {
+                if (v[k] == null) return;
+                e.fill[k].style.width = (v[k] * 100).toFixed(1) + '%';
+                e.tick[k].style.left  = (e[k].v * 100).toFixed(1) + '%';
+                e.num[k].textContent  = (v[k] * 100).toFixed(1) + '%';
+            });
+            e.trace.push({ t: now, rx: v.rx, tx: v.tx });
+            while (e.trace.length && now - e.trace[0].t > TRACE_MS) e.trace.shift();
+            drawTrace(e, now);
+        }
+        if (lags.length) {
+            var sum = 0, mx = 0;
+            for (var j = 0; j < lags.length; j++) { sum += lags[j]; if (lags[j] > mx) mx = lags[j]; }
+            $('ax-lag').textContent = '수신→복사 지연 평균 ' + Math.round(sum / lags.length) +
+                                      'ms · 최대 ' + mx + 'ms (' + lags.length + '건)';
+        }
+    }
+    // ⚠ requestAnimationFrame 을 쓰면 안 된다 — 탭이 가려지거나 화면이 합성되지 않는 상황에서
+    //   **아예 안 돈다**(여기서 실제로 한 번도 안 불렸다). 그러면 막대가 멈춘 채 거짓 상태를 보여준다.
+    //   setInterval 은 숨은 탭에서 느려질 뿐 멈추지 않는다.
+    setInterval(axTick, 33);
+
+    function resetAxes() {
+        axes = {}; axOrder = []; rxRecent = []; lags = [];
+        $('ax-list').innerHTML = '<div class="text-faint" id="ax-empty" style="font-size:12px; padding:6px 0;">' +
+            '아직 축 명령이 없습니다. 기기를 연결하거나 아래에서 <code>L050I500</code> 를 보내 보세요.</div>';
+        $('ax-lag').textContent = '수신→복사 지연 —';
+    }
+
     // ── 버튼 ──
     function guard(fn) {
         return async function () {
@@ -272,7 +451,10 @@
         $('b-pause').textContent = paused ? '▶ 계속' : '⏸ 멈춤';
         if (!paused) redraw();
     });
-    $('b-clear').addEventListener('click', function () { rows = []; logEl.textContent = ''; if (D.clearLog) D.clearLog(); });
+    $('b-clear').addEventListener('click', function () {
+        rows = []; logEl.textContent = ''; if (D.clearLog) D.clearLog();
+        resetAxes();
+    });
     document.querySelectorAll('#filters input').forEach(function (cb) { cb.addEventListener('change', redraw); });
 
     function asText() {
